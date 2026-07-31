@@ -34,6 +34,34 @@ At portfolio level it must also:
 
 The dashboard does not remove Facu's approval gate. It makes the reasoning and recommended order visible so that priorities can be defined deliberately and then executed consistently by the responsible team.
 
+## Delivery priority
+
+### P0 — correct Tab 1 structure
+
+The immediate goal is not to build the entire operating loop. It is to make the account cockpit structurally correct:
+
+- the right accounts and filters;
+- the right priority/context fields;
+- the right CONFIG → BUY → LIST → SELL sequence;
+- the right five-card drill-down;
+- complete, source-labeled evidence without losing scorecard metrics;
+- a clear bottleneck and next-action surface;
+- correct behavior by product type;
+- no misleading health labels or downstream conclusions when prerequisites are missing.
+
+Tab 1 must earn trust before the system expands into workflow tracking.
+
+### Later operating layer
+
+Once Tab 1 is trusted, the dashboard should support a two-week priority cycle:
+
+```text
+set next-two-week priorities → assign CS/Implementation owner → record conversation/action
+→ record what changed → capture result and learning → record blocker/escalation → review and reprioritize
+```
+
+That later layer needs explicit fields for owner, date, account objective, conversation, action, status, result, learning and blocker. Those fields are intentionally not treated as complete in P0; adding them must not destabilize the Tab 1 contract.
+
 Metrics are inputs to that loop. A tab, card or lead that does not help move the loop forward is informational, not operational, and must not be presented as a completed capability.
 
 ## Scope
