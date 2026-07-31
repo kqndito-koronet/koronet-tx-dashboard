@@ -62,6 +62,20 @@ set next-two-week priorities → assign CS/Implementation owner → record conve
 
 That later layer needs explicit fields for owner, date, account objective, conversation, action, status, result, learning and blocker. Those fields are intentionally not treated as complete in P0; adding them must not destabilize the Tab 1 contract.
 
+## Enablement is part of the operating product
+
+An opportunity is not operational merely because the dashboard detects it. For every approved opportunity, the system must eventually tell the team:
+
+- **which accounts** have the opportunity;
+- **why** it applies to that account and what evidence supports it;
+- **which prerequisite** (CONFIG, BUY, LIST or SELL) must be resolved first;
+- **who** should act (CS, Implementations, Product or another owner);
+- **what to say, check or do next**;
+- **what good execution looks like** and which metric or customer result confirms it;
+- **what to do when blocked**, including escalation or required data.
+
+For P0 Tab 1, the minimum enablement contract is: opportunity label, evidence, applicability by product type, bottleneck, owner/team and next action. The full playbook—talk track, discovery questions, process steps, examples, objection handling and success capture—is a subsequent layer built from approved lead definitions. No lead should be presented as ready for CS or Implementations without at least that minimum context.
+
 Metrics are inputs to that loop. A tab, card or lead that does not help move the loop forward is informational, not operational, and must not be presented as a completed capability.
 
 ## Scope
