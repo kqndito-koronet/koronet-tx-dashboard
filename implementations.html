@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TX Implementations Dashboard</title>
+<style>
+:root {
+  --bg: #f8fafc;
+  --bg-card: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --green: #059669;
+  --amber: #d97706;
+  --red: #dc2626;
+  --blue: #2563eb;
+  --muted: #64748b;
+  --bg-hover: #f1f5f9;
+  --bg-tag: #e2e8f0;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+}
+.header {
+  padding: 16px 24px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header h1 { font-size: 18px; font-weight: 700; }
+.header-links a {
+  font-size: 12px;
+  color: var(--blue);
+  text-decoration: none;
+  margin-left: 16px;
+}
+.header-links a:hover { text-decoration: underline; }
+.tabs {
+  display: flex;
+  gap: 0;
+  background: var(--bg-card);
+  border-bottom: 2px solid var(--border);
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.tab {
+  padding: 10px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+.tab-content { display: none; padding: 20px 24px; }
+.tab-content.active { display: block; }
+
+/* PIPELINE TAB — Kanban */
+.pipeline-summary {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.summary-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  min-width: 120px;
+}
+.summary-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.summary-card .value { font-size: 22px; font-weight: 700; margin-top: 2px; }
+.kanban {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.kanban-col {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-height: 200px;
+}
+.kanban-col-header {
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.kanban-col-header .count {
+  background: var(--bg-tag);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.kanban-cards { padding: 8px; }
+.kanban-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+  border-left: 3px solid var(--border);
+}
+.kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+.kanban-card.status-GREEN { border-left-color: var(--green); }
+.kanban-card.status-YELLOW { border-left-color: var(--amber); }
+.kanban-card.status-RED { border-left-color: var(--red); }
+.kanban-card .card-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+.kanban-card .card-meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+.kanban-card .card-meta span { display: inline-flex; align-items: center; gap: 3px; }
+.kanban-card .card-blocker { font-size: 11px; color: var(--red); margin-top: 4px; font-weight: 500; }
+.card-details {
+  display: none;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.card-details.open { display: block; }
+.card-details table { width: 100%; border-collapse: collapse; }
+.card-details td { padding: 2px 4px; }
+.card-details td:first-child { color: var(--muted); width: 100px; }
+.tag { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.tag-core { background: #dbeafe; color: #1e40af; }
+.tag-esuite { background: #fef3c7; color: #92400e; }
+.tag-k2k { background: #d1fae5; color: #065f46; }
+.tag-proc { background: #ede9fe; color: #5b21b6; }
+
+/* PARKED section */
+.parked-section {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.parked-header {
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--muted);
+}
+.parked-header:hover { color: var(--text); }
+.parked-body { display: none; padding: 8px 12px; }
+.parked-body.open { display: block; }
+
+/* CONFIG TAB */
+.config-summary {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+table.config-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+table.config-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+table.config-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+table.config-table tr:last-child td { border-bottom: none; }
+table.config-table tr:hover td { background: var(--bg-hover); }
+.check-yes { color: var(--green); font-weight: 700; }
+.check-no { color: var(--red); font-weight: 700; }
+.check-na { color: var(--muted); }
+
+/* OKR TAB */
+.okr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.okr-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 20px;
+}
+.okr-card h3 { font-size: 14px; margin-bottom: 4px; }
+.okr-card .okr-desc { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.progress-bar {
+  height: 8px;
+  background: var(--bg);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s;
+}
+.okr-value { font-size: 12px; color: var(--muted); }
+.okr-value strong { color: var(--text); }
+
+/* DEFINITIONS TAB */
+.def-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.def-section h3 {
+  padding: 10px 14px;
+  font-size: 13px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.def-section table { width: 100%; border-collapse: collapse; }
+.def-section td, .def-section th {
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.def-section tr:last-child td { border-bottom: none; }
+.def-section td:first-child { font-weight: 600; white-space: nowrap; width: 160px; color: var(--muted); }
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+  font-size: 14px;
+}
+@media (max-width: 900px) {
+  .kanban { grid-template-columns: 1fr; }
+  .okr-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>TX Implementations</h1>
+  <div class="header-links">
+    <a href="leadership.html">Leadership Dashboard</a>
+    <a href="cs.html">CS Dashboard</a>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="pipeline">Pipeline</div>
+  <div class="tab" data-tab="config">Config Checklist</div>
+  <div class="tab" data-tab="okr">OKR Tracking</div>
+  <div class="tab" data-tab="definitions">Definitions</div>
+</div>
+
+<div id="pipeline" class="tab-content active">
+  <div class="loading" id="pipeline-loading">Loading pipeline data...</div>
+</div>
+<div id="config" class="tab-content">
+  <div class="loading" id="config-loading">Loading config data...</div>
+</div>
+<div id="okr" class="tab-content">
+  <div class="loading" id="okr-loading">Loading OKR data...</div>
+</div>
+<div id="definitions" class="tab-content">
+  <div class="loading" id="def-loading">Loading definitions...</div>
+</div>
+
+<script>
+(function() {
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  const BASE = 'data/';
+  const TODAY = new Date();
+
+  function fetchJSON(file) {
+    return fetch(BASE + file).then(r => r.json());
+  }
+
+  function fmt(n) {
+    if (n == null) return '-';
+    if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return '$' + (n / 1e3).toFixed(1) + 'K';
+    return '$' + n.toLocaleString();
+  }
+
+  function pct(n) { return n != null ? n + '%' : '-'; }
+
+  function daysSince(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d)) return null;
+    return Math.floor((TODAY - d) / 86400000);
+  }
+
+  function typeTag(ctId) {
+    if (!ctId) return '';
+    const map = {
+      'WH_CORE': ['Core', 'tag-core'],
+      'WH_ESUITE': ['eSuite', 'tag-esuite'],
+      'WH_K2K': ['K2K', 'tag-k2k'],
+      'WH_PROC': ['Proc', 'tag-proc'],
+      'IMP_CORE': ['Imp Core', 'tag-core'],
+      'IMP_K2K': ['Imp K2K', 'tag-k2k'],
+      'K2K Only': ['K2K', 'tag-k2k'],
+    };
+    const m = map[ctId] || [ctId, ''];
+    return '<span class="tag ' + m[1] + '">' + m[0] + '</span>';
+  }
+
+  // Determine maxAge threshold based on type
+  function maxAgeThreshold(ctId) {
+    if (ctId === 'WH_CORE' || ctId === 'IMP_CORE') return 30;
+    return 10; // eSuite, K2K, etc.
+  }
+
+  Promise.all([
+    fetchJSON('accounts.json'),
+    fetchJSON('metrics.json'),
+    fetchJSON('config.json'),
+    fetchJSON('bunches.json'),
+    fetchJSON('christine.json'),
+    fetchJSON('definitions.json'),
+    fetchJSON('sfdc.json')
+  ]).then(([accountsArr, metrics, configData, bunches, christine, definitions, sfdc]) => {
+
+    // Build accounts lookup
+    const accountsById = {};
+    accountsArr.forEach(a => {
+      if (a.company_id) accountsById[a.company_id] = a;
+    });
+    // Also keep accounts without company_id for display
+    const noIdAccounts = accountsArr.filter(a => !a.company_id && a.priority_level === 'IMPL');
+
+    // Identify impl accounts: priority_level IMPL OR has entry in christine.json
+    const implIds = new Set();
+    accountsArr.forEach(a => {
+      if (a.priority_level === 'IMPL' && a.company_id) implIds.add(a.company_id);
+    });
+    Object.keys(christine).forEach(id => implIds.add(id));
+
+    // Build impl account objects with all data merged
+    const implAccounts = [];
+    implIds.forEach(id => {
+      const acct = accountsById[id] || { company_id: id, name: 'Unknown (' + id + ')', ct_id: 'UNKNOWN' };
+      const chr = christine[id] || {};
+      const met = metrics[id] || {};
+      const cfg = configData[id] || {};
+      const bch = bunches[id] || {};
+      implAccounts.push({
+        id: id,
+        name: acct.name || 'Unknown',
+        ct_id: acct.ct_id || chr.type || 'UNKNOWN',
+        priority_level: acct.priority_level || 'CHRISTINE',
+        go_live: acct.go_live,
+        has_eshops: acct.has_eshops,
+        has_procurement: acct.has_procurement,
+        is_esuite: acct.is_esuite,
+        system_type: acct.system_type || '',
+        annual_sales_est: acct.annual_sales_est,
+        // Christine data
+        chr_stage: chr.stage || null,
+        chr_type: chr.type || null,
+        chr_status: chr.status || null,
+        chr_days_live: chr.days_live || null,
+        chr_proc_pct: chr.proc_pct || null,
+        chr_sales_pct: chr.sales_pct || null,
+        chr_pay_pct: chr.pay_pct || null,
+        chr_ora: chr.ora || null,
+        chr_note: chr.note || null,
+        // Metrics
+        proc_online: met.proc_online || 0,
+        proc_total: met.proc_total || 0,
+        online_pct: met.online_pct || 0,
+        fees_total: met.fees_total || 0,
+        k2k_active: met.k2k_active || 0,
+        k2k_total: met.k2k_total || 0,
+        sell_online: met.sell_online || 0,
+        sell_total: met.sell_total || 0,
+        buy_stage: met.buy_stage || '-',
+        sell_stage: met.sell_stage || '-',
+        // Config
+        max_age: cfg.max_age,
+        future: cfg.future || false,
+        bunches_flag: cfg.bunches_flag || false,
+        on_hand: cfg.on_hand || false,
+        audited: cfg.audited || false,
+        // Bunches
+        sells_bunches: bch.sells_bunches || false,
+        bunch_discrepancy: bch.discrepancy || false,
+      });
+    });
+
+    // Also add no-ID IMPL accounts
+    noIdAccounts.forEach(a => {
+      implAccounts.push({
+        id: null,
+        name: a.name,
+        ct_id: a.ct_id || 'UNKNOWN',
+        priority_level: 'IMPL',
+        go_live: null,
+        chr_stage: null, chr_type: null, chr_status: null,
+        chr_days_live: null, chr_proc_pct: null, chr_sales_pct: null, chr_pay_pct: null,
+        chr_ora: null, chr_note: a.note || null,
+        proc_online: 0, proc_total: 0, online_pct: 0, fees_total: 0,
+        k2k_active: 0, k2k_total: 0, sell_online: 0, sell_total: 0,
+        buy_stage: '-', sell_stage: '-',
+        max_age: null, future: false, bunches_flag: false, on_hand: false, audited: false,
+        sells_bunches: false, bunch_discrepancy: false,
+      });
+    });
+
+    // Map stages for pipeline
+    function resolveStage(acct) {
+      // Christine stage takes priority
+      if (acct.chr_stage) {
+        const s = acct.chr_stage;
+        if (s === 'PARKED') return 'PARKED';
+        if (s === 'Not Started') return 'Not Started';
+        if (s === 'Kickoff') return 'Kickoff';
+        if (s === 'Training') return 'Training';
+        if (s === 'Go-Live' || s === 'Pre-Go-Live') return 'Go-Live';
+        return s;
+      }
+      // Infer from data
+      if (!acct.go_live && acct.proc_total === 0 && acct.k2k_total === 0) return 'Not Started';
+      if (acct.go_live) return 'Go-Live';
+      return 'Not Started';
+    }
+
+    // Determine blocker
+    function getBlocker(acct) {
+      if (acct.chr_note) return acct.chr_note;
+      if (acct.id === null) return 'No company_id in Snowflake';
+      if (acct.chr_status === 'RED') return 'RED status';
+      return null;
+    }
+
+    // Build pipeline columns
+    const columns = {
+      'Not Started': [],
+      'Kickoff': [],
+      'Training': [],
+      'Go-Live': [],
+      'PARKED': []
+    };
+
+    implAccounts.forEach(acct => {
+      const stage = resolveStage(acct);
+      if (columns[stage]) {
+        columns[stage].push(acct);
+      } else {
+        columns['Go-Live'].push(acct); // fallback
+      }
+    });
+
+    // =====================
+    // TAB 1: PIPELINE
+    // =====================
+    const totalImpl = implAccounts.length;
+    const liveCount = columns['Go-Live'].length + columns['Training'].length;
+    const parkedCount = columns['PARKED'].length;
+
+    let pipelineHTML = '<div class="pipeline-summary">';
+    pipelineHTML += '<div class="summary-card"><div class="label">Total Impls</div><div class="value">' + totalImpl + '</div></div>';
+    pipelineHTML += '<div class="summary-card"><div class="label">In Progress</div><div class="value">' + (totalImpl - parkedCount - columns['Not Started'].length) + '</div></div>';
+    pipelineHTML += '<div class="summary-card"><div class="label">Go-Live / Training</div><div class="value">' + liveCount + '</div></div>';
+    pipelineHTML += '<div class="summary-card"><div class="label">Parked</div><div class="value">' + parkedCount + '</div></div>';
+    pipelineHTML += '</div>';
+
+    function renderCard(acct) {
+      const statusClass = acct.chr_status ? 'status-' + acct.chr_status : '';
+      const blocker = getBlocker(acct);
+      const daysLive = acct.chr_days_live || daysSince(acct.go_live);
+      const daysLabel = daysLive != null ? daysLive + 'd' : '';
+      let html = '<div class="kanban-card ' + statusClass + '" onclick="this.querySelector(\'.card-details\').classList.toggle(\'open\')">';
+      html += '<div class="card-name">' + acct.name + '</div>';
+      html += '<div class="card-meta">';
+      if (acct.id) html += '<span>CT:' + acct.id + '</span>';
+      html += '<span>' + typeTag(acct.chr_type || acct.ct_id) + '</span>';
+      if (daysLabel) html += '<span>' + daysLabel + ' live</span>';
+      if (acct.chr_status) html += '<span style="color:' + (acct.chr_status === 'GREEN' ? 'var(--green)' : acct.chr_status === 'YELLOW' ? 'var(--amber)' : 'var(--red)') + ';font-weight:600">' + acct.chr_status + '</span>';
+      html += '</div>';
+      if (blocker) html += '<div class="card-blocker">Blocker: ' + blocker + '</div>';
+      // Expandable details
+      html += '<div class="card-details">';
+      html += '<table>';
+      if (acct.chr_proc_pct != null) html += '<tr><td>Proc %</td><td>' + acct.chr_proc_pct + '%</td></tr>';
+      if (acct.chr_sales_pct != null) html += '<tr><td>Sales %</td><td>' + acct.chr_sales_pct + '%</td></tr>';
+      if (acct.chr_pay_pct != null) html += '<tr><td>Pay %</td><td>' + acct.chr_pay_pct + '%</td></tr>';
+      if (acct.chr_ora != null) html += '<tr><td>ORA</td><td>' + fmt(acct.chr_ora) + '</td></tr>';
+      html += '<tr><td>Online %</td><td>' + pct(acct.online_pct) + '</td></tr>';
+      html += '<tr><td>Fees (YTD)</td><td>' + fmt(acct.fees_total) + '</td></tr>';
+      html += '<tr><td>K2K</td><td>' + acct.k2k_active + ' / ' + acct.k2k_total + '</td></tr>';
+      html += '<tr><td>BUY stage</td><td>' + acct.buy_stage + '</td></tr>';
+      html += '<tr><td>SELL stage</td><td>' + acct.sell_stage + '</td></tr>';
+      // Config checklist inline
+      const maThresh = maxAgeThreshold(acct.ct_id);
+      const maOk = acct.max_age != null && acct.max_age >= maThresh;
+      html += '<tr><td colspan="2" style="font-weight:600;padding-top:6px;color:var(--muted)">CONFIG</td></tr>';
+      html += '<tr><td>MaxAge</td><td>' + (acct.max_age != null ? acct.max_age + 'd ' + (maOk ? '<span class="check-yes">OK</span>' : '<span class="check-no">LOW</span>') : '<span class="check-na">N/A</span>') + '</td></tr>';
+      html += '<tr><td>Bunches</td><td>' + (acct.bunches_flag ? '<span class="check-yes">ON</span>' : '<span class="check-no">OFF</span>') + '</td></tr>';
+      html += '<tr><td>Future</td><td>' + (acct.future ? '<span class="check-yes">ON</span>' : '<span class="check-no">OFF</span>') + '</td></tr>';
+      html += '<tr><td>On-Hand</td><td>' + (acct.on_hand ? '<span class="check-yes">ON</span>' : '<span class="check-no">OFF</span>') + '</td></tr>';
+      html += '<tr><td>Audited</td><td>' + (acct.audited ? '<span class="check-yes">Yes</span>' : '<span class="check-no">No</span>') + '</td></tr>';
+      // Readiness
+      const isCore = acct.ct_id === 'WH_CORE' || acct.ct_id === 'IMP_CORE';
+      const configGood = maOk && acct.bunches_flag && (!isCore || acct.future);
+      html += '<tr><td>Readiness</td><td>' + (configGood ? '<span class="check-yes">READY</span>' : '<span class="check-no">NOT READY</span>') + '</td></tr>';
+      html += '</table></div>';
+      html += '</div>';
+      return html;
+    }
+
+    // Render kanban columns (not PARKED)
+    pipelineHTML += '<div class="kanban">';
+    ['Not Started', 'Kickoff', 'Training', 'Go-Live'].forEach(stage => {
+      const items = columns[stage];
+      pipelineHTML += '<div class="kanban-col">';
+      pipelineHTML += '<div class="kanban-col-header"><span>' + stage + '</span><span class="count">' + items.length + '</span></div>';
+      pipelineHTML += '<div class="kanban-cards">';
+      items.forEach(acct => { pipelineHTML += renderCard(acct); });
+      if (items.length === 0) pipelineHTML += '<div style="text-align:center;color:var(--muted);padding:20px;font-size:12px">No accounts</div>';
+      pipelineHTML += '</div></div>';
+    });
+    pipelineHTML += '</div>';
+
+    // PARKED section (collapsed)
+    if (columns['PARKED'].length > 0) {
+      pipelineHTML += '<div class="parked-section">';
+      pipelineHTML += '<div class="parked-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><span>PARKED (' + columns['PARKED'].length + ')</span><span>&#9660;</span></div>';
+      pipelineHTML += '<div class="parked-body">';
+      columns['PARKED'].forEach(acct => { pipelineHTML += renderCard(acct); });
+      pipelineHTML += '</div></div>';
+    }
+
+    document.getElementById('pipeline').innerHTML = pipelineHTML;
+
+    // =====================
+    // TAB 2: CONFIG CHECKLIST
+    // =====================
+    // Build objective columns from definitions.json config_objectives
+    const objKeys = Object.keys(definitions.config_objectives);
+    const objectives = objKeys.map(k => {
+      const o = definitions.config_objectives[k];
+      return { key: k, setting: o.setting, question: o.question, desc: o.desc, if_wrong: o.if_wrong, fix: o.fix, tx_impact: o.tx_impact, applies_to: o.applies_to };
+    });
+
+    // Map each objective to a check function using available config.json + accounts data
+    function checkObjective(objKey, acct) {
+      // Returns { ok: bool|null, na: bool, value: string }
+      // null ok = unknown/no data
+      const isCore = acct.ct_id === 'WH_CORE' || acct.ct_id === 'IMP_CORE';
+      const isESuite = acct.ct_id === 'WH_ESUITE';
+      const isK2K = acct.ct_id === 'WH_K2K';
+      switch(objKey) {
+        case 'gate_eshop':
+          // Use has_eshops from accounts.json as proxy
+          if (acct.has_eshops != null) return { ok: acct.has_eshops, na: false, value: acct.has_eshops ? 'ON' : 'OFF' };
+          return { ok: null, na: false, value: '?' };
+        case 'can_show_inventory':
+          if (acct.max_age == null) return { ok: null, na: false, value: '?' };
+          var thresh = maxAgeThreshold(acct.ct_id);
+          return { ok: acct.max_age >= thresh, na: false, value: acct.max_age + 'd' };
+        case 'can_show_future':
+          if (!isCore) return { ok: null, na: true, value: 'N/A' };
+          return { ok: acct.future, na: false, value: acct.future ? 'ON' : 'OFF' };
+        case 'can_sell_bunches':
+          if (!isCore && !isESuite) return { ok: null, na: true, value: 'N/A' };
+          return { ok: acct.bunches_flag, na: false, value: acct.bunches_flag ? 'ON' : 'OFF' };
+        case 'checkout_works':
+          // No data in config.json for this
+          return { ok: null, na: false, value: '?' };
+        case 'sold_as_future':
+          if (!isCore) return { ok: null, na: true, value: 'N/A' };
+          // No direct data — only audited accounts would know
+          return { ok: null, na: false, value: '?' };
+        case 'vendor_availability':
+          // No direct data in config.json
+          return { ok: null, na: false, value: '?' };
+        default:
+          return { ok: null, na: false, value: '?' };
+      }
+    }
+
+    let fullyConfigured = 0;
+    let configHTML = '';
+
+    // Filter to impl accounts with IDs, sort: not fully configured first
+    const configAccounts = implAccounts.filter(a => a.id != null).sort((a, b) => {
+      // Count known-good objectives for sorting
+      function goodCount(acct) {
+        let g = 0;
+        objKeys.forEach(k => {
+          const obj = definitions.config_objectives[k];
+          const applies = obj.applies_to.some(t => acct.ct_id === t || (acct.ct_id === 'IMP_CORE' && t === 'WH_CORE'));
+          if (!applies) return;
+          const r = checkObjective(k, acct);
+          if (r.ok === true) g++;
+        });
+        return g;
+      }
+      const ga = goodCount(a), gb = goodCount(b);
+      if (ga !== gb) return ga - gb; // fewer good = first (needs attention)
+      return a.name.localeCompare(b.name);
+    });
+
+    // Impact badge helper
+    function impactBadge(impact) {
+      if (impact === 'MUST HAVE') return '<span style="display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:700;margin-left:4px">MUST</span>';
+      if (impact === 'MUST HAVE (non-zero)') return '<span style="display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:700;margin-left:4px">MUST</span>';
+      if (impact === 'SHOULD HAVE') return '<span style="display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:#fef3c7;color:#92400e;font-weight:700;margin-left:4px">SHOULD</span>';
+      return '';
+    }
+
+    let tableRows = '';
+    configAccounts.forEach(acct => {
+      // Count applicable objectives that are OK to determine "fully configured"
+      let applicableCount = 0, okCount = 0;
+      objKeys.forEach(k => {
+        const obj = definitions.config_objectives[k];
+        const applies = obj.applies_to.some(t => acct.ct_id === t || (acct.ct_id === 'IMP_CORE' && t === 'WH_CORE'));
+        if (!applies) return;
+        applicableCount++;
+        const r = checkObjective(k, acct);
+        if (r.ok === true) okCount++;
+      });
+      // Fully configured = all known applicable objectives are OK (excluding unknowns)
+      let knownApplicable = 0, knownOk = 0;
+      objKeys.forEach(k => {
+        const obj = definitions.config_objectives[k];
+        const applies = obj.applies_to.some(t => acct.ct_id === t || (acct.ct_id === 'IMP_CORE' && t === 'WH_CORE'));
+        if (!applies) return;
+        const r = checkObjective(k, acct);
+        if (r.ok !== null && !r.na) { knownApplicable++; if (r.ok) knownOk++; }
+      });
+      if (knownApplicable > 0 && knownOk === knownApplicable) fullyConfigured++;
+
+      tableRows += '<tr>';
+      tableRows += '<td style="font-weight:600;white-space:nowrap">' + acct.name + '</td>';
+      tableRows += '<td>' + typeTag(acct.chr_type || acct.ct_id) + '</td>';
+
+      objKeys.forEach(k => {
+        const obj = definitions.config_objectives[k];
+        const applies = obj.applies_to.some(t => acct.ct_id === t || (acct.ct_id === 'IMP_CORE' && t === 'WH_CORE'));
+        const r = checkObjective(k, acct);
+        if (!applies || r.na) {
+          tableRows += '<td class="check-na" style="text-align:center">-</td>';
+        } else if (r.ok === true) {
+          tableRows += '<td class="check-yes" style="text-align:center" title="' + r.value + '">&#10003;</td>';
+        } else if (r.ok === false) {
+          tableRows += '<td class="check-no" style="text-align:center" title="' + obj.if_wrong.replace(/"/g, '&quot;') + '">&#10007; <span style="font-size:10px;color:var(--muted)">' + r.value + '</span></td>';
+        } else {
+          tableRows += '<td style="text-align:center;color:var(--muted)" title="No data available">?</td>';
+        }
+      });
+      tableRows += '</tr>';
+    });
+
+    configHTML += '<div class="config-summary">' + fullyConfigured + ' of ' + configAccounts.length + ' fully configured (across verifiable settings)</div>';
+    configHTML += '<div style="overflow-x:auto">';
+    configHTML += '<table class="config-table">';
+    configHTML += '<thead><tr><th>Account</th><th>Type</th>';
+    objectives.forEach(obj => {
+      configHTML += '<th style="text-align:center;min-width:80px" title="' + obj.question + ' &#10;&#10;If wrong: ' + obj.if_wrong.replace(/"/g, '&quot;') + '">';
+      // Short label from setting name
+      var shortLabel = obj.setting.split('(')[0].split('+')[0].trim();
+      if (shortLabel.length > 14) shortLabel = shortLabel.substring(0, 12) + '...';
+      configHTML += shortLabel + impactBadge(obj.tx_impact) + '</th>';
+    });
+    configHTML += '</tr></thead>';
+    configHTML += '<tbody>' + tableRows + '</tbody>';
+    configHTML += '</table></div>';
+
+    // Legend
+    configHTML += '<div style="margin-top:12px;font-size:11px;color:var(--muted)">';
+    configHTML += '<span class="check-yes">&#10003;</span> = Configured &nbsp;&nbsp;';
+    configHTML += '<span class="check-no">&#10007;</span> = Not configured (hover for impact) &nbsp;&nbsp;';
+    configHTML += '<span style="color:var(--muted)">?</span> = No data &nbsp;&nbsp;';
+    configHTML += '<span style="color:var(--muted)">-</span> = Not applicable to this product type &nbsp;&nbsp;';
+    configHTML += '<span style="display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:#fee2e2;color:#991b1b;font-weight:700">MUST</span> = Must Have &nbsp;&nbsp;';
+    configHTML += '<span style="display:inline-block;font-size:9px;padding:1px 4px;border-radius:3px;background:#fef3c7;color:#92400e;font-weight:700">SHOULD</span> = Should Have';
+    configHTML += '</div>';
+
+    document.getElementById('config').innerHTML = configHTML;
+
+    // =====================
+    // TAB 3: OKR TRACKING
+    // =====================
+    // KR1: Impl speed <60 days (avg days in impl for Go-Live + Training accounts)
+    const liveAccounts = [...columns['Go-Live'], ...columns['Training']].filter(a => a.go_live || a.chr_days_live);
+    let totalDays = 0, daysCount = 0;
+    liveAccounts.forEach(a => {
+      const d = a.chr_days_live || daysSince(a.go_live);
+      if (d != null) { totalDays += d; daysCount++; }
+    });
+    const avgDays = daysCount > 0 ? Math.round(totalDays / daysCount) : 0;
+    const kr1Pct = daysCount > 0 ? Math.max(0, Math.min(100, Math.round((1 - (avgDays - 60) / 60) * 100))) : 0;
+    const kr1Color = avgDays <= 60 ? 'var(--green)' : avgDays <= 90 ? 'var(--amber)' : 'var(--red)';
+
+    // KR2: >10% online in 90 days (among live accounts with 90+ days)
+    const mature = implAccounts.filter(a => {
+      const d = a.chr_days_live || daysSince(a.go_live);
+      return d != null && d >= 90;
+    });
+    const matureOnline = mature.filter(a => a.online_pct >= 10);
+    const kr2Pct = mature.length > 0 ? Math.round((matureOnline.length / mature.length) * 100) : 0;
+    const kr2Color = kr2Pct >= 80 ? 'var(--green)' : kr2Pct >= 50 ? 'var(--amber)' : 'var(--red)';
+
+    // KR3: 100% config
+    const kr3Pct = configAccounts.length > 0 ? Math.round((fullyConfigured / configAccounts.length) * 100) : 0;
+    const kr3Color = kr3Pct >= 80 ? 'var(--green)' : kr3Pct >= 50 ? 'var(--amber)' : 'var(--red)';
+
+    // KR4: >50% procurement in 60 days (among live accounts with 60+ days)
+    const procMature = implAccounts.filter(a => {
+      const d = a.chr_days_live || daysSince(a.go_live);
+      return d != null && d >= 60 && a.proc_total > 0;
+    });
+    const procHit = procMature.filter(a => a.proc_online > 0 && (a.proc_online / a.proc_total) >= 0.5);
+    const kr4Pct = procMature.length > 0 ? Math.round((procHit.length / procMature.length) * 100) : 0;
+    const kr4Color = kr4Pct >= 80 ? 'var(--green)' : kr4Pct >= 50 ? 'var(--amber)' : 'var(--red)';
+
+    let okrHTML = '<div class="okr-grid">';
+
+    okrHTML += '<div class="okr-card"><h3>KR1: Impl Speed</h3>';
+    okrHTML += '<div class="okr-desc">Target: average time to go-live &lt;60 days</div>';
+    okrHTML += '<div class="progress-bar"><div class="progress-fill" style="width:' + Math.min(100, kr1Pct) + '%;background:' + kr1Color + '"></div></div>';
+    okrHTML += '<div class="okr-value">Average: <strong>' + avgDays + ' days</strong> across ' + daysCount + ' live accounts</div></div>';
+
+    okrHTML += '<div class="okr-card"><h3>KR2: Online Adoption</h3>';
+    okrHTML += '<div class="okr-desc">Target: &gt;10% online sales within 90 days of go-live</div>';
+    okrHTML += '<div class="progress-bar"><div class="progress-fill" style="width:' + kr2Pct + '%;background:' + kr2Color + '"></div></div>';
+    okrHTML += '<div class="okr-value"><strong>' + matureOnline.length + ' / ' + mature.length + '</strong> mature accounts hitting &gt;10% (' + kr2Pct + '%)</div></div>';
+
+    okrHTML += '<div class="okr-card"><h3>KR3: Config Completion</h3>';
+    okrHTML += '<div class="okr-desc">Target: 100% of impl accounts fully configured</div>';
+    okrHTML += '<div class="progress-bar"><div class="progress-fill" style="width:' + kr3Pct + '%;background:' + kr3Color + '"></div></div>';
+    okrHTML += '<div class="okr-value"><strong>' + fullyConfigured + ' / ' + configAccounts.length + '</strong> fully configured (' + kr3Pct + '%)</div></div>';
+
+    okrHTML += '<div class="okr-card"><h3>KR4: Procurement Adoption</h3>';
+    okrHTML += '<div class="okr-desc">Target: &gt;50% procurement online within 60 days</div>';
+    okrHTML += '<div class="progress-bar"><div class="progress-fill" style="width:' + kr4Pct + '%;background:' + kr4Color + '"></div></div>';
+    okrHTML += '<div class="okr-value"><strong>' + procHit.length + ' / ' + procMature.length + '</strong> hitting &gt;50% online procurement (' + kr4Pct + '%)</div></div>';
+
+    okrHTML += '</div>';
+
+    // Per-account detail table from christine.json
+    const chrAccounts = implAccounts.filter(a => a.chr_days_live != null || a.chr_proc_pct != null || a.chr_sales_pct != null);
+    if (chrAccounts.length > 0) {
+      okrHTML += '<h3 style="margin-top:24px;margin-bottom:8px;font-size:14px">Account-Level Progress (from Christine tracker)</h3>';
+      okrHTML += '<div style="overflow-x:auto"><table class="config-table">';
+      okrHTML += '<thead><tr><th>Account</th><th>Type</th><th>Stage</th><th>Status</th><th>Days Live</th><th>Proc %</th><th>Sales %</th><th>Pay %</th><th>ORA</th><th>Note</th></tr></thead>';
+      okrHTML += '<tbody>';
+      chrAccounts.sort((a, b) => {
+        // Sort by status severity (RED first), then by name
+        const statusOrder = { 'RED': 0, 'YELLOW': 1, 'GREEN': 2 };
+        const sa = statusOrder[a.chr_status] != null ? statusOrder[a.chr_status] : 3;
+        const sb = statusOrder[b.chr_status] != null ? statusOrder[b.chr_status] : 3;
+        if (sa !== sb) return sa - sb;
+        return a.name.localeCompare(b.name);
+      }).forEach(acct => {
+        const statusColor = acct.chr_status === 'GREEN' ? 'var(--green)' : acct.chr_status === 'YELLOW' ? 'var(--amber)' : acct.chr_status === 'RED' ? 'var(--red)' : 'var(--muted)';
+        okrHTML += '<tr>';
+        okrHTML += '<td style="font-weight:600;white-space:nowrap">' + acct.name + '</td>';
+        okrHTML += '<td>' + typeTag(acct.chr_type || acct.ct_id) + '</td>';
+        okrHTML += '<td>' + (acct.chr_stage || '-') + '</td>';
+        okrHTML += '<td style="color:' + statusColor + ';font-weight:600">' + (acct.chr_status || '-') + '</td>';
+        okrHTML += '<td style="text-align:right">' + (acct.chr_days_live != null ? acct.chr_days_live + 'd' : '-') + '</td>';
+        okrHTML += '<td style="text-align:right">' + (acct.chr_proc_pct != null ? acct.chr_proc_pct + '%' : '-') + '</td>';
+        okrHTML += '<td style="text-align:right">' + (acct.chr_sales_pct != null ? acct.chr_sales_pct + '%' : '-') + '</td>';
+        okrHTML += '<td style="text-align:right">' + (acct.chr_pay_pct != null ? acct.chr_pay_pct + '%' : '-') + '</td>';
+        okrHTML += '<td style="text-align:right">' + (acct.chr_ora != null ? fmt(acct.chr_ora) : '-') + '</td>';
+        okrHTML += '<td style="font-size:11px;color:var(--muted)">' + (acct.chr_note || '') + '</td>';
+        okrHTML += '</tr>';
+      });
+      okrHTML += '</tbody></table></div>';
+    }
+
+    document.getElementById('okr').innerHTML = okrHTML;
+
+    // =====================
+    // TAB 4: DEFINITIONS
+    // =====================
+    let defHTML = '';
+
+    // Product Types
+    defHTML += '<div class="def-section"><h3>Product Types</h3><table>';
+    Object.entries(definitions.product_types).forEach(([key, val]) => {
+      defHTML += '<tr><td>' + val.display + '</td><td>' + val.desc;
+      if (val.examples) defHTML += '<br><span style="color:var(--muted)">e.g. ' + val.examples + '</span>';
+      defHTML += '</td></tr>';
+    });
+    defHTML += '</table></div>';
+
+    // Config Objectives
+    defHTML += '<div class="def-section"><h3>Config Objectives</h3><table>';
+    Object.entries(definitions.config_objectives).forEach(([key, val]) => {
+      defHTML += '<tr><td>' + val.setting + '</td><td><strong>' + val.question + '</strong><br>' + val.desc;
+      defHTML += '<br><span style="color:var(--green)">Fix: ' + val.fix + '</span>';
+      defHTML += '<br><span style="color:var(--muted)">Applies to: ' + val.applies_to.join(', ') + '</span>';
+      defHTML += '</td></tr>';
+    });
+    defHTML += '</table></div>';
+
+    // Abbreviations
+    defHTML += '<div class="def-section"><h3>Abbreviations</h3><table>';
+    Object.entries(definitions.abbreviations).forEach(([key, val]) => {
+      defHTML += '<tr><td>' + key + '</td><td>' + val + '</td></tr>';
+    });
+    defHTML += '</table></div>';
+
+    // Trust Journey
+    defHTML += '<div class="def-section"><h3>Trust Journey</h3><table>';
+    definitions.trust_journey.forEach(step => {
+      defHTML += '<tr><td>Step ' + step.step + ': ' + step.name + '</td><td><strong>' + step.desc + '</strong><br>' + step.action + '</td></tr>';
+    });
+    defHTML += '</table></div>';
+
+    // LIST Challenger
+    defHTML += '<div class="def-section"><h3>LIST Challenger Talk Track</h3><table>';
+    definitions.list_challenger.forEach((line, i) => {
+      defHTML += '<tr><td>' + (i + 1) + '</td><td>' + line + '</td></tr>';
+    });
+    defHTML += '</table></div>';
+
+    // BUY Discovery
+    defHTML += '<div class="def-section"><h3>BUY Discovery Questions</h3><table>';
+    definitions.buy_discovery.forEach((line, i) => {
+      defHTML += '<tr><td>' + (i + 1) + '</td><td>' + line + '</td></tr>';
+    });
+    defHTML += '</table></div>';
+
+    document.getElementById('definitions').innerHTML = defHTML;
+
+  }).catch(err => {
+    console.error('Data load error:', err);
+    document.querySelectorAll('.loading').forEach(el => {
+      el.textContent = 'Error loading data: ' + err.message;
+      el.style.color = 'var(--red)';
+    });
+  });
+})();
+</script>
+</body>
+</html>

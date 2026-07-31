@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TX Dashboard - Leadership</title>
+<style>
+:root {
+  --bg: #f8fafc; --bg-card: #ffffff; --border: #e2e8f0; --text: #1e293b;
+  --green: #059669; --amber: #d97706; --red: #dc2626; --blue: #2563eb;
+  --text-muted: #64748b; --bg-hover: #f1f5f9; --bg-active: #e2e8f0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:13px; background:var(--bg); color:var(--text); line-height:1.5; }
+
+/* NAV */
+.nav { display:flex; align-items:center; gap:16px; padding:12px 24px; background:var(--bg-card); border-bottom:1px solid var(--border); }
+.nav-title { font-weight:700; font-size:15px; }
+.nav-links { display:flex; gap:8px; margin-left:auto; }
+.nav-links a { font-size:12px; color:var(--blue); text-decoration:none; padding:4px 10px; border:1px solid var(--border); border-radius:4px; }
+.nav-links a:hover { background:var(--bg-hover); }
+
+/* TABS */
+.tabs { display:flex; gap:0; padding:0 24px; background:var(--bg-card); border-bottom:2px solid var(--border); }
+.tab { padding:10px 20px; cursor:pointer; font-size:13px; font-weight:600; border-bottom:2px solid transparent; color:var(--text-muted); margin-bottom:-2px; transition:all 0.15s; user-select:none; }
+.tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.tab:hover { color:var(--text); background:var(--bg-hover); }
+.tab-content { display:none; padding:16px 24px; }
+.tab-content.active { display:block; }
+
+/* FILTERS */
+.filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; padding:10px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; }
+.filters select, .filters input[type="text"] { font-size:12px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); outline:none; }
+.filters input[type="text"] { width:220px; }
+.filters input[type="text"]:focus { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+.filters label { font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; }
+.filters label input[type="checkbox"] { cursor:pointer; }
+.filter-count { font-size:11px; color:var(--text-muted); margin-left:auto; }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { background:#f1f5f9; padding:8px 10px; text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); border-bottom:2px solid var(--border); white-space:nowrap; cursor:pointer; user-select:none; }
+th:hover { background:var(--bg-active); }
+th .sort-arrow { font-size:10px; margin-left:3px; opacity:0.4; }
+th.sorted .sort-arrow { opacity:1; color:var(--blue); }
+td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+tr:hover { background:var(--bg-hover); }
+tr.total-row { background:#f1f5f9; font-weight:700; border-top:2px solid var(--border); }
+tr.total-row:hover { background:#f1f5f9; }
+tr.eco-row { opacity:0.6; }
+tr.eco-row:hover { opacity:1; }
+
+/* EXPAND */
+.expand-btn { cursor:pointer; font-size:11px; color:var(--text-muted); width:20px; text-align:center; transition:transform 0.15s; display:inline-block; }
+.expand-btn.open { transform:rotate(90deg); }
+.expand-row { display:none; }
+.expand-row.open { display:table-row; }
+.expand-cell { padding:12px 16px 12px 36px; background:#fafbfc; border-bottom:1px solid var(--border); }
+.expand-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; }
+.expand-section { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
+.expand-section h4 { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:6px; }
+.expand-section .detail-row { display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+.expand-section .detail-label { color:var(--text-muted); }
+
+/* BADGES */
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; letter-spacing:0.3px; }
+.badge-TA { background:#fecaca; color:#991b1b; }
+.badge-IMPL { background:#fef3c7; color:#92400e; }
+.badge-P1 { background:#dcfce7; color:#166534; }
+.badge-CS_P2 { background:#e0e7ff; color:#3730a3; }
+.badge-WATCH { background:#f1f5f9; color:#475569; }
+.badge-ECOSYSTEM { background:#f5f3ff; color:#6d28d9; }
+.badge-CS_TRACKED { background:#fce7f3; color:#9d174d; }
+.badge-Multiloc { background:#fff7ed; color:#9a3412; }
+.badge-ct { background:#f1f5f9; color:var(--text-muted); font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--border); }
+
+/* PRODUCT BADGES */
+.prod-badge { display:inline-block; padding:1px 5px; border-radius:3px; font-size:9px; font-weight:700; letter-spacing:0.3px; margin-right:2px; }
+.prod-WH_CORE { background:#dbeafe; color:#1e40af; }
+.prod-WH_ESUITE { background:#e0e7ff; color:#3730a3; }
+.prod-WH_K2K { background:#fef3c7; color:#92400e; }
+.prod-WH_PROC { background:#dcfce7; color:#166534; }
+.prod-IMP_CORE { background:#fce7f3; color:#9d174d; }
+.prod-IMP_K2K { background:#fff7ed; color:#9a3412; }
+.prod-other { background:#f1f5f9; color:#475569; }
+
+/* CONFIG INLINE */
+.cfg-ok { color:var(--green); font-weight:600; font-size:11px; }
+.cfg-fail { color:var(--red); font-weight:600; font-size:11px; }
+.cfg-cell { font-size:10px; line-height:1.6; white-space:nowrap; }
+
+/* INLINE DATA CELLS */
+.data-cell { font-size:11px; line-height:1.5; white-space:nowrap; }
+.data-label { color:var(--text-muted); font-size:10px; }
+.data-val { font-weight:600; }
+
+/* OPP COUNT */
+.opp-count { display:inline-block; min-width:18px; text-align:center; padding:1px 5px; border-radius:10px; font-size:10px; font-weight:700; }
+.opp-count.has-opps { background:#fef3c7; color:#92400e; }
+.opp-count.no-opps { background:#f1f5f9; color:#94a3b8; }
+
+/* METRICS GRID */
+.metrics-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:20px; }
+.metric-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:14px 16px; }
+.metric-card .metric-label { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:4px; }
+.metric-card .metric-value { font-size:22px; font-weight:700; color:var(--text); }
+.metric-card .metric-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
+
+/* SECTION HEADERS */
+.section-header { font-size:15px; font-weight:700; margin:20px 0 10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.section-header:first-child { margin-top:0; }
+
+/* QW / OPP CARDS */
+.qw-list { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:8px; }
+.qw-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:10px 14px; }
+.qw-card .qw-name { font-weight:600; font-size:13px; }
+.qw-card .qw-issue { font-size:12px; color:var(--red); margin-top:2px; }
+.qw-card .qw-impact { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.opp-list { display:flex; flex-direction:column; gap:8px; }
+.opp-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+.opp-card:hover { border-color:var(--blue); }
+.opp-name { font-weight:600; font-size:13px; }
+.opp-detail { font-size:11px; color:var(--text-muted); }
+.opp-amount { font-size:16px; font-weight:700; color:var(--green); }
+.opp-stage { font-size:11px; font-weight:600; padding:2px 8px; border-radius:4px; }
+.opp-stage-closing { background:#dcfce7; color:#166534; }
+.opp-stage-negotiating { background:#fef3c7; color:#92400e; }
+.opp-stage-selling { background:#dbeafe; color:#1d4ed8; }
+.opp-stage-discovery { background:#f1f5f9; color:#475569; }
+
+/* DEFINITIONS */
+.def-section { margin-bottom:20px; }
+.def-section h3 { font-size:14px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.def-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:10px; }
+.def-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:12px; }
+.def-card h4 { font-size:13px; margin-bottom:4px; color:var(--blue); }
+.def-card p { font-size:12px; color:var(--text-muted); }
+.abbr-grid { display:grid; grid-template-columns:100px 1fr; gap:4px 12px; font-size:12px; }
+.abbr-key { font-weight:700; }
+.trust-journey { display:flex; gap:0; margin:10px 0; flex-wrap:wrap; }
+.trust-step { flex:1; min-width:140px; padding:10px 12px; border:1px solid var(--border); text-align:center; }
+.trust-step:first-child { border-radius:8px 0 0 8px; }
+.trust-step:last-child { border-radius:0 8px 8px 0; }
+.trust-step .step-num { font-size:10px; color:var(--text-muted); }
+.trust-step .step-name { font-size:14px; font-weight:700; }
+.trust-step .step-desc { font-size:11px; color:var(--text-muted); margin-top:2px; }
+.def-table { width:100%; border-collapse:collapse; }
+.def-table th { background:#f1f5f9; text-align:left; padding:6px 10px; font-size:11px; }
+.def-table td { padding:6px 10px; border-bottom:1px solid var(--border); font-size:12px; }
+.challenger-list { list-style:decimal; padding-left:20px; }
+.challenger-list li { padding:4px 0; font-size:12px; line-height:1.6; }
+.discovery-list { list-style:decimal; padding-left:20px; }
+.discovery-list li { padding:3px 0; font-size:12px; }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .nav { flex-direction:column; gap:6px; align-items:flex-start; }
+  .filters { flex-direction:column; }
+  .filters input[type="text"] { width:100%; }
+  .expand-grid { grid-template-columns:1fr; }
+  .metrics-grid { grid-template-columns:repeat(2, 1fr); }
+}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span class="nav-title">TX Dashboard / Leadership</span>
+  <div class="nav-links">
+    <a href="cs.html">CS View</a>
+    <a href="implementations.html">Implementations</a>
+  </div>
+</div>
+
+<div class="tabs" id="mainTabs">
+  <div class="tab active" data-tab="accounts">Accounts</div>
+  <div class="tab" data-tab="health">Health Summary</div>
+  <div class="tab" data-tab="opps">Opportunities</div>
+  <div class="tab" data-tab="definitions">Definitions</div>
+</div>
+
+<!-- TAB 1: ACCOUNTS -->
+<div class="tab-content active" id="tab-accounts">
+  <div class="filters">
+    <select id="repFilter">
+      <option value="all">All Reps</option>
+    </select>
+    <select id="priorityFilter">
+      <option value="ALL" selected>All Priorities</option>
+      <option value="EXCLUDE_ECO">All (excl. Ecosystem)</option>
+      <option value="IMPL">IMPL</option>
+      <option value="P1">P1</option>
+      <option value="CS_P2">CS P2</option>
+      <option value="TA">TA</option>
+      <option value="WATCH">WATCH</option>
+      <option value="CS_TRACKED">CS Tracked</option>
+    </select>
+    <select id="configFilter">
+      <option value="ALL">CONFIG: All</option>
+      <option value="issues">CONFIG: has issues</option>
+      <option value="ok">CONFIG: OK</option>
+    </select>
+    <select id="implFilter">
+      <option value="ALL">Impl: All</option>
+      <option value="Not Started">Not Started</option>
+      <option value="Kickoff">Kickoff</option>
+      <option value="Training">Training</option>
+      <option value="Go-Live">Go-Live</option>
+      <option value="Pre-Go-Live">Pre-Go-Live</option>
+    </select>
+    <select id="ctFilter">
+      <option value="ALL">CT_ID: All</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Search accounts...">
+    <label><input type="checkbox" id="hasDataOnly"> Has-data-only</label>
+    <span class="filter-count" id="filterCount"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="accountsTable">
+      <thead>
+        <tr>
+          <th style="width:26px"></th>
+          <th data-sort="name">Account <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="rep">Owner <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="priority_order">Priority <span class="sort-arrow">&#9650;</span></th>
+          <th>Products</th>
+          <th data-sort="est_sell" style="text-align:right">Est. Sell GMV <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="koronet_sell" style="text-align:right">Koronet Sell <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="penetration" style="text-align:right">Penetr. % <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="online_pct" style="text-align:right">Online % <span class="sort-arrow">&#9650;</span></th>
+          <th>CONFIG</th>
+          <th>BUY</th>
+          <th>LIST</th>
+          <th>SELL</th>
+          <th>SFDC Opp</th>
+          <th data-sort="opp_count" style="text-align:center">Opps <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="fees" style="text-align:right">Fees <span class="sort-arrow">&#9650;</span></th>
+        </tr>
+      </thead>
+      <tbody id="accountsBody"></tbody>
+      <tfoot id="accountsFoot"></tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 2: HEALTH SUMMARY -->
+<div class="tab-content" id="tab-health">
+  <div class="section-header">Portfolio Overview</div>
+  <div class="metrics-grid" id="healthMetrics"></div>
+  <div class="section-header">By Priority</div>
+  <div class="metrics-grid" id="priorityMetrics"></div>
+  <div class="section-header">By Product Type (CT_ID)</div>
+  <div class="metrics-grid" id="ctMetrics"></div>
+  <div class="section-header">CONFIG Readiness</div>
+  <div class="metrics-grid" id="configMetrics"></div>
+  <div class="section-header">BUY / LIST / SELL Distribution</div>
+  <div class="metrics-grid" id="blsMetrics"></div>
+  <div class="section-header">Total Fees</div>
+  <div class="metrics-grid" id="feeMetrics"></div>
+</div>
+
+<!-- TAB 3: OPPORTUNITIES -->
+<div class="tab-content" id="tab-opps">
+  <div class="section-header">CONFIG Quick Wins (5-min fixes)</div>
+  <div class="qw-list" id="configQuickWins"></div>
+  <div class="section-header">High-GMV Low-Online Accounts</div>
+  <div class="qw-list" id="highGmvLowOnline"></div>
+  <div class="section-header">SFDC Active Opportunities</div>
+  <div class="opp-list" id="sfdcOpps"></div>
+  <div class="section-header">What-If Fee Uplift</div>
+  <div class="metrics-grid" id="whatIfMetrics"></div>
+</div>
+
+<!-- TAB 4: DEFINITIONS -->
+<div class="tab-content" id="tab-definitions"></div>
+
+<script>
+// === DATA LOAD (ALL 12 FILES) ===
+var ACCOUNTS=[], METRICS={}, CONFIG={}, BUNCHES={}, SFDC=[], CHRISTINE={}, DEFINITIONS={};
+var BUYERS=[], SELL_BY_CHANNEL={}, BUYER_CONCENTRATION={}, REPEAT_RATE={}, SUPPLY_MATRIX={};
+
+async function loadData() {
+  var base = 'data/';
+  var results = await Promise.all([
+    fetch(base+'accounts.json').then(function(r){return r.json();}),
+    fetch(base+'metrics.json').then(function(r){return r.json();}),
+    fetch(base+'config.json').then(function(r){return r.json();}),
+    fetch(base+'bunches.json').then(function(r){return r.json();}),
+    fetch(base+'sfdc.json').then(function(r){return r.json();}),
+    fetch(base+'christine.json').then(function(r){return r.json();}),
+    fetch(base+'definitions.json').then(function(r){return r.json();}),
+    fetch(base+'buyers.json').then(function(r){return r.json();}),
+    fetch(base+'sell_by_channel.json').then(function(r){return r.json();}),
+    fetch(base+'buyer_concentration.json').then(function(r){return r.json();}),
+    fetch(base+'repeat_rate.json').then(function(r){return r.json();}),
+    fetch(base+'supply_matrix_full.json').then(function(r){return r.json();}),
+  ]);
+  ACCOUNTS=results[0]; METRICS=results[1]; CONFIG=results[2]; BUNCHES=results[3]; SFDC=results[4]; CHRISTINE=results[5]; DEFINITIONS=results[6];
+  BUYERS=results[7]; SELL_BY_CHANNEL=results[8]; BUYER_CONCENTRATION=results[9]; REPEAT_RATE=results[10]; SUPPLY_MATRIX=results[11];
+  populateFilters();
+  renderAccounts();
+  renderHealth();
+  renderOpps();
+  renderDefinitions();
+}
+
+// === HELPERS ===
+function fmt$(v) { if(v==null||v===undefined||isNaN(v)) return '\u2014'; if(v>=1e6) return '$'+(v/1e6).toFixed(1)+'M'; if(v>=1e3) return '$'+(v/1e3).toFixed(0)+'K'; return '$'+v.toFixed(0); }
+function fmtN(v) { if(v==null||v===undefined) return '\u2014'; if(v>=1e6) return (v/1e6).toFixed(1)+'M'; if(v>=1e3) return (v/1e3).toFixed(1)+'K'; return v.toString(); }
+function fmtPct(v) { if(v==null||v===undefined||isNaN(v)) return '\u2014'; return v.toFixed(1)+'%'; }
+function normName(s) { return (s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+var PRIORITY_ORDER = {TA:0, IMPL:1, P1:2, CS_P2:3, WATCH:4, CS_TRACKED:5, ECOSYSTEM:99};
+var PRIORITY_LABELS = {TA:'TA', IMPL:'IMPL', P1:'P1', CS_P2:'CS P2', WATCH:'WATCH', CS_TRACKED:'CS Tracked', ECOSYSTEM:'Ecosystem'};
+
+function priorityBadge(p) {
+  var label = PRIORITY_LABELS[p] || p;
+  return '<span class="badge badge-'+(p||'WATCH')+'" title="'+label+'">'+label+'</span>';
+}
+
+// === PRODUCT BADGE (CT_ID) ===
+function ctBadge(ctId) {
+  if(!ctId) return '\u2014';
+  var cls = 'prod-other';
+  if(ctId.startsWith('WH_') || ctId.startsWith('IMP_')) cls = 'prod-'+ctId;
+  var short = ctId.replace('WH_','').replace('IMP_','I:');
+  return '<span class="prod-badge '+cls+'">'+short+'</span>';
+}
+
+// === REP / OWNER ASSIGNMENTS ===
+// Priority: christine.json (impl lead), then SFDC opp owner, then known mappings
+function getRep(acct) {
+  var id = acct.company_id;
+  // Christine/impl data has direct ownership
+  if(id && CHRISTINE[id]) {
+    // Find SFDC owner for this account if any
+    var sfdcMatch = getSFDC(acct);
+    if(sfdcMatch.length > 0) return sfdcMatch[0].owner;
+    return 'Implementations';
+  }
+  // SFDC owner
+  var sfdcMatch = getSFDC(acct);
+  if(sfdcMatch.length > 0) return sfdcMatch[0].owner;
+  // Fallback: Unassigned
+  return 'Unassigned';
+}
+
+// === SFDC MATCH ===
+function getSFDC(acct) {
+  if(!acct.name) return [];
+  var name = normName(acct.name);
+  return SFDC.filter(function(o) {
+    var on = normName(o.account_name);
+    return name === on || name.includes(on) || on.includes(name) || (name.length > 5 && on.length > 5 && (name.includes(on.substring(0,8)) || on.includes(name.substring(0,8))));
+  });
+}
+
+// === LOOKUP HELPERS (by company_name) ===
+function findBuyerData(companyId) {
+  if(!companyId || !BUYERS.length) return null;
+  return BUYERS.find(function(b){ return b.company_id === companyId; });
+}
+function findConcentrationByName(name) {
+  if(!name || !BUYER_CONCENTRATION.accounts) return null;
+  var n = normName(name);
+  return BUYER_CONCENTRATION.accounts.find(function(b){
+    var bn = normName(b.company_name);
+    return bn === n || bn.includes(n) || n.includes(bn);
+  });
+}
+function findRepeatRate(name) {
+  if(!name || !REPEAT_RATE.data) return null;
+  var n = normName(name);
+  return REPEAT_RATE.data.find(function(r){
+    var rn = normName(r.company_name);
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findSupplyBuy(name) {
+  if(!name || !SUPPLY_MATRIX.buy_coverage) return null;
+  var n = normName(name);
+  return SUPPLY_MATRIX.buy_coverage.find(function(r){
+    var rn = normName(r.company_name);
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findSupplySell(name) {
+  if(!name || !SUPPLY_MATRIX.sell_coverage) return null;
+  var n = normName(name);
+  return SUPPLY_MATRIX.sell_coverage.find(function(r){
+    var rn = normName(r.company_name);
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findGapCategories(name) {
+  if(!name || !SUPPLY_MATRIX.gap_categories) return null;
+  var n = normName(name);
+  return SUPPLY_MATRIX.gap_categories.find(function(r){
+    var rn = normName(r.company_name);
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findChannelMix(name) {
+  if(!name || !SELL_BY_CHANNEL.data) return null;
+  var n = normName(name);
+  return SELL_BY_CHANNEL.data.filter(function(r){
+    var rn = normName(r.company_name);
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+
+// === OPPORTUNITY GENERATOR ===
+function getOpportunities(acct) {
+  var id = acct.company_id;
+  if(!id) return [];
+  var cfg = CONFIG[id];
+  var met = METRICS[id];
+  var bun = BUNCHES[id];
+  var opps = [];
+  if(cfg) {
+    if(cfg.max_age === 0 || cfg.max_age === null) {
+      opps.push({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config'});
+    } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      opps.push({text:'MaxAge='+cfg.max_age+'d. Benchmark: 300. 5-min fix.', type:'config'});
+    }
+    if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      var bunchGMV = bun && bun.sells_bunches ? fmt$(bun.total_bunch_gmv)+' bunch GMV offline' : '';
+      opps.push({text:'Bunches OFF.'+(bunchGMV ? ' '+bunchGMV+'.' : '')+' 5-min fix.', type:'config'});
+    }
+    if(!cfg.future && acct.ct_id === 'WH_CORE') {
+      opps.push({text:'Future Sales OFF. eShop shows today only.', type:'config'});
+    }
+    if(!cfg.on_hand && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      opps.push({text:'Checkout may require payment. Verify hideCheckoutWithoutPayment.', type:'config'});
+    }
+  }
+  if(met) {
+    if(met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY') {
+      opps.push({text:'BUY stage: '+met.buy_stage.replace(/_/g,' ')+'. Needs activation.', type:'buy'});
+    }
+    if(met.k2k_total > 0 && met.k2k_active / met.k2k_total < 0.7) {
+      var inactive = met.k2k_total - met.k2k_active;
+      opps.push({text:inactive+'/'+met.k2k_total+' K2K inactive. Reactivation opp.', type:'buy'});
+    }
+  }
+  if(met) {
+    if(met.online_pct < 5 && met.sell_total > 100000) {
+      opps.push({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell'});
+    }
+  }
+  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+    opps.push({text:'No eShop. Cannot sell online.', type:'sell'});
+  }
+  return opps;
+}
+
+// === BOTTLENECK ===
+function computeBottleneck(acct, cfg, met) {
+  if(cfg && (cfg.max_age === 0 || cfg.max_age === null)) return 'GATE: MaxAge=0';
+  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'GATE: No eShop';
+  if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'FORMAT: Bunches OFF';
+  if(met && (met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY')) return 'BUY: No active connections';
+  if(met && met.buy_stage === 'ACTIVATING') return 'BUY: Activating';
+  var buyerData = findBuyerData(acct.company_id);
+  if(buyerData && buyerData.online_buyers < 10) return 'SELL: Few online buyers';
+  if(met && met.sell_stage === 'NO_ONLINE_SALES') return 'SELL: No online sales';
+  return '\u2014';
+}
+
+// === CONFIG HAS ISSUES ===
+function configHasIssues(id, acct) {
+  var cfg = CONFIG[id];
+  if(!cfg) return null; // no data
+  if(cfg.max_age === 0 || cfg.max_age === null) return true;
+  if(cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return true;
+  if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return true;
+  if(!cfg.future && acct.ct_id === 'WH_CORE') return true;
+  return false;
+}
+
+// === POPULATE FILTERS ===
+function populateFilters() {
+  // Rep filter
+  var repSet = new Set(ACCOUNTS.map(function(a){ return getRep(a); }));
+  var sel = document.getElementById('repFilter');
+  Array.from(repSet).sort().forEach(function(rep) {
+    var o = document.createElement('option');
+    o.value = rep; o.textContent = rep;
+    sel.appendChild(o);
+  });
+  // CT_ID filter
+  var ctSet = new Set(ACCOUNTS.map(function(a){ return a.ct_id || 'UNKNOWN'; }));
+  var ctSel = document.getElementById('ctFilter');
+  Array.from(ctSet).sort().forEach(function(ct) {
+    var o = document.createElement('option');
+    o.value = ct; o.textContent = ct;
+    ctSel.appendChild(o);
+  });
+}
+
+// === SORT STATE ===
+var sortCol = 'est_sell';
+var sortDir = -1; // desc
+
+// === RENDER ACCOUNTS (Tab 1) ===
+function renderAccounts() {
+  var rep = document.getElementById('repFilter').value;
+  var search = document.getElementById('searchInput').value.toLowerCase();
+  var priority = document.getElementById('priorityFilter').value;
+  var cfgFilter = document.getElementById('configFilter').value;
+  var implFilterVal = document.getElementById('implFilter').value;
+  var ctFilterVal = document.getElementById('ctFilter').value;
+  var hasDataOnly = document.getElementById('hasDataOnly').checked;
+
+  var filtered = ACCOUNTS.filter(function(a) {
+    // Default: show ALL. Exclude ECOSYSTEM only if filter says so.
+    if(priority === 'EXCLUDE_ECO' && a.priority_level === 'ECOSYSTEM') return false;
+    if(priority !== 'ALL' && priority !== 'EXCLUDE_ECO' && a.priority_level !== priority) return false;
+    if(rep !== 'all' && getRep(a) !== rep) return false;
+    if(search && !(a.name||'').toLowerCase().includes(search) && !(a.company_id||'').includes(search)) return false;
+    if(ctFilterVal !== 'ALL' && (a.ct_id||'UNKNOWN') !== ctFilterVal) return false;
+    if(hasDataOnly && !a.company_id) return false;
+    if(hasDataOnly && !METRICS[a.company_id]) return false;
+    if(cfgFilter !== 'ALL') {
+      var issues = configHasIssues(a.company_id, a);
+      if(cfgFilter === 'issues' && issues !== true) return false;
+      if(cfgFilter === 'ok' && issues !== false) return false;
+    }
+    if(implFilterVal !== 'ALL') {
+      var impl = a.company_id ? CHRISTINE[a.company_id] : null;
+      if(!impl) return false;
+      if(impl.stage !== implFilterVal) return false;
+    }
+    return true;
+  });
+
+  // Enrich for sorting
+  filtered = filtered.map(function(a) {
+    var id = a.company_id;
+    var m = id ? METRICS[id] : null;
+    var cfg = id ? CONFIG[id] : null;
+    var opps = getOpportunities(a);
+    var estSell = a.annual_sales_est;
+    var koronetSell = m ? m.sell_total : null;
+    var penetration = (estSell && estSell > 0 && koronetSell != null) ? (koronetSell / estSell * 100) : null;
+    var onlinePct = m ? m.online_pct : null;
+    var fees = m ? m.fees_total : null;
+    return Object.assign({}, a, {
+      _m: m,
+      _cfg: cfg,
+      rep: getRep(a),
+      priority_order: PRIORITY_ORDER[a.priority_level] != null ? PRIORITY_ORDER[a.priority_level] : 99,
+      est_sell: estSell || 0,
+      koronet_sell: koronetSell || 0,
+      penetration: penetration || 0,
+      online_pct_val: onlinePct || 0,
+      fees: fees || 0,
+      opp_count: opps.length,
+      _opps: opps,
+    });
+  });
+
+  // Sort — ECOSYSTEM always last, then by sort column
+  filtered.sort(function(a, b) {
+    var aEco = a.priority_level === 'ECOSYSTEM' ? 1 : 0;
+    var bEco = b.priority_level === 'ECOSYSTEM' ? 1 : 0;
+    if(aEco !== bEco) return aEco - bEco;
+
+    // Within same ecosystem status, sort by selected column
+    if(sortCol === 'priority_order') {
+      var pa = a.priority_order, pb = b.priority_order;
+      if(pa !== pb) return (pa - pb) * sortDir;
+      // Within same priority, sort by est_sell desc
+      return (b.est_sell - a.est_sell);
+    }
+    if(sortCol === 'name' || sortCol === 'rep') {
+      var va = (a[sortCol]||'').toLowerCase(), vb = (b[sortCol]||'').toLowerCase();
+      if(va < vb) return -1 * sortDir;
+      if(va > vb) return 1 * sortDir;
+      return 0;
+    }
+    // Numeric sort
+    var va = a[sortCol] || 0, vb = b[sortCol] || 0;
+    return (va - vb) * sortDir;
+  });
+
+  var tbody = document.getElementById('accountsBody');
+  var tfoot = document.getElementById('accountsFoot');
+  var html = '';
+  var totals = {est_sell:0, koronet_sell:0, fees:0, sell_online:0, count:0};
+
+  filtered.forEach(function(a, i) {
+    var id = a.company_id;
+    var met = a._m;
+    var cfg = a._cfg;
+    var opps = a._opps;
+    var sfdcMatches = getSFDC(a);
+    var impl = id ? CHRISTINE[id] : null;
+    var bun = id ? BUNCHES[id] : null;
+    var isEco = a.priority_level === 'ECOSYSTEM';
+
+    // Compute display values
+    var estSellDisplay = a.annual_sales_est ? fmt$(a.annual_sales_est) : '\u2014';
+    var koronetSellDisplay = met ? fmt$(met.sell_total) : '\u2014';
+    var penetrationDisplay = (a.annual_sales_est && a.annual_sales_est > 0 && met) ? fmtPct(met.sell_total / a.annual_sales_est * 100) : '\u2014';
+    var onlinePctDisplay = met ? fmtPct(met.online_pct) : '\u2014';
+    var feesDisplay = met ? fmt$(met.fees_total) : '\u2014';
+
+    // Totals
+    if(a.annual_sales_est) totals.est_sell += a.annual_sales_est;
+    if(met) {
+      totals.koronet_sell += met.sell_total || 0;
+      totals.fees += met.fees_total || 0;
+      totals.sell_online += met.sell_online || 0;
+    }
+    totals.count++;
+
+    // CONFIG inline: MaxAge>10, Bunches, Future, Checkout
+    var configHtml = '\u2014';
+    if(cfg) {
+      var maxAgeOk = cfg.max_age !== null && cfg.max_age > 10;
+      var bunchesOk = cfg.bunches_flag;
+      var futureOk = cfg.future;
+      var checkoutOk = cfg.on_hand;
+      configHtml = '<div class="cfg-cell">' +
+        '<span class="'+(maxAgeOk?'cfg-ok':'cfg-fail')+'" title="MaxAge: '+(cfg.max_age!=null?cfg.max_age+'d':'null')+'">'+(maxAgeOk?'\u2713':'\u2717')+'</span> MA' +
+        ' <span class="'+(bunchesOk?'cfg-ok':'cfg-fail')+'" title="Bunches: '+(bunchesOk?'ON':'OFF')+'">'+(bunchesOk?'\u2713':'\u2717')+'</span> Bu' +
+        ' <span class="'+(futureOk?'cfg-ok':'cfg-fail')+'" title="Future: '+(futureOk?'ON':'OFF')+'">'+(futureOk?'\u2713':'\u2717')+'</span> Fu' +
+        ' <span class="'+(checkoutOk?'cfg-ok':'cfg-fail')+'" title="Checkout/OnHand: '+(checkoutOk?'ON':'OFF')+'">'+(checkoutOk?'\u2713':'\u2717')+'</span> Co' +
+        '</div>';
+    }
+
+    // BUY inline: proc_online_pct + K2K active/total
+    var buyHtml = '\u2014';
+    if(met) {
+      var procOnlinePct = met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0;
+      var k2kStr = met.k2k_active + '/' + met.k2k_total;
+      buyHtml = '<div class="data-cell">' +
+        '<span class="data-val">'+fmtPct(procOnlinePct)+'</span> <span class="data-label">proc</span><br>' +
+        '<span class="data-val">'+k2kStr+'</span> <span class="data-label">K2K</span>' +
+        '</div>';
+    }
+
+    // LIST inline: coverage from supply_matrix + MaxAge value
+    var listHtml = '\u2014';
+    var supSell = findSupplySell(a.name);
+    if(supSell || cfg) {
+      var covStr = '\u2014';
+      if(supSell) {
+        var sellCov = supSell.total_categories_sold > 0 ? (supSell.online_categories_sold / supSell.total_categories_sold * 100) : 0;
+        covStr = fmtPct(sellCov);
+      }
+      var maStr = cfg ? (cfg.max_age != null ? cfg.max_age + 'd' : 'null') : '\u2014';
+      listHtml = '<div class="data-cell">' +
+        '<span class="data-val">'+covStr+'</span> <span class="data-label">cov</span><br>' +
+        '<span class="data-val">'+maStr+'</span> <span class="data-label">MA</span>' +
+        '</div>';
+    }
+
+    // SELL inline: buyers count + repeat_rate
+    var sellHtml = '\u2014';
+    var buyerData = findBuyerData(id);
+    var repeatData = findRepeatRate(a.name);
+    if(buyerData || repeatData) {
+      var buyersStr = buyerData ? buyerData.total_buyers + ' / ' + buyerData.online_buyers : '\u2014';
+      var repeatStr = repeatData ? fmtPct(repeatData.repeat_rate_pct) : '\u2014';
+      sellHtml = '<div class="data-cell">' +
+        '<span class="data-val">'+buyersStr+'</span> <span class="data-label">buy</span><br>' +
+        '<span class="data-val">'+repeatStr+'</span> <span class="data-label">rpt</span>' +
+        '</div>';
+    }
+
+    // SFDC display
+    var sfdcType = '\u2014';
+    if(sfdcMatches.length > 0) {
+      sfdcType = '<span style="color:var(--blue);font-size:11px" title="'+sfdcMatches.map(function(o){return o.opp_name+' ('+o.stage+')';}).join('\n')+'">' +
+        (sfdcMatches[0].stage || 'Opp') +
+        (sfdcMatches.length > 1 ? ' +' + (sfdcMatches.length-1) : '') + '</span>';
+    }
+
+    // Opp count badge
+    var oppBadge = opps.length > 0
+      ? '<span class="opp-count has-opps" title="'+opps.map(function(o){return o.text;}).join('\n')+'">'+opps.length+'</span>'
+      : '<span class="opp-count no-opps">0</span>';
+
+    // Online % color
+    var onlineColor = 'var(--text)';
+    if(met) {
+      if(met.online_pct >= 20) onlineColor = 'var(--green)';
+      else if(met.online_pct > 0) onlineColor = 'var(--amber)';
+      else onlineColor = 'var(--red)';
+    }
+
+    // Main row
+    html += '<tr data-idx="'+i+'"'+(isEco?' class="eco-row"':'')+'>';
+    html += '<td><span class="expand-btn" data-idx="'+i+'">&#9654;</span></td>';
+    html += '<td style="font-weight:600;white-space:nowrap">'+(a.name || '\u2014')+'</td>';
+    html += '<td style="font-size:11px;white-space:nowrap">'+a.rep+'</td>';
+    html += '<td>'+priorityBadge(a.priority_level)+'</td>';
+    html += '<td style="white-space:nowrap">'+ctBadge(a.ct_id)+'</td>';
+    html += '<td style="text-align:right;font-weight:600">'+estSellDisplay+'</td>';
+    html += '<td style="text-align:right">'+koronetSellDisplay+'</td>';
+    html += '<td style="text-align:right">'+penetrationDisplay+'</td>';
+    html += '<td style="text-align:right;color:'+onlineColor+'">'+onlinePctDisplay+'</td>';
+    html += '<td>'+configHtml+'</td>';
+    html += '<td>'+buyHtml+'</td>';
+    html += '<td>'+listHtml+'</td>';
+    html += '<td>'+sellHtml+'</td>';
+    html += '<td>'+sfdcType+'</td>';
+    html += '<td style="text-align:center">'+oppBadge+'</td>';
+    html += '<td style="text-align:right;font-weight:600">'+feesDisplay+'</td>';
+    html += '</tr>';
+
+    // === EXPAND ROW (17 fields from spec) ===
+    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="16"><div class="expand-cell"><div class="expand-grid">';
+
+    // --- Section 1: GMV & Penetration ---
+    html += '<div class="expand-section"><h4>GMV & Penetration</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Est. Sell GMV (ORA)</span><span>'+(a.annual_sales_est ? fmt$(a.annual_sales_est)+' (Christine)' : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Est. Sell GMV (calc)</span><span>\u2014</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Koronet Sell GMV</span><span>'+(met ? fmt$(met.sell_total) : '\u2014')+'</span></div>';
+    var penDisplay = (a.annual_sales_est && a.annual_sales_est > 0 && met) ? fmtPct(met.sell_total / a.annual_sales_est * 100) : '\u2014';
+    html += '<div class="detail-row"><span class="detail-label">Penetration %</span><span style="font-weight:600">'+penDisplay+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Online Sell %</span><span style="color:'+onlineColor+'">'+(met ? fmtPct(met.online_pct) : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Koronet Buy GMV</span><span>'+(met ? fmt$(met.proc_total) : '\u2014')+'</span></div>';
+    var buyOnlinePct = met && met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0;
+    html += '<div class="detail-row"><span class="detail-label">Online Buy %</span><span>'+(met ? fmtPct(buyOnlinePct) : '\u2014')+'</span></div>';
+    html += '</div>';
+
+    // --- Section 2: Buyers & Sustainability ---
+    var concData = findConcentrationByName(a.name);
+    html += '<div class="expand-section"><h4>Buyers & Sustainability</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Buyers (total / online)</span><span>'+(buyerData ? buyerData.total_buyers+' / '+buyerData.online_buyers : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Repeat Rate %</span><span>'+(repeatData ? fmtPct(repeatData.repeat_rate_pct) : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Concentration (Top 2 %)</span><span style="color:'+(concData && concData.top2_pct > 25 ? 'var(--red)' : concData && concData.top2_pct > 15 ? 'var(--amber)' : 'var(--green)')+'">'+(concData ? fmtPct(concData.top2_pct) : '\u2014')+'</span></div>';
+    if(concData) {
+      html += '<div class="detail-row"><span class="detail-label">#1 Buyer</span><span style="font-size:11px">'+concData.top1_name+' ('+fmt$(concData.top1_gmv)+')</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">#2 Buyer</span><span style="font-size:11px">'+(concData.top2_name||'\u2014')+' ('+(concData.top2_gmv_2!=null?fmt$(concData.top2_gmv_2):'\u2014')+')</span></div>';
+    }
+    html += '</div>';
+
+    // --- Section 3: Supply Coverage ---
+    var supBuy = findSupplyBuy(a.name);
+    var gapCat = findGapCategories(a.name);
+    html += '<div class="expand-section"><h4>Coverage & Gaps</h4>';
+    if(supBuy) {
+      var buyCov = supBuy.total_categories_bought > 0 ? (supBuy.online_categories_bought / supBuy.total_categories_bought * 100) : 0;
+      html += '<div class="detail-row"><span class="detail-label">BUY Coverage</span><span>'+supBuy.online_categories_bought+'/'+supBuy.total_categories_bought+' cats ('+fmtPct(buyCov)+')</span></div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">BUY Coverage</span><span>\u2014</span></div>';
+    }
+    if(supSell) {
+      var sellCovPct = supSell.total_categories_sold > 0 ? (supSell.online_categories_sold / supSell.total_categories_sold * 100) : 0;
+      html += '<div class="detail-row"><span class="detail-label">SELL Coverage</span><span>'+supSell.online_categories_sold+'/'+supSell.total_categories_sold+' cats ('+fmtPct(sellCovPct)+')</span></div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">SELL Coverage</span><span>\u2014</span></div>';
+    }
+    if(gapCat) {
+      html += '<div class="detail-row"><span class="detail-label">Gap Categories</span><span style="color:var(--amber)">'+gapCat.gap_categories+' categories</span></div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">Gap Categories</span><span>\u2014</span></div>';
+    }
+    html += '</div>';
+
+    // --- Section 4: Channel Mix ---
+    var channels = findChannelMix(a.name);
+    html += '<div class="expand-section"><h4>Channel Mix</h4>';
+    if(channels && channels.length > 0) {
+      var totalGmv = channels.reduce(function(s, c){ return s + c.channel_gmv; }, 0);
+      channels.forEach(function(c) {
+        var pct = totalGmv > 0 ? (c.channel_gmv / totalGmv * 100) : 0;
+        html += '<div class="detail-row"><span class="detail-label">'+c.sales_channel+'</span><span>'+fmt$(c.channel_gmv)+' ('+fmtPct(pct)+')</span></div>';
+      });
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">\u2014</span><span>No channel data</span></div>';
+    }
+    html += '</div>';
+
+    // --- Section 5: Bunches ---
+    html += '<div class="expand-section"><h4>Bunches</h4>';
+    if(bun) {
+      html += '<div class="detail-row"><span class="detail-label">Total Bunch GMV</span><span>'+fmt$(bun.total_bunch_gmv)+'</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Sells Bunches</span><span>'+(bun.sells_bunches ? 'Yes' : 'No')+'</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Config Flag</span><span style="color:'+(bun.bunches_flag ? 'var(--green)' : 'var(--red)')+'">'+(bun.bunches_flag ? 'ON' : 'OFF')+'</span></div>';
+      if(bun.discrepancy) {
+        html += '<div class="detail-row"><span class="detail-label">Discrepancy</span><span style="color:var(--red);font-weight:600">Sells bunches but flag OFF</span></div>';
+      }
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">\u2014</span><span>No bunch data</span></div>';
+    }
+    html += '</div>';
+
+    // --- Section 6: Bottleneck & Next Action ---
+    var bottleneck = computeBottleneck(a, cfg, met);
+    var nextAction = opps.length > 0 ? opps[0].text : '\u2014';
+    html += '<div class="expand-section"><h4>Bottleneck & Next Action</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Bottleneck</span><span style="font-weight:600;color:'+(bottleneck.includes('GATE') ? 'var(--red)' : bottleneck === '\u2014' ? 'var(--text-muted)' : 'var(--amber)')+'">'+bottleneck+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Next Action</span><span style="font-size:11px">'+nextAction+'</span></div>';
+    if(opps.length > 1) {
+      html += '<div style="margin-top:4px;font-size:11px;color:var(--text-muted)">';
+      opps.slice(1).forEach(function(o) {
+        html += '<div>\u2022 '+o.text+'</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // --- Section 7: SFDC Opportunities ---
+    if(sfdcMatches.length) {
+      html += '<div class="expand-section"><h4>SFDC Opportunities</h4>';
+      sfdcMatches.forEach(function(o) {
+        html += '<div class="detail-row"><span class="detail-label">'+o.stage+'</span><span>'+o.opp_name+' \u2014 '+fmt$(o.amount)+(o.close_date ? ' \u00b7 close '+o.close_date : '')+'</span></div>';
+      });
+      html += '</div>';
+    }
+
+    // --- Section 8: Implementation ---
+    if(impl) {
+      html += '<div class="expand-section"><h4>Implementation</h4>';
+      html += '<div class="detail-row"><span class="detail-label">Stage</span><span>'+(impl.stage || '\u2014')+'</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Type</span><span>'+(impl.type || '\u2014')+'</span></div>';
+      if(impl.status) html += '<div class="detail-row"><span class="detail-label">Status</span><span>'+impl.status+'</span></div>';
+      if(impl.days_live != null) html += '<div class="detail-row"><span class="detail-label">Days Live</span><span>'+impl.days_live+'</span></div>';
+      if(impl.proc_pct != null) html += '<div class="detail-row"><span class="detail-label">Proc %</span><span>'+impl.proc_pct+'%</span></div>';
+      if(impl.sales_pct != null) html += '<div class="detail-row"><span class="detail-label">Sales %</span><span>'+impl.sales_pct+'%</span></div>';
+      if(impl.pay_pct != null) html += '<div class="detail-row"><span class="detail-label">Pay %</span><span>'+impl.pay_pct+'%</span></div>';
+      if(impl.note) html += '<div class="detail-row"><span class="detail-label">Note</span><span>'+impl.note+'</span></div>';
+      html += '</div>';
+    }
+
+    // --- Section 9: Fee Breakdown ---
+    html += '<div class="expand-section"><h4>Fee Breakdown</h4>';
+    if(met && met.fees_by_type && Object.keys(met.fees_by_type).length > 0) {
+      html += '<div class="detail-row"><span class="detail-label">Total Fees</span><span style="font-weight:600">'+fmt$(met.fees_total)+'</span></div>';
+      Object.entries(met.fees_by_type).forEach(function(entry) {
+        var pct = met.fees_total > 0 ? (entry[1] / met.fees_total * 100) : 0;
+        html += '<div class="detail-row"><span class="detail-label">'+entry[0]+'</span><span>'+fmt$(entry[1])+' ('+fmtPct(pct)+')</span></div>';
+      });
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">\u2014</span><span>No fee data</span></div>';
+    }
+    html += '</div>';
+
+    // --- Section 10: K2K & Identity ---
+    html += '<div class="expand-section"><h4>Identity & K2K</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Company ID</span><span>'+(id||'\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">CT_ID</span><span><span class="badge-ct">'+(a.ct_id||'\u2014')+'</span></span></div>';
+    html += '<div class="detail-row"><span class="detail-label">System</span><span>'+(a.system_type||'\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Status</span><span>'+(a.status||'\u2014')+'</span></div>';
+    if(met) {
+      html += '<div class="detail-row"><span class="detail-label">K2K Active / Total</span><span>'+met.k2k_active+' / '+met.k2k_total+'</span></div>';
+      var k2kPct = met.k2k_total > 0 ? (met.k2k_active / met.k2k_total * 100) : 0;
+      html += '<div class="detail-row"><span class="detail-label">K2K Active %</span><span style="color:'+(k2kPct >= 70 ? 'var(--green)' : k2kPct >= 40 ? 'var(--amber)' : 'var(--red)')+'">'+fmtPct(k2kPct)+'</span></div>';
+    }
+    if(a.note) {
+      html += '<div class="detail-row"><span class="detail-label">Note</span><span style="color:var(--amber)">'+a.note+'</span></div>';
+    }
+    html += '</div>';
+
+    html += '</div></div></td></tr>';
+  });
+
+  tbody.innerHTML = html;
+
+  // Total row
+  var totalOnlinePct = totals.koronet_sell > 0 ? (totals.sell_online / totals.koronet_sell * 100) : 0;
+  var totalPenPct = totals.est_sell > 0 ? (totals.koronet_sell / totals.est_sell * 100) : 0;
+  tfoot.innerHTML = '<tr class="total-row">' +
+    '<td></td>' +
+    '<td>TOTAL ('+totals.count+' shown)</td>' +
+    '<td></td><td></td><td></td>' +
+    '<td style="text-align:right">'+fmt$(totals.est_sell)+'</td>' +
+    '<td style="text-align:right">'+fmt$(totals.koronet_sell)+'</td>' +
+    '<td style="text-align:right">'+fmtPct(totalPenPct)+'</td>' +
+    '<td style="text-align:right">'+fmtPct(totalOnlinePct)+'</td>' +
+    '<td></td><td></td><td></td><td></td><td></td><td></td>' +
+    '<td style="text-align:right">'+fmt$(totals.fees)+'</td>' +
+    '</tr>';
+
+  document.getElementById('filterCount').textContent = filtered.length+' of '+ACCOUNTS.length+' accounts';
+
+  // Bind expand buttons
+  document.querySelectorAll('.expand-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = this.dataset.idx;
+      var row = document.querySelector('tr[data-expand="'+idx+'"]');
+      this.classList.toggle('open');
+      row.classList.toggle('open');
+    });
+  });
+}
+
+// === HEALTH SUMMARY (Tab 2) ===
+function renderHealth() {
+  var totalAccounts = ACCOUNTS.length;
+  var withScorecard = ACCOUNTS.filter(function(a){ return a.has_scorecard; }).length;
+  var totalGmv = 0, totalFees = 0, totalSellOnline = 0;
+  var feesByType = {};
+  Object.values(METRICS).forEach(function(m) {
+    totalGmv += m.sell_total || 0;
+    totalFees += m.fees_total || 0;
+    totalSellOnline += m.sell_online || 0;
+    if(m.fees_by_type) {
+      Object.entries(m.fees_by_type).forEach(function(entry) {
+        feesByType[entry[0]] = (feesByType[entry[0]] || 0) + entry[1];
+      });
+    }
+  });
+  var overallOnlinePct = totalGmv > 0 ? (totalSellOnline / totalGmv * 100) : 0;
+
+  document.getElementById('healthMetrics').innerHTML =
+    metricCard('Total Accounts', totalAccounts, withScorecard+' with scorecard') +
+    metricCard('Total H1 GMV', fmt$(totalGmv), 'All scored accounts') +
+    metricCard('Total H1 Fees', fmt$(totalFees), 'K2K + eCommerce + API') +
+    metricCard('Overall Online %', fmtPct(overallOnlinePct), 'Sell online / total sell') +
+    metricCard('Accounts with Metrics', Object.keys(METRICS).length, 'of '+totalAccounts+' total') +
+    metricCard('CONFIG Entries', Object.keys(CONFIG).length, 'COMPANIES_SV verified');
+
+  // By priority
+  var byPriority = {};
+  ACCOUNTS.forEach(function(a) {
+    var p = a.priority_level || 'UNKNOWN';
+    if(!byPriority[p]) byPriority[p] = {count:0, gmv:0, fees:0};
+    byPriority[p].count++;
+    var m = a.company_id ? METRICS[a.company_id] : null;
+    if(m) {
+      byPriority[p].gmv += m.sell_total || 0;
+      byPriority[p].fees += m.fees_total || 0;
+    }
+  });
+  document.getElementById('priorityMetrics').innerHTML = Object.entries(byPriority)
+    .sort(function(a, b) { return (PRIORITY_ORDER[a[0]] != null ? PRIORITY_ORDER[a[0]] : 99) - (PRIORITY_ORDER[b[0]] != null ? PRIORITY_ORDER[b[0]] : 99); })
+    .map(function(entry) { return metricCard(entry[0], entry[1].count+' accounts', 'GMV: '+fmt$(entry[1].gmv)+' | Fees: '+fmt$(entry[1].fees)); })
+    .join('');
+
+  // By CT_ID
+  var byCt = {};
+  ACCOUNTS.forEach(function(a) {
+    var ct = a.ct_id || 'UNKNOWN';
+    if(!byCt[ct]) byCt[ct] = {count:0, gmv:0, fees:0};
+    byCt[ct].count++;
+    var m = a.company_id ? METRICS[a.company_id] : null;
+    if(m) {
+      byCt[ct].gmv += m.sell_total || 0;
+      byCt[ct].fees += m.fees_total || 0;
+    }
+  });
+  document.getElementById('ctMetrics').innerHTML = Object.entries(byCt)
+    .sort(function(a, b) { return b[1].fees - a[1].fees; })
+    .map(function(entry) { return metricCard(entry[0], entry[1].count+' accounts', 'GMV: '+fmt$(entry[1].gmv)+' | Fees: '+fmt$(entry[1].fees)); })
+    .join('');
+
+  // CONFIG readiness
+  var cfgTotal = Object.keys(CONFIG).length;
+  var cfgAudited = Object.values(CONFIG).filter(function(c){ return c.audited; }).length;
+  var cfgBunches = Object.values(CONFIG).filter(function(c){ return c.bunches_flag; }).length;
+  var cfgFuture = Object.values(CONFIG).filter(function(c){ return c.future; }).length;
+  var cfgMaxAgeLow = Object.values(CONFIG).filter(function(c){ return c.max_age !== null && c.max_age <= 10; }).length;
+  var cfgMaxAgeZero = Object.values(CONFIG).filter(function(c){ return c.max_age === 0 || c.max_age === null; }).length;
+  document.getElementById('configMetrics').innerHTML =
+    metricCard('Audited', cfgAudited+' / '+cfgTotal, fmtPct(cfgTotal > 0 ? cfgAudited/cfgTotal*100 : 0)+' verified') +
+    metricCard('Bunches ON', cfgBunches+' / '+cfgTotal, fmtPct(cfgTotal > 0 ? cfgBunches/cfgTotal*100 : 0)) +
+    metricCard('Future Sales ON', cfgFuture+' / '+cfgTotal, fmtPct(cfgTotal > 0 ? cfgFuture/cfgTotal*100 : 0)) +
+    metricCard('MaxAge <= 10', cfgMaxAgeLow+' / '+cfgTotal, 'Low visibility risk') +
+    metricCard('MaxAge = 0/null', cfgMaxAgeZero, 'GATE fail: inventory invisible');
+
+  // BUY / LIST / SELL distribution
+  var buyDist = {green:0, yellow:0, red:0};
+  var listDist = {green:0, yellow:0, red:0};
+  var sellDist = {green:0, yellow:0, red:0};
+  ACCOUNTS.forEach(function(a) {
+    var id = a.company_id;
+    var m = id ? METRICS[id] : null;
+    if(!m) { buyDist.red++; listDist.red++; sellDist.red++; return; }
+    // BUY
+    if(m.buy_stage === 'SCALE' || m.buy_stage === 'HABIT') buyDist.green++;
+    else if(m.buy_stage === 'ACTIVATING') buyDist.yellow++;
+    else buyDist.red++;
+    // LIST
+    if(m.list_stage === 'HEALTHY' || m.list_stage === 'STRONG') listDist.green++;
+    else if(m.list_stage === 'GROWING' || m.list_stage === 'ACTIVATING') listDist.yellow++;
+    else listDist.red++;
+    // SELL
+    if(m.sell_stage === 'HEALTHY' || m.sell_stage === 'STRONG') sellDist.green++;
+    else if(m.sell_stage === 'GROWING' || m.sell_stage === 'MINIMAL') sellDist.yellow++;
+    else sellDist.red++;
+  });
+  document.getElementById('blsMetrics').innerHTML =
+    metricCard('BUY Healthy', buyDist.green, buyDist.yellow+' activating, '+buyDist.red+' inactive') +
+    metricCard('LIST Healthy', listDist.green, listDist.yellow+' growing, '+listDist.red+' inactive') +
+    metricCard('SELL Healthy', sellDist.green, sellDist.yellow+' growing, '+sellDist.red+' inactive');
+
+  // Total fees by type
+  var feeTypeHtml = metricCard('Total Fees', fmt$(totalFees), 'H1 2026');
+  Object.entries(feesByType).sort(function(a,b){return b[1]-a[1];}).forEach(function(entry) {
+    var pct = totalFees > 0 ? (entry[1] / totalFees * 100) : 0;
+    feeTypeHtml += metricCard(entry[0]+' Fees', fmt$(entry[1]), fmtPct(pct)+' of total');
+  });
+  var bunchDisc = Object.values(BUNCHES).filter(function(b){ return b.discrepancy; }).length;
+  var bunchDiscGmv = Object.values(BUNCHES).filter(function(b){ return b.discrepancy; }).reduce(function(s, b){ return s + (b.total_bunch_gmv || 0); }, 0);
+  feeTypeHtml += metricCard('Bunch Discrepancies', bunchDisc, 'At-risk GMV: '+fmt$(bunchDiscGmv));
+  document.getElementById('feeMetrics').innerHTML = feeTypeHtml;
+}
+
+function metricCard(label, value, sub) {
+  return '<div class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-value">'+value+'</div>'+(sub ? '<div class="metric-sub">'+sub+'</div>' : '')+'</div>';
+}
+
+// === OPPORTUNITIES (Tab 3) ===
+function renderOpps() {
+  var qwList = [];
+  Object.entries(BUNCHES).forEach(function(entry) {
+    var id = entry[0], b = entry[1];
+    if(b.discrepancy && b.total_bunch_gmv > 10000) {
+      var acc = ACCOUNTS.find(function(a){ return a.company_id === id; });
+      if(acc) qwList.push({name:acc.name, issue:'Bunches flag OFF but sells bunches', impact:'Bunch GMV: '+fmt$(b.total_bunch_gmv), gmv:b.total_bunch_gmv});
+    }
+  });
+  Object.entries(CONFIG).forEach(function(entry) {
+    var id = entry[0], c = entry[1];
+    if((c.max_age === 0 || c.max_age === null) && c.audited) {
+      var acc = ACCOUNTS.find(function(a){ return a.company_id === id; });
+      var m = METRICS[id];
+      if(acc && m && m.sell_total > 100000) {
+        qwList.push({name:acc.name, issue:'MaxAge = '+(c.max_age != null ? c.max_age : 'null')+' (inventory invisible)', impact:'GMV: '+fmt$(m.sell_total), gmv:m.sell_total});
+      }
+    }
+  });
+  qwList.sort(function(a, b){ return b.gmv - a.gmv; });
+  document.getElementById('configQuickWins').innerHTML = qwList.slice(0, 20).map(function(q) {
+    return '<div class="qw-card"><div class="qw-name">'+q.name+'</div><div class="qw-issue">'+q.issue+'</div><div class="qw-impact">'+q.impact+'</div></div>';
+  }).join('') || '<div style="color:var(--text-muted)">No quick wins found</div>';
+
+  var highGmv = [];
+  ACCOUNTS.forEach(function(a) {
+    if(!a.company_id) return;
+    var m = METRICS[a.company_id];
+    if(m && m.sell_total > 1000000 && m.online_pct < 10) {
+      highGmv.push({name:a.name, gmv:m.sell_total, online_pct:m.online_pct, fees:m.fees_total, sell_offline:m.sell_offline});
+    }
+  });
+  highGmv.sort(function(a, b){ return b.gmv - a.gmv; });
+  document.getElementById('highGmvLowOnline').innerHTML = highGmv.slice(0, 15).map(function(h) {
+    var potentialFees = h.sell_offline * 0.005;
+    return '<div class="qw-card">' +
+      '<div class="qw-name">'+h.name+'</div>' +
+      '<div class="qw-issue">Online: '+fmtPct(h.online_pct)+' | GMV: '+fmt$(h.gmv)+' | Offline: '+fmt$(h.sell_offline)+'</div>' +
+      '<div class="qw-impact">Current fees: '+fmt$(h.fees)+' | If 10% online at 0.5%: +'+fmt$(potentialFees * 0.1)+'</div></div>';
+  }).join('') || '<div style="color:var(--text-muted)">None found</div>';
+
+  var sortedSfdc = SFDC.slice().sort(function(a, b){ return (b.amount || 0) - (a.amount || 0); });
+  document.getElementById('sfdcOpps').innerHTML = sortedSfdc.map(function(o) {
+    var stageCls = o.stage ? 'opp-stage-'+o.stage.toLowerCase() : '';
+    return '<div class="opp-card">' +
+      '<div><div class="opp-name">'+(o.account_name||'\u2014')+'</div>' +
+      '<div class="opp-detail">'+(o.opp_name||'\u2014')+' | '+(o.owner||'\u2014')+' | Close: '+(o.close_date||'\u2014')+'</div></div>' +
+      '<div style="text-align:right"><div class="opp-amount">'+fmt$(o.amount)+'</div>' +
+      '<span class="opp-stage '+stageCls+'">'+(o.stage||'\u2014')+'</span></div></div>';
+  }).join('');
+
+  var totalOffline = 0, totalCurrentFees = 0;
+  Object.values(METRICS).forEach(function(m) {
+    totalOffline += m.sell_offline || 0;
+    totalCurrentFees += m.fees_total || 0;
+  });
+  var uplift5 = totalOffline * 0.05 * 0.005;
+  var uplift10 = totalOffline * 0.10 * 0.005;
+  var uplift25 = totalOffline * 0.25 * 0.005;
+  document.getElementById('whatIfMetrics').innerHTML =
+    metricCard('Current Total Fees', fmt$(totalCurrentFees), 'H1 2026') +
+    metricCard('Total Offline GMV', fmt$(totalOffline), 'Revenue at $0 take-rate') +
+    metricCard('If +5% Online', '+'+fmt$(uplift5)+' fees', 'at 0.5% take-rate on new online') +
+    metricCard('If +10% Online', '+'+fmt$(uplift10)+' fees', 'at 0.5% take-rate on new online') +
+    metricCard('If +25% Online', '+'+fmt$(uplift25)+' fees', 'at 0.5% take-rate on new online');
+}
+
+// === DEFINITIONS (Tab 4) ===
+function renderDefinitions() {
+  var el = document.getElementById('tab-definitions');
+  var D = DEFINITIONS;
+  var html = '';
+
+  if(D.product_types) {
+    html += '<div class="def-section"><h3>Product Types (CT_ID)</h3><table class="def-table"><thead><tr><th>Code</th><th>Display</th><th>Description</th><th>Count</th><th>Examples</th></tr></thead><tbody>';
+    Object.entries(D.product_types).forEach(function(entry) {
+      var k = entry[0], v = entry[1];
+      html += '<tr><td style="font-weight:600">'+k+'</td><td>'+v.display+'</td><td>'+v.desc+'</td><td>'+(v.count||'\u2014')+'</td><td style="color:var(--text-muted)">'+(v.examples||'\u2014')+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  if(D.config_objectives) {
+    html += '<div class="def-section"><h3>CONFIG Objectives</h3><table class="def-table"><thead><tr><th>Objective</th><th>Setting</th><th>Question</th><th>Impact</th><th>Fix</th><th>Applies To</th></tr></thead><tbody>';
+    Object.entries(D.config_objectives).forEach(function(entry) {
+      var k = entry[0], v = entry[1];
+      html += '<tr><td style="font-weight:600">'+k+'</td><td>'+v.setting+'</td><td>'+v.question+'</td><td style="color:'+(v.tx_impact==='MUST HAVE'?'var(--red)':'var(--amber)')+'">'+v.tx_impact+'</td><td style="color:var(--green)">'+v.fix+'</td><td>'+(v.applies_to||[]).join(', ')+'</td></tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
+  if(D.abbreviations) {
+    html += '<div class="def-section"><h3>Abbreviations</h3><div class="abbr-grid">';
+    Object.entries(D.abbreviations).forEach(function(entry) {
+      html += '<span class="abbr-key">'+entry[0]+'</span><span>'+entry[1]+'</span>';
+    });
+    html += '</div></div>';
+  }
+
+  if(D.trust_journey) {
+    html += '<div class="def-section"><h3>Trust Journey</h3><div class="trust-journey">';
+    D.trust_journey.forEach(function(s) {
+      html += '<div class="trust-step"><div class="step-num">Step '+s.step+'</div><div class="step-name">'+s.name+'</div><div class="step-desc">'+s.desc+'</div><div style="font-size:10px;color:var(--blue);margin-top:4px">'+s.action+'</div></div>';
+    });
+    html += '</div></div>';
+  }
+
+  if(D.list_challenger) {
+    html += '<div class="def-section"><h3>9 LIST Challenger Messages</h3><ol class="challenger-list">';
+    D.list_challenger.forEach(function(msg) {
+      html += '<li>'+msg+'</li>';
+    });
+    html += '</ol></div>';
+  }
+
+  if(D.buy_discovery) {
+    html += '<div class="def-section"><h3>BUY Discovery Questions</h3><ol class="discovery-list">';
+    D.buy_discovery.forEach(function(q) {
+      html += '<li>'+q+'</li>';
+    });
+    html += '</ol></div>';
+  }
+
+  if(D.buy_challenger) {
+    html += '<div class="def-section"><h3>BUY Challenger Messages</h3><ol class="challenger-list">';
+    D.buy_challenger.forEach(function(msg) {
+      html += '<li>'+msg+'</li>';
+    });
+    html += '</ol></div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// === TAB SWITCHING ===
+document.getElementById('mainTabs').addEventListener('click', function(e) {
+  var tab = e.target.closest('.tab');
+  if(!tab) return;
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
+  tab.classList.add('active');
+  document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+});
+
+// === SORT HANDLING ===
+document.querySelectorAll('th[data-sort]').forEach(function(th) {
+  th.addEventListener('click', function() {
+    var col = this.dataset.sort;
+    if(sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = (col === 'name' || col === 'rep') ? 1 : -1; }
+    document.querySelectorAll('th').forEach(function(h){h.classList.remove('sorted');});
+    this.classList.add('sorted');
+    var arrow = this.querySelector('.sort-arrow');
+    if(arrow) arrow.innerHTML = sortDir === 1 ? '&#9650;' : '&#9660;';
+    renderAccounts();
+  });
+});
+
+// === FILTER EVENTS ===
+document.getElementById('repFilter').addEventListener('change', renderAccounts);
+document.getElementById('searchInput').addEventListener('input', renderAccounts);
+document.getElementById('priorityFilter').addEventListener('change', renderAccounts);
+document.getElementById('configFilter').addEventListener('change', renderAccounts);
+document.getElementById('implFilter').addEventListener('change', renderAccounts);
+document.getElementById('ctFilter').addEventListener('change', renderAccounts);
+document.getElementById('hasDataOnly').addEventListener('change', renderAccounts);
+
+// === BOOT ===
+loadData();
+</script>
+</body>
+</html>

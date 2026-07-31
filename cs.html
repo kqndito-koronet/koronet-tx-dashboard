@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TX Dashboard - CS View</title>
+<style>
+:root {
+  --bg: #f8fafc; --bg-card: #ffffff; --border: #e2e8f0; --text: #1e293b;
+  --green: #059669; --amber: #d97706; --red: #dc2626; --blue: #2563eb;
+  --text-muted: #64748b; --bg-hover: #f1f5f9; --bg-active: #e2e8f0;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size:13px; background:var(--bg); color:var(--text); line-height:1.5; }
+
+/* NAV — NOT sticky */
+.nav { display:flex; align-items:center; gap:16px; padding:12px 24px; background:var(--bg-card); border-bottom:1px solid var(--border); }
+.nav-title { font-weight:700; font-size:15px; }
+.nav-links { display:flex; gap:8px; margin-left:auto; }
+.nav-links a { font-size:12px; color:var(--blue); text-decoration:none; padding:4px 10px; border:1px solid var(--border); border-radius:4px; }
+.nav-links a:hover { background:var(--bg-hover); }
+
+/* TABS */
+.tabs { display:flex; gap:0; padding:0 24px; background:var(--bg-card); border-bottom:2px solid var(--border); }
+.tab { padding:10px 20px; cursor:pointer; font-size:13px; font-weight:600; border-bottom:2px solid transparent; color:var(--text-muted); margin-bottom:-2px; transition:all 0.15s; user-select:none; }
+.tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.tab:hover { color:var(--text); background:var(--bg-hover); }
+.tab-content { display:none; padding:16px 24px; }
+.tab-content.active { display:block; }
+
+/* FILTERS */
+.filters { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:12px; padding:10px 14px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; }
+.filters select, .filters input[type="text"] { font-size:12px; padding:6px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); outline:none; }
+.filters input[type="text"] { width:220px; }
+.filters input[type="text"]:focus { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+.filters label { font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:4px; cursor:pointer; }
+.filters label input[type="checkbox"] { cursor:pointer; }
+.filter-count { font-size:11px; color:var(--text-muted); margin-left:auto; }
+
+/* TABLE */
+.table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:8px; background:var(--bg-card); }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+thead { position:sticky; top:0; z-index:50; }
+th { background:#f1f5f9; padding:8px 10px; text-align:left; font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); border-bottom:2px solid var(--border); white-space:nowrap; cursor:pointer; user-select:none; }
+th:hover { background:var(--bg-active); }
+th .sort-arrow { font-size:10px; margin-left:3px; opacity:0.4; }
+th.sorted .sort-arrow { opacity:1; color:var(--blue); }
+td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+tr:hover { background:var(--bg-hover); }
+tr.total-row { background:#f1f5f9; font-weight:700; border-top:2px solid var(--border); }
+tr.total-row:hover { background:#f1f5f9; }
+
+/* EXPAND */
+.expand-btn { cursor:pointer; font-size:11px; color:var(--text-muted); width:20px; text-align:center; transition:transform 0.15s; display:inline-block; }
+.expand-btn.open { transform:rotate(90deg); }
+.expand-row { display:none; }
+.expand-row.open { display:table-row; }
+.expand-cell { padding:12px 16px 12px 36px; background:#fafbfc; border-bottom:1px solid var(--border); }
+.expand-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; }
+.expand-section { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
+.expand-section h4 { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:6px; }
+.expand-section .detail-row { display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
+.expand-section .detail-label { color:var(--text-muted); }
+
+/* BADGES */
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:600; letter-spacing:0.3px; }
+.badge-TA { background:#dbeafe; color:#1e40af; }
+.badge-IMPL { background:#fef3c7; color:#92400e; }
+.badge-P1 { background:#dcfce7; color:#166534; }
+.badge-CS_P2 { background:#e0e7ff; color:#3730a3; }
+.badge-WATCH { background:#f1f5f9; color:#475569; }
+.badge-ECOSYSTEM { background:#f5f3ff; color:#6d28d9; }
+.badge-CS_TRACKED { background:#fce7f3; color:#9d174d; }
+.badge-ct { background:#f1f5f9; color:var(--text-muted); font-size:10px; padding:1px 6px; border-radius:4px; border:1px solid var(--border); }
+
+/* STAGE BADGES */
+.stage { display:inline-block; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; }
+.stage-SCALE, .stage-STRONG, .stage-HEALTHY { background:#dcfce7; color:#166534; }
+.stage-HABIT, .stage-GROWING { background:#dbeafe; color:#1d4ed8; }
+.stage-ACTIVATING, .stage-MINIMAL { background:#fef3c7; color:#92400e; }
+.stage-CONNECTIONS_NO_BUY, .stage-ESHOP_NO_FEATURES { background:#fed7aa; color:#9a3412; }
+.stage-NO_CONNECTIONS, .stage-NO_ESHOP, .stage-NO_ONLINE_SALES { background:#fecaca; color:#991b1b; }
+
+/* CONFIG INLINE */
+.check-ok { color:var(--green); font-weight:700; }
+.check-fail { color:var(--red); font-weight:700; }
+
+/* SUB-TABS (enablement) */
+.sub-tabs { display:flex; gap:0; margin-bottom:16px; border-bottom:1px solid var(--border); }
+.sub-tab { padding:8px 16px; cursor:pointer; font-size:13px; color:var(--text-muted); border-bottom:2px solid transparent; }
+.sub-tab.active { color:var(--blue); border-bottom-color:var(--blue); }
+.sub-content { display:none; }
+.sub-content.active { display:block; }
+
+/* ENABLEMENT CARDS */
+.en-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px; }
+.en-card h4 { font-size:13px; margin-bottom:6px; }
+.en-card p { font-size:12px; color:var(--text-muted); margin-bottom:4px; }
+.en-tag { display:inline-block; font-size:10px; padding:2px 6px; border-radius:3px; margin-right:4px; }
+.en-tag.fix5 { background:#dcfce7; color:#166534; }
+.en-tag.approval { background:#fef3c7; color:#92400e; }
+.en-list { list-style:none; padding:0; }
+.en-list li { padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; line-height:1.5; }
+.en-list li:last-child { border-bottom:none; }
+.en-num { display:inline-block; width:20px; height:20px; border-radius:50%; background:var(--blue); color:#fff; text-align:center; line-height:20px; font-size:10px; font-weight:700; margin-right:8px; }
+
+/* DEFINITIONS */
+.def-section { margin-bottom:20px; }
+.def-section h3 { font-size:14px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.def-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:10px; }
+.def-card { background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:12px; }
+.def-card h4 { font-size:13px; margin-bottom:4px; color:var(--blue); }
+.def-card p { font-size:12px; color:var(--text-muted); }
+.abbr-grid { display:grid; grid-template-columns:100px 1fr; gap:4px 12px; font-size:12px; }
+.abbr-key { font-weight:700; }
+
+/* TRAFFIC LIGHTS */
+.tl { display:inline-block; font-size:14px; width:22px; text-align:center; }
+.tl-green { color:var(--green); }
+.tl-amber { color:var(--amber); }
+.tl-red { color:var(--red); }
+
+/* PRODUCT BADGES */
+.prod-badge { display:inline-block; padding:1px 5px; border-radius:3px; font-size:9px; font-weight:700; letter-spacing:0.3px; margin-right:2px; }
+.prod-core { background:#dbeafe; color:#1e40af; }
+.prod-esuite { background:#e0e7ff; color:#3730a3; }
+.prod-proc { background:#dcfce7; color:#166534; }
+.prod-eshop { background:#fef3c7; color:#92400e; }
+.prod-pay { background:#fce7f3; color:#9d174d; }
+
+/* PRIORITY MAPPED */
+.badge-P0 { background:#fecaca; color:#991b1b; }
+.badge-P1 { background:#dcfce7; color:#166534; }
+.badge-P2 { background:#e0e7ff; color:#3730a3; }
+.badge-P3 { background:#f1f5f9; color:#475569; }
+
+/* OPP COUNT */
+.opp-count { display:inline-block; min-width:18px; text-align:center; padding:1px 5px; border-radius:10px; font-size:10px; font-weight:700; }
+.opp-count.has-opps { background:#fef3c7; color:#92400e; }
+.opp-count.no-opps { background:#f1f5f9; color:#94a3b8; }
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .nav { flex-direction:column; gap:6px; align-items:flex-start; }
+  .filters { flex-direction:column; }
+  .filters input[type="text"] { width:100%; }
+  .expand-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <span class="nav-title">TX Dashboard / CS</span>
+  <div class="nav-links">
+    <a href="leadership.html">Leadership View</a>
+    <a href="implementations.html">Implementations</a>
+  </div>
+</div>
+
+<div class="tabs" id="mainTabs">
+  <div class="tab active" data-tab="accounts">Accounts</div>
+  <div class="tab" data-tab="enablement">Enablement</div>
+  <div class="tab" data-tab="definitions">Definitions</div>
+</div>
+
+<!-- TAB 1: ACCOUNTS (TABLE LAYOUT) -->
+<div class="tab-content active" id="tab-accounts">
+  <div class="filters">
+    <select id="repFilter">
+      <option value="all">All Reps</option>
+    </select>
+    <select id="priorityFilter">
+      <option value="EXCLUDE_ECO" selected>All (excl. Ecosystem)</option>
+      <option value="ALL">All Priorities</option>
+      <option value="P0">P0</option>
+      <option value="P1">P1</option>
+      <option value="P2">P2</option>
+      <option value="P3">P3</option>
+    </select>
+    <select id="configFilter">
+      <option value="ALL">CONFIG: All</option>
+      <option value="pass">CONFIG: ✅</option>
+      <option value="warn">CONFIG: ⚠️</option>
+      <option value="fail">CONFIG: ❌</option>
+    </select>
+    <select id="buyFilter">
+      <option value="ALL">BUY: All</option>
+      <option value="green">BUY: 🟢</option>
+      <option value="yellow">BUY: 🟡</option>
+      <option value="red">BUY: 🔴</option>
+    </select>
+    <select id="listFilter">
+      <option value="ALL">LIST: All</option>
+      <option value="green">LIST: 🟢</option>
+      <option value="yellow">LIST: 🟡</option>
+      <option value="red">LIST: 🔴</option>
+    </select>
+    <select id="sellFilter">
+      <option value="ALL">SELL: All</option>
+      <option value="green">SELL: 🟢</option>
+      <option value="yellow">SELL: 🟡</option>
+      <option value="red">SELL: 🔴</option>
+    </select>
+    <select id="implFilter">
+      <option value="ALL">Impl: All</option>
+      <option value="Not Started">Not Started</option>
+      <option value="Kickoff">Kickoff</option>
+      <option value="Training">Training</option>
+      <option value="Go-Live">Go-Live</option>
+    </select>
+    <input type="text" id="searchInput" placeholder="Search accounts...">
+    <span class="filter-count" id="filterCount"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="accountsTable">
+      <thead>
+        <tr>
+          <th style="width:26px"></th>
+          <th data-sort="name">Account <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="rep">Owner <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="priority_mapped">Priority <span class="sort-arrow">&#9650;</span></th>
+          <th>Products</th>
+          <th data-sort="config_score">CONFIG <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="buy_score">BUY <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="list_score">LIST <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="sell_score">SELL <span class="sort-arrow">&#9650;</span></th>
+          <th>SFDC Opp</th>
+          <th data-sort="opp_count">Opportunities <span class="sort-arrow">&#9650;</span></th>
+        </tr>
+      </thead>
+      <tbody id="accountsBody"></tbody>
+      <tfoot id="accountsFoot"></tfoot>
+    </table>
+  </div>
+</div>
+
+<!-- TAB 2: ENABLEMENT -->
+<div class="tab-content" id="tab-enablement">
+  <div class="sub-tabs" id="enSubTabs">
+    <div class="sub-tab active" data-sub="config">CONFIG</div>
+    <div class="sub-tab" data-sub="buy">BUY</div>
+    <div class="sub-tab" data-sub="list">LIST</div>
+    <div class="sub-tab" data-sub="sell">SELL</div>
+  </div>
+
+  <div class="sub-content active" id="sub-config"></div>
+  <div class="sub-content" id="sub-buy"></div>
+  <div class="sub-content" id="sub-list"></div>
+  <div class="sub-content" id="sub-sell"></div>
+</div>
+
+<!-- TAB 3: DEFINITIONS -->
+<div class="tab-content" id="tab-definitions"></div>
+
+<script>
+// ─── DATA LOAD ──────────────────────────────────────────────
+var ACCOUNTS=[], METRICS={}, CONFIG={}, BUNCHES={}, SFDC=[], CHRISTINE={}, DEFINITIONS={};
+var BUYERS=[], SELL_BY_CHANNEL={}, BUYER_CONCENTRATION={}, REPEAT_RATE={}, SUPPLY_MATRIX={};
+
+async function loadData() {
+  var base = 'data/';
+  var results = await Promise.all([
+    fetch(base+'accounts.json').then(function(r){return r.json();}),
+    fetch(base+'metrics.json').then(function(r){return r.json();}),
+    fetch(base+'config.json').then(function(r){return r.json();}),
+    fetch(base+'bunches.json').then(function(r){return r.json();}),
+    fetch(base+'sfdc.json').then(function(r){return r.json();}),
+    fetch(base+'christine.json').then(function(r){return r.json();}),
+    fetch(base+'definitions.json').then(function(r){return r.json();}),
+    fetch(base+'buyers.json').then(function(r){return r.json();}),
+    fetch(base+'sell_by_channel.json').then(function(r){return r.json();}),
+    fetch(base+'buyer_concentration.json').then(function(r){return r.json();}),
+    fetch(base+'repeat_rate.json').then(function(r){return r.json();}),
+    fetch(base+'supply_matrix_full.json').then(function(r){return r.json();}),
+  ]);
+  ACCOUNTS=results[0]; METRICS=results[1]; CONFIG=results[2]; BUNCHES=results[3]; SFDC=results[4]; CHRISTINE=results[5]; DEFINITIONS=results[6];
+  BUYERS=results[7]; SELL_BY_CHANNEL=results[8]; BUYER_CONCENTRATION=results[9]; REPEAT_RATE=results[10]; SUPPLY_MATRIX=results[11];
+  populateRepFilter();
+  renderAccounts();
+  renderEnablement();
+  renderDefinitions();
+}
+
+// ─── HELPERS ────────────────────────────────────────────────
+function fmt$(v) { if(v==null||v===undefined||isNaN(v)) return '\u2014'; if(v>=1e6) return '$'+(v/1e6).toFixed(1)+'M'; if(v>=1e3) return '$'+(v/1e3).toFixed(0)+'K'; return '$'+v.toFixed(0); }
+function fmtN(v) { if(v==null||v===undefined) return '\u2014'; if(v>=1e6) return (v/1e6).toFixed(1)+'M'; if(v>=1e3) return (v/1e3).toFixed(1)+'K'; return v.toString(); }
+function fmtPct(v) { if(v==null||v===undefined||isNaN(v)) return '\u2014'; return v.toFixed(1)+'%'; }
+
+var PRIORITY_ORDER = {TA:0, IMPL:1, P1:2, CS_P2:3, WATCH:4, CS_TRACKED:5, ECOSYSTEM:6};
+var PRIORITY_LABELS = {TA:'TA', IMPL:'IMPL', P1:'P1', CS_P2:'CS P2', WATCH:'WATCH', CS_TRACKED:'CS Tracked', ECOSYSTEM:'Ecosystem'};
+
+// Map priority_level to P0/P1/P2/P3
+function mapPriority(p) {
+  if(p === 'TA' || p === 'IMPL') return 'P0';
+  if(p === 'P1') return 'P1';
+  if(p === 'CS_P2') return 'P2';
+  if(p === 'WATCH' || p === 'CS_TRACKED') return 'P3';
+  return 'P3'; // ECOSYSTEM and others default to P3
+}
+var MAPPED_PRIORITY_ORDER = {P0:0, P1:1, P2:2, P3:3};
+
+function priorityBadge(p) {
+  var mapped = mapPriority(p);
+  var label = mapped;
+  return '<span class="badge badge-'+mapped+'" title="'+PRIORITY_LABELS[p]+'">'+label+'</span>';
+}
+
+function stageBadge(s) { if(!s) return '\u2014'; return '<span class="stage stage-'+s+'">'+s.replace(/_/g,' ')+'</span>'; }
+
+// ─── PRODUCT BADGES ─────────────────────────────────────────
+function productBadges(acct) {
+  var badges = [];
+  if(acct.is_esuite) {
+    badges.push('<span class="prod-badge prod-esuite">eSuite</span>');
+  } else if(acct.system_type && acct.system_type.toLowerCase().includes('core')) {
+    badges.push('<span class="prod-badge prod-core">Core</span>');
+  }
+  if(acct.has_procurement) badges.push('<span class="prod-badge prod-proc">Proc</span>');
+  if(acct.has_eshops) badges.push('<span class="prod-badge prod-eshop">eShop</span>');
+  return badges.length ? badges.join('') : '\u2014';
+}
+
+// ─── REP ASSIGNMENTS ────────────────────────────────────────
+function getRep(acct) {
+  var id = acct.company_id;
+  if(!id) return 'Unassigned';
+  if(CHRISTINE[id]) return 'Christian';
+  if(acct.name && (acct.name.includes('Dreisbach') || acct.name.includes('Penn Valley') || acct.name.includes('Cleveland'))) return 'Santiago';
+  if(acct.name && (acct.name.includes('EZ flowers') || acct.name.includes('Algro') || acct.name.includes('J Van Vliet') || acct.name.includes('GOMEZ') || acct.name.includes('Kontiki') || acct.name.includes('FGS'))) return 'Catalina';
+  if(acct.name && (acct.name.includes('Avon Valley') || acct.name.includes('Price'))) return 'Dave';
+  return 'Unassigned';
+}
+
+// ─── TRAFFIC LIGHT LOGIC ────────────────────────────────────
+// Returns {icon, color, cls, score} where score is for sorting (0=red,1=amber,2=green)
+function configTrafficLight(id, acct) {
+  var cfg = CONFIG[id];
+  if(!cfg) return {icon:'\u2014', cls:'', score:-1};
+  // GATE: max_age=0 or null
+  if(cfg.max_age === 0 || cfg.max_age === null) return {icon:'\u274c', cls:'tl tl-red', score:0};
+  // GATE: wholesaler without eShop
+  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return {icon:'\u274c', cls:'tl tl-red', score:0};
+  // WARN: bunches=false or future=false for Core
+  if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return {icon:'\u26a0\ufe0f', cls:'tl tl-amber', score:1};
+  if(!cfg.future && acct.ct_id === 'WH_CORE') return {icon:'\u26a0\ufe0f', cls:'tl tl-amber', score:1};
+  return {icon:'\u2705', cls:'tl tl-green', score:2};
+}
+
+function buyTrafficLight(met) {
+  if(!met) return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+  var s = met.buy_stage;
+  if(s === 'SCALE' || s === 'HABIT') return {icon:'\ud83d\udfe2', cls:'tl tl-green', score:2};
+  if(s === 'ACTIVATING') return {icon:'\ud83d\udfe1', cls:'tl tl-amber', score:1};
+  return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+}
+
+function listTrafficLight(met, cfg, acct) {
+  if(!met && !cfg) return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+  // No eShop = red
+  if(!acct.has_eshops) return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+  if(met && met.list_stage) {
+    var s = met.list_stage;
+    if(s === 'HEALTHY' || s === 'STRONG') return {icon:'\ud83d\udfe2', cls:'tl tl-green', score:2};
+    if(s === 'GROWING' || s === 'ACTIVATING') return {icon:'\ud83d\udfe1', cls:'tl tl-amber', score:1};
+    if(s === 'ESHOP_NO_FEATURES' || s === 'NO_ESHOP') return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+  }
+  // Fallback: check config features
+  if(cfg) {
+    if(!cfg.bunches_flag && !cfg.future) return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+    if(!cfg.bunches_flag || !cfg.future) return {icon:'\ud83d\udfe1', cls:'tl tl-amber', score:1};
+    return {icon:'\ud83d\udfe2', cls:'tl tl-green', score:2};
+  }
+  return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+}
+
+function sellTrafficLight(met) {
+  if(!met) return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+  var s = met.sell_stage;
+  if(s === 'HEALTHY' || s === 'STRONG') return {icon:'\ud83d\udfe2', cls:'tl tl-green', score:2};
+  if(s === 'GROWING' || s === 'MINIMAL') return {icon:'\ud83d\udfe1', cls:'tl tl-amber', score:1};
+  return {icon:'\ud83d\udd34', cls:'tl tl-red', score:0};
+}
+
+// ─── OPPORTUNITY GENERATOR ──────────────────────────────────
+function getOpportunities(acct) {
+  var id = acct.company_id;
+  if(!id) return [];
+  var cfg = CONFIG[id];
+  var met = METRICS[id];
+  var bun = BUNCHES[id];
+  var opps = [];
+  // Config gaps
+  if(cfg) {
+    if((cfg.max_age === 0 || cfg.max_age === null)) {
+      opps.push({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config'});
+    } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      opps.push({text:'MaxAge='+cfg.max_age+'d. Benchmark: 300. 5-min fix.', type:'config'});
+    }
+    if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      var bunchGMV = bun && bun.sells_bunches ? fmt$(bun.total_bunch_gmv)+' bunch GMV offline' : '';
+      opps.push({text:'Bunches OFF.'+(bunchGMV ? ' '+bunchGMV+'.' : '')+' 5-min fix.', type:'config'});
+    }
+    if(!cfg.future && acct.ct_id === 'WH_CORE') {
+      opps.push({text:'Future Sales OFF. eShop shows today only.', type:'config'});
+    }
+  }
+  // Buy gaps
+  if(met) {
+    if(met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY') {
+      opps.push({text:'BUY stage: '+met.buy_stage.replace(/_/g,' ')+'. Needs activation.', type:'buy'});
+    }
+    if(met.k2k_total > 0 && met.k2k_active / met.k2k_total < 0.7) {
+      var inactive = met.k2k_total - met.k2k_active;
+      opps.push({text:inactive+'/'+met.k2k_total+' K2K inactive. Reactivation opp.', type:'buy'});
+    }
+  }
+  // Sell gaps
+  if(met) {
+    if(met.online_pct < 5 && met.sell_total > 100000) {
+      opps.push({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell'});
+    }
+  }
+  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+    opps.push({text:'No eShop. Cannot sell online.', type:'sell'});
+  }
+  return opps;
+}
+
+// ─── SFDC MATCH ─────────────────────────────────────────────
+function getSFDC(acct) {
+  if(!acct.name) return [];
+  var name = acct.name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return SFDC.filter(function(o) {
+    var on = o.account_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return name.includes(on) || on.includes(name) || (name.length > 5 && on.includes(name.substring(0,8)));
+  });
+}
+
+// ─── LOOKUP HELPERS FOR NEW DATA ────────────────────────────
+function findBuyerData(companyId) {
+  if(!companyId || !BUYERS.length) return null;
+  return BUYERS.find(function(b){ return b.company_id === companyId; });
+}
+function findConcentration(companyId) {
+  if(!companyId || !BUYER_CONCENTRATION.accounts) return null;
+  return BUYER_CONCENTRATION.accounts.find(function(b){ return b.company_name; /* match below */ });
+}
+function findConcentrationByName(name) {
+  if(!name || !BUYER_CONCENTRATION.accounts) return null;
+  var n = name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return BUYER_CONCENTRATION.accounts.find(function(b){
+    var bn = b.company_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return bn === n || bn.includes(n) || n.includes(bn);
+  });
+}
+function findRepeatRate(name) {
+  if(!name || !REPEAT_RATE.data) return null;
+  var n = name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return REPEAT_RATE.data.find(function(r){
+    var rn = r.company_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findSupplyBuy(name) {
+  if(!name || !SUPPLY_MATRIX.buy_coverage) return null;
+  var n = name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return SUPPLY_MATRIX.buy_coverage.find(function(r){
+    var rn = r.company_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findSupplySell(name) {
+  if(!name || !SUPPLY_MATRIX.sell_coverage) return null;
+  var n = name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return SUPPLY_MATRIX.sell_coverage.find(function(r){
+    var rn = r.company_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findGapCategories(name) {
+  if(!name || !SUPPLY_MATRIX.gap_categories) return null;
+  var n = name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return SUPPLY_MATRIX.gap_categories.find(function(r){
+    var rn = r.company_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+function findChannelMix(name) {
+  if(!name || !SELL_BY_CHANNEL.data) return null;
+  var n = name.toLowerCase().replace(/[^a-z0-9]/g,'');
+  return SELL_BY_CHANNEL.data.filter(function(r){
+    var rn = r.company_name.toLowerCase().replace(/[^a-z0-9]/g,'');
+    return rn === n || rn.includes(n) || n.includes(rn);
+  });
+}
+
+// ─── BOTTLENECK COMPUTATION ─────────────────────────────────
+function computeBottleneck(acct, cfg, met) {
+  // GATE -> BREADTH -> DEPTH -> FORMAT -> BUYERS -> COMPETITIVE
+  if(cfg && (cfg.max_age === 0 || cfg.max_age === null)) return 'GATE';
+  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'GATE';
+  if(cfg && !cfg.bunches_flag) return 'FORMAT';
+  if(met && (met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY')) return 'BREADTH';
+  if(met && met.buy_stage === 'ACTIVATING') return 'DEPTH';
+  var buyerData = findBuyerData(acct.company_id);
+  if(buyerData && buyerData.online_buyers < 10) return 'BUYERS';
+  if(met && met.sell_stage === 'NO_ONLINE_SALES') return 'COMPETITIVE';
+  return '\u2014';
+}
+
+// ─── POPULATE REP FILTER ────────────────────────────────────
+function populateRepFilter() {
+  var repSet = new Set(ACCOUNTS.map(function(a){ return getRep(a); }));
+  var sel = document.getElementById('repFilter');
+  Array.from(repSet).sort().forEach(function(rep) {
+    var o = document.createElement('option');
+    o.value = rep; o.textContent = rep;
+    sel.appendChild(o);
+  });
+}
+
+// ─── SORT STATE ─────────────────────────────────────────────
+var sortCol = 'priority_mapped';
+var sortDir = 1;
+
+// ─── RENDER ACCOUNTS (TABLE) ────────────────────────────────
+function renderAccounts() {
+  var rep = document.getElementById('repFilter').value;
+  var search = document.getElementById('searchInput').value.toLowerCase();
+  var priority = document.getElementById('priorityFilter').value;
+  var cfgFilter = document.getElementById('configFilter').value;
+  var buyFilter = document.getElementById('buyFilter').value;
+  var listFilterVal = document.getElementById('listFilter').value;
+  var sellFilter = document.getElementById('sellFilter').value;
+  var implFilter = document.getElementById('implFilter').value;
+
+  var filtered = ACCOUNTS.filter(function(a) {
+    var mapped = mapPriority(a.priority_level);
+    // Default: exclude ECOSYSTEM (accounts with no meaningful priority)
+    if(priority === 'EXCLUDE_ECO' && a.priority_level === 'ECOSYSTEM') return false;
+    if(priority !== 'ALL' && priority !== 'EXCLUDE_ECO' && mapped !== priority) return false;
+    if(rep !== 'all' && getRep(a) !== rep) return false;
+    if(search && !(a.name||'').toLowerCase().includes(search) && !(a.company_id||'').includes(search)) return false;
+    // Traffic light filters
+    if(cfgFilter !== 'ALL') {
+      var ct = configTrafficLight(a.company_id, a);
+      if(cfgFilter === 'pass' && ct.score !== 2) return false;
+      if(cfgFilter === 'warn' && ct.score !== 1) return false;
+      if(cfgFilter === 'fail' && ct.score !== 0) return false;
+    }
+    if(buyFilter !== 'ALL') {
+      var bt = buyTrafficLight(METRICS[a.company_id]);
+      if(buyFilter === 'green' && bt.score !== 2) return false;
+      if(buyFilter === 'yellow' && bt.score !== 1) return false;
+      if(buyFilter === 'red' && bt.score !== 0) return false;
+    }
+    if(listFilterVal !== 'ALL') {
+      var lt = listTrafficLight(METRICS[a.company_id], CONFIG[a.company_id], a);
+      if(listFilterVal === 'green' && lt.score !== 2) return false;
+      if(listFilterVal === 'yellow' && lt.score !== 1) return false;
+      if(listFilterVal === 'red' && lt.score !== 0) return false;
+    }
+    if(sellFilter !== 'ALL') {
+      var st = sellTrafficLight(METRICS[a.company_id]);
+      if(sellFilter === 'green' && st.score !== 2) return false;
+      if(sellFilter === 'yellow' && st.score !== 1) return false;
+      if(sellFilter === 'red' && st.score !== 0) return false;
+    }
+    if(implFilter !== 'ALL') {
+      var impl = CHRISTINE[a.company_id];
+      if(!impl) return false;
+      if(impl.stage !== implFilter) return false;
+    }
+    return true;
+  });
+
+  // Enrich for sorting
+  filtered = filtered.map(function(a) {
+    var id = a.company_id;
+    var m = id ? METRICS[id] : null;
+    var cfg = id ? CONFIG[id] : null;
+    var ct = configTrafficLight(id, a);
+    var bt = buyTrafficLight(m);
+    var lt = listTrafficLight(m, cfg, a);
+    var st = sellTrafficLight(m);
+    var opps = getOpportunities(a);
+    return Object.assign({}, a, {
+      _m: m,
+      _cfg: cfg,
+      rep: getRep(a),
+      priority_mapped: mapPriority(a.priority_level),
+      config_score: ct.score,
+      buy_score: bt.score,
+      list_score: lt.score,
+      sell_score: st.score,
+      opp_count: opps.length,
+      _opps: opps,
+      _ct: ct, _bt: bt, _lt: lt, _st: st,
+    });
+  });
+
+  // Sort
+  filtered.sort(function(a, b) {
+    if(sortCol === 'priority_mapped') {
+      var pa = MAPPED_PRIORITY_ORDER[a.priority_mapped] != null ? MAPPED_PRIORITY_ORDER[a.priority_mapped] : 99;
+      var pb = MAPPED_PRIORITY_ORDER[b.priority_mapped] != null ? MAPPED_PRIORITY_ORDER[b.priority_mapped] : 99;
+      if(pa !== pb) return (pa - pb) * sortDir;
+      return ((a.name||'').localeCompare(b.name||''));
+    }
+    var va = a[sortCol], vb = b[sortCol];
+    if(typeof va === 'string') { va = (va||'').toLowerCase(); vb = (vb||'').toLowerCase(); }
+    if(va < vb) return -1 * sortDir;
+    if(va > vb) return 1 * sortDir;
+    return 0;
+  });
+
+  var tbody = document.getElementById('accountsBody');
+  var tfoot = document.getElementById('accountsFoot');
+  var html = '';
+
+  filtered.forEach(function(a, i) {
+    var id = a.company_id;
+    var met = a._m;
+    var cfg = a._cfg;
+    var ct = a._ct;
+    var bt = a._bt;
+    var lt = a._lt;
+    var st = a._st;
+    var opps = a._opps;
+    var sfdcMatches = getSFDC(a);
+    var impl = id ? CHRISTINE[id] : null;
+
+    // SFDC product type
+    var sfdcType = '\u2014';
+    if(sfdcMatches.length > 0) {
+      sfdcType = '<span style="color:var(--blue);font-size:11px" title="'+sfdcMatches.map(function(o){return o.opp_name;}).join(', ')+'">' +
+        (sfdcMatches[0].type || sfdcMatches[0].stage || 'Opp') +
+        (sfdcMatches.length > 1 ? ' +' + (sfdcMatches.length-1) : '') + '</span>';
+    }
+
+    // Opp count badge
+    var oppBadge = opps.length > 0
+      ? '<span class="opp-count has-opps" title="'+opps.map(function(o){return o.text;}).join('\n')+'">'+opps.length+'</span>'
+      : '<span class="opp-count no-opps">0</span>';
+
+    // Main row
+    html += '<tr data-idx="'+i+'">';
+    html += '<td><span class="expand-btn" data-idx="'+i+'">&#9654;</span></td>';
+    html += '<td style="font-weight:600;white-space:nowrap">'+(a.name || '\u2014')+'</td>';
+    html += '<td style="font-size:11px;white-space:nowrap">'+a.rep+'</td>';
+    html += '<td>'+priorityBadge(a.priority_level)+'</td>';
+    html += '<td style="white-space:nowrap">'+productBadges(a)+'</td>';
+    html += '<td style="text-align:center"><span class="'+ct.cls+'">'+ct.icon+'</span></td>';
+    html += '<td style="text-align:center"><span class="'+bt.cls+'">'+bt.icon+'</span></td>';
+    html += '<td style="text-align:center"><span class="'+lt.cls+'">'+lt.icon+'</span></td>';
+    html += '<td style="text-align:center"><span class="'+st.cls+'">'+st.icon+'</span></td>';
+    html += '<td>'+sfdcType+'</td>';
+    html += '<td style="text-align:center">'+oppBadge+'</td>';
+    html += '</tr>';
+
+    // Expand row
+    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="11"><div class="expand-cell"><div class="expand-grid">';
+
+    // Section 1: GMV & Revenue
+    html += '<div class="expand-section"><h4>GMV & Revenue</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Est. GMV Sell</span><span>'+(a.annual_sales_est ? fmt$(a.annual_sales_est) : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Koronet Sell GMV</span><span>'+(met ? fmt$(met.sell_total) : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Online Sell %</span><span style="color:'+(met && met.online_pct >= 20 ? 'var(--green)' : met && met.online_pct > 0 ? 'var(--amber)' : 'var(--red)')+'">'+(met ? fmtPct(met.online_pct) : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Koronet Buy GMV</span><span>'+(met ? fmt$(met.proc_total) : '\u2014')+'</span></div>';
+    var buyOnlinePct = met && met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0;
+    html += '<div class="detail-row"><span class="detail-label">Online Buy %</span><span>'+(met ? fmtPct(buyOnlinePct) : '\u2014')+'</span></div>';
+    html += '</div>';
+
+    // Section 2: Buyers & Sustainability
+    var buyerData = findBuyerData(id);
+    var concData = findConcentrationByName(a.name);
+    var repeatData = findRepeatRate(a.name);
+    html += '<div class="expand-section"><h4>Buyers & Sustainability</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Buyers</span><span>'+(buyerData ? buyerData.total_buyers+' total / '+buyerData.online_buyers+' online' : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Repeat Rate</span><span>'+(repeatData ? fmtPct(repeatData.repeat_rate_pct) : '\u2014')+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Concentration (top 2)</span><span style="color:'+(concData && concData.top2_pct > 25 ? 'var(--red)' : concData && concData.top2_pct > 15 ? 'var(--amber)' : 'var(--green)')+'">'+(concData ? fmtPct(concData.top2_pct) : '\u2014')+'</span></div>';
+    if(concData) {
+      html += '<div class="detail-row"><span class="detail-label">#1 Buyer</span><span style="font-size:11px">'+concData.top1_name+' ('+fmt$(concData.top1_gmv)+')</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">#2 Buyer</span><span style="font-size:11px">'+(concData.top2_name||'\u2014')+' ('+fmt$(concData.top2_gmv_2)+')</span></div>';
+    }
+    html += '</div>';
+
+    // Section 3: Supply Coverage
+    var supBuy = findSupplyBuy(a.name);
+    var supSell = findSupplySell(a.name);
+    var gapCat = findGapCategories(a.name);
+    html += '<div class="expand-section"><h4>Supply Coverage</h4>';
+    if(supBuy) {
+      var buyCov = supBuy.total_categories_bought > 0 ? (supBuy.online_categories_bought / supBuy.total_categories_bought * 100) : 0;
+      html += '<div class="detail-row"><span class="detail-label">BUY Coverage</span><span>'+supBuy.online_categories_bought+'/'+supBuy.total_categories_bought+' ('+fmtPct(buyCov)+')</span></div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">BUY Coverage</span><span>\u2014</span></div>';
+    }
+    if(supSell) {
+      var sellCov = supSell.total_categories_sold > 0 ? (supSell.online_categories_sold / supSell.total_categories_sold * 100) : 0;
+      html += '<div class="detail-row"><span class="detail-label">SELL Coverage</span><span>'+supSell.online_categories_sold+'/'+supSell.total_categories_sold+' ('+fmtPct(sellCov)+')</span></div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">SELL Coverage</span><span>\u2014</span></div>';
+    }
+    html += '<div class="detail-row"><span class="detail-label">Gap Categories</span><span>'+(gapCat ? gapCat.gap_categories+' categories' : '\u2014')+'</span></div>';
+    html += '</div>';
+
+    // Section 4: Bottleneck & Actions
+    var bottleneck = computeBottleneck(a, cfg, met);
+    var nextAction = opps.length > 0 ? opps[0].text : '\u2014';
+    html += '<div class="expand-section"><h4>Bottleneck & Actions</h4>';
+    html += '<div class="detail-row"><span class="detail-label">Bottleneck</span><span style="font-weight:600;color:'+(bottleneck === 'GATE' ? 'var(--red)' : bottleneck === '\u2014' ? 'var(--text-muted)' : 'var(--amber)')+'">'+bottleneck+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Next Action</span><span style="font-size:11px">'+nextAction+'</span></div>';
+    if(opps.length > 1) {
+      html += '<div style="margin-top:4px;font-size:11px;color:var(--text-muted)">';
+      opps.slice(1).forEach(function(o) {
+        html += '<div>\u2022 '+o.text+'</div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+
+    // Section 5: Channel Mix
+    var channels = findChannelMix(a.name);
+    html += '<div class="expand-section"><h4>Channel Mix</h4>';
+    if(channels && channels.length > 0) {
+      var totalGmv = channels.reduce(function(s, c){ return s + c.channel_gmv; }, 0);
+      channels.forEach(function(c) {
+        var pct = totalGmv > 0 ? (c.channel_gmv / totalGmv * 100) : 0;
+        html += '<div class="detail-row"><span class="detail-label">'+c.sales_channel+'</span><span>'+fmt$(c.channel_gmv)+' ('+fmtPct(pct)+')</span></div>';
+      });
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">\u2014</span><span>No channel data</span></div>';
+    }
+    html += '</div>';
+
+    // Section 6: Bunches & Config
+    var bun = id ? BUNCHES[id] : null;
+    html += '<div class="expand-section"><h4>Bunches & Config</h4>';
+    if(bun) {
+      html += '<div class="detail-row"><span class="detail-label">Bunch GMV</span><span>'+fmt$(bun.total_bunch_gmv)+'</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Flag</span><span style="color:'+(bun.bunches_flag ? 'var(--green)' : 'var(--red)')+'">'+(bun.bunches_flag ? 'ON' : 'OFF')+'</span></div>';
+      if(bun.discrepancy) {
+        html += '<div class="detail-row"><span class="detail-label">Discrepancy</span><span style="color:var(--red);font-weight:600">Sells bunches but flag OFF</span></div>';
+      }
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">\u2014</span><span>No bunch data</span></div>';
+    }
+    if(cfg) {
+      html += '<div class="detail-row"><span class="detail-label">MaxAge</span><span style="color:'+(cfg.max_age && cfg.max_age >= 30 ? 'var(--green)' : cfg.max_age && cfg.max_age > 0 ? 'var(--amber)' : 'var(--red)')+'">'+(cfg.max_age != null ? cfg.max_age+'d' : 'null')+'</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Future Sales</span><span style="color:'+(cfg.future ? 'var(--green)' : 'var(--red)')+'">'+(cfg.future ? 'ON' : 'OFF')+'</span></div>';
+    }
+    html += '</div>';
+
+    // Section 7: SFDC
+    if(sfdcMatches.length) {
+      html += '<div class="expand-section"><h4>SFDC Opportunities</h4>';
+      sfdcMatches.forEach(function(o) {
+        html += '<div class="detail-row"><span class="detail-label">'+o.stage+'</span><span>'+o.opp_name+' \u2014 '+fmt$(o.amount)+(o.close_date ? ' \u00b7 close '+o.close_date : '')+'</span></div>';
+      });
+      html += '</div>';
+    }
+
+    // Section 8: Implementation
+    if(impl) {
+      html += '<div class="expand-section"><h4>Implementation</h4>';
+      html += '<div class="detail-row"><span class="detail-label">Stage</span><span>'+(impl.stage || '\u2014')+'</span></div>';
+      html += '<div class="detail-row"><span class="detail-label">Type</span><span>'+(impl.type || '\u2014')+'</span></div>';
+      if(impl.status) html += '<div class="detail-row"><span class="detail-label">Status</span><span>'+impl.status+'</span></div>';
+      if(impl.days_live != null) html += '<div class="detail-row"><span class="detail-label">Days Live</span><span>'+impl.days_live+'</span></div>';
+      if(impl.note) html += '<div class="detail-row"><span class="detail-label">Note</span><span>'+impl.note+'</span></div>';
+      html += '</div>';
+    }
+
+    html += '</div></div></td></tr>';
+  });
+
+  tbody.innerHTML = html;
+
+  // Total row
+  tfoot.innerHTML = '<tr class="total-row">' +
+    '<td></td><td>TOTAL ('+filtered.length+' accounts)</td>' +
+    '<td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>' +
+    '</tr>';
+
+  document.getElementById('filterCount').textContent = filtered.length+' of '+ACCOUNTS.length+' accounts';
+
+  // Bind expand buttons
+  document.querySelectorAll('.expand-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var idx = this.dataset.idx;
+      var row = document.querySelector('tr[data-expand="'+idx+'"]');
+      this.classList.toggle('open');
+      row.classList.toggle('open');
+    });
+  });
+}
+
+// ─── ENABLEMENT ─────────────────────────────────────────────
+function renderEnablement() {
+  var D = DEFINITIONS;
+
+  // CONFIG sub-tab
+  var configHtml = Object.entries(D.config_objectives).map(function(entry) {
+    var key = entry[0], obj = entry[1];
+    return '<div class="en-card" style="border-left:3px solid '+(obj.tx_impact==='MUST HAVE'?'var(--red)':obj.tx_impact==='SHOULD HAVE'?'var(--amber)':'var(--green)')+'">' +
+      '<h4>'+obj.question+' <span style="font-size:11px;color:var(--text-muted);font-weight:400">('+obj.setting+')</span></h4>' +
+      '<p>'+obj.desc+'</p>' +
+      (obj.if_wrong ? '<p style="color:var(--red);margin-top:4px;font-size:11px"><strong>Si est\u00e1 mal:</strong> '+obj.if_wrong+'</p>' : '') +
+      '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">' +
+        '<span class="en-tag '+(obj.fix.includes('5-min')?'fix5':'approval')+'">'+(obj.fix.includes('5-min')?'\u26a1 5-min fix':'\u2699\ufe0f Needs config')+'</span>' +
+        '<span class="en-tag" style="background:#fef2f2;color:var(--red)">'+obj.tx_impact+'</span>' +
+        '<span style="font-size:11px;color:var(--text-muted)">Aplica a: '+(obj.applies_to||[]).join(', ')+'</span>' +
+      '</div>' +
+      '<div style="margin-top:6px;font-size:12px"><strong>Acci\u00f3n:</strong> '+obj.fix+'</div>' +
+    '</div>';
+  }).join('');
+
+  var alphaHtml = D.config_alpha_accounts ? '<div class="en-card" style="border-left:3px solid var(--green);margin-top:16px">' +
+    '<h4>\u26a1 Quick Wins Verificados (ALPHA \u2014 5 accounts)</h4>' +
+    '<table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:8px">' +
+    '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Account</th><th>Issue</th><th>Fix</th><th>Time</th><th>Impact</th></tr>' +
+    D.config_alpha_accounts.map(function(a){return '<tr><td style="padding:4px 8px;font-weight:600">'+a.account+'</td><td>'+a.issue+'</td><td>'+a.fix+'</td><td>'+a.time+'</td><td>'+a.impact+'</td></tr>';}).join('') +
+    '</table></div>' : '';
+
+  var issuesHtml = D.known_issues_by_product ? Object.entries(D.known_issues_by_product).map(function(entry) {
+    var ct = entry[0], issues = entry[1];
+    return '<div class="en-card" style="margin-top:8px"><h4 style="color:var(--amber)">\u26a0\ufe0f Known Issues: '+ct+'</h4>' +
+      '<ul style="font-size:12px;padding-left:16px;margin-top:4px">'+issues.map(function(i){return '<li style="margin:2px 0">'+i+'</li>';}).join('')+'</ul></div>';
+  }).join('') : '';
+
+  document.getElementById('sub-config').innerHTML =
+    '<h3 style="font-size:14px;margin-bottom:4px">Config por Objetivo</h3>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Organizados por lo que habilitan para el cliente, no por nombre t\u00e9cnico. <span style="color:var(--red)">MUST HAVE</span> = sin esto no vende. <span style="color:var(--amber)">SHOULD HAVE</span> = mejora significativa.</p>' +
+    configHtml + alphaHtml + issuesHtml;
+
+  // BUY sub-tab
+  var funnel = D.buy_funnel;
+  var funnelHtml = '';
+  if(funnel) {
+    funnelHtml = '<h3 style="font-size:14px;margin:20px 0 8px">BUY Funnel: Conexiones \u2192 Supply \u2192 Activaci\u00f3n \u2192 H\u00e1bito \u2192 Retenci\u00f3n</h3>' +
+      '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Cada etapa depende de la anterior. No empujar activaci\u00f3n si no hay conexiones. No empujar h\u00e1bito si supply es malo.</p>' +
+      '<div style="display:flex;flex-direction:column;gap:0">' +
+      funnel.stages.map(function(s,i) {
+        return '<div class="en-card" style="border-left:3px solid var(--blue);margin-bottom:2px">' +
+          '<h4>'+(i+1)+'. '+s.name+'</h4>' +
+          '<p><strong>Pregunta:</strong> '+s.question+'</p>' +
+          '<p style="color:var(--red)"><strong>Si NO:</strong> '+s.if_no+'</p>' +
+          (s.lead ? '<p style="font-size:11px;color:var(--text-muted)"><strong>Lead trigger:</strong> '+s.lead+'</p>' : '') +
+        '</div>';
+      }).join('<div style="text-align:center;font-size:16px;color:var(--blue)">\u2193</div>') +
+      '</div>';
+  }
+
+  var leakageHtml = '';
+  if(funnel && funnel.leakage_vs_gap) {
+    leakageHtml = '<div class="en-card" style="margin-top:16px;border-left:3px solid var(--amber)">' +
+      '<h4>LEAKAGE vs GAP</h4>' +
+      '<p><strong style="color:var(--red)">LEAKAGE:</strong> '+funnel.leakage_vs_gap.leakage+'</p>' +
+      '<p style="margin-top:4px"><strong style="color:var(--amber)">GAP:</strong> '+funnel.leakage_vs_gap.gap+'</p></div>';
+  }
+
+  var objectionHtml = '';
+  if(funnel && funnel.objection_procurement_expensive) {
+    var obj = funnel.objection_procurement_expensive;
+    objectionHtml = '<div class="en-card" style="margin-top:12px;border-left:3px solid var(--red)">' +
+      '<h4>\u26a0\ufe0f Objeci\u00f3n: "Procurement es caro"</h4>' +
+      '<p style="font-size:12px">'+obj.description+'</p>' +
+      '<p style="margin-top:6px;font-size:12px"><strong>Qu\u00e9 hacer:</strong> '+obj.what_to_do+'</p>' +
+      '<p style="margin-top:6px;font-size:11px;color:var(--text-muted)"><strong>Root causes:</strong> '+obj.root_causes.join(' | ')+'</p></div>';
+  }
+
+  var csTrackingHtml = '';
+  if(funnel && funnel.cs_procurement_tracking) {
+    csTrackingHtml = '<div class="en-card" style="margin-top:12px;border-left:3px solid var(--green)">' +
+      '<h4>\ud83d\udcca CS Procurement Tracking (FUNDAMENTAL)</h4>' +
+      '<p style="font-size:12px">'+funnel.cs_procurement_tracking+'</p></div>';
+  }
+
+  var buyLeadsHtml = '';
+  if(D.buy_leads) {
+    buyLeadsHtml = '<h3 style="font-size:14px;margin:20px 0 8px">SUPPLY Leads (Category B)</h3>' +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Lead</th><th>Detecta</th><th>Acci\u00f3n</th></tr>' +
+      D.buy_leads.map(function(l){return '<tr><td style="padding:4px 8px;font-weight:600;font-size:11px">'+l.type+'</td><td>'+l.detects+'</td><td>'+l.action+'</td></tr>';}).join('') +
+      '</table>';
+  }
+
+  var buyChallenger = '';
+  if(D.buy_challenger) {
+    buyChallenger = '<h3 style="font-size:14px;margin:20px 0 8px">Challenger Messages \u2014 BUY</h3>' +
+      '<ol class="en-list">'+D.buy_challenger.map(function(m,i){return '<li><span class="en-num">'+(i+1)+'</span>'+m+'</li>';}).join('')+'</ol>';
+  }
+
+  document.getElementById('sub-buy').innerHTML =
+    '<h3 style="font-size:14px;margin-bottom:4px">BUY \u2014 Discovery + Funnel + Enablement</h3>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Activaci\u00f3n es DISCOVERY-FIRST, no feature-push. Entender la realidad de compra ANTES de proponer.</p>' +
+    '<h3 style="font-size:13px;margin-bottom:8px">Preguntas de Discovery</h3>' +
+    '<ol class="en-list">'+D.buy_discovery.map(function(q,i){return '<li><span class="en-num">'+(i+1)+'</span>'+q+'</li>';}).join('')+'</ol>' +
+    funnelHtml + leakageHtml + objectionHtml + csTrackingHtml + buyLeadsHtml + buyChallenger;
+
+  // LIST sub-tab
+  var rubikHtml = '';
+  if(D.list_rubiks_cube) {
+    var rc = D.list_rubiks_cube;
+    rubikHtml = '<div class="en-card" style="border-left:3px solid var(--blue);margin-top:16px">' +
+      '<h4>\ud83e\udde9 Rubik\'s Cube: '+rc.formula+'</h4>' +
+      '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">' +
+        '<div style="background:#eff6ff;padding:8px;border-radius:6px;font-size:12px"><strong>VARIETIES</strong><br>'+rc.varieties+'</div>' +
+        '<div style="background:#fef3c7;padding:8px;border-radius:6px;font-size:12px"><strong>TIME</strong><br>'+rc.time+'</div>' +
+        '<div style="background:#ecfdf5;padding:8px;border-radius:6px;font-size:12px"><strong>FORMAT</strong><br>'+rc.format+'</div>' +
+      '</div>' +
+      '<p style="font-size:11px;color:var(--text-muted);margin-top:8px">'+rc.insight+'</p></div>';
+  }
+
+  var pathsHtml = '';
+  if(D.list_inventory_paths) {
+    pathsHtml = '<h3 style="font-size:13px;margin:20px 0 8px">5 Paths para Inventory en eShop</h3>' +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Path</th><th>Effort</th><th>Qui\u00e9n puede</th><th>Qu\u00e9 cubre</th></tr>' +
+      D.list_inventory_paths.map(function(p){return '<tr><td style="padding:4px 8px;font-weight:600">'+p.path+'</td><td>'+p.effort+'</td><td>'+p.who+'</td><td>'+p.covers+'</td></tr>';}).join('') +
+      '</table>';
+  }
+
+  var coverageHtml = '';
+  if(D.list_coverage_metrics) {
+    coverageHtml = '<div class="en-card" style="margin-top:16px"><h4>Listing Coverage Metrics</h4>' +
+      '<div style="font-size:12px;margin-top:6px">' +
+        '<p><strong>Coverage %</strong> = '+D.list_coverage_metrics.coverage_pct+'</p>' +
+        '<p><strong>Depth %</strong> = '+D.list_coverage_metrics.depth_pct+'</p>' +
+        '<p><strong>Time %</strong> = '+D.list_coverage_metrics.time_pct+'</p>' +
+      '</div></div>';
+  }
+
+  var leadingHtml = '';
+  if(D.list_leading_indicators) {
+    leadingHtml = '<div class="en-card" style="margin-top:12px;border-left:3px solid var(--green)">' +
+      '<h4>Leading Indicators (Facu \u2192 Mauro, Jul 8)</h4>' +
+      '<ul style="font-size:12px;padding-left:16px;margin-top:6px">'+D.list_leading_indicators.map(function(i){return '<li>'+i+'</li>';}).join('')+'</ul></div>';
+  }
+
+  document.getElementById('sub-list').innerHTML =
+    '<h3 style="font-size:14px;margin-bottom:4px">LIST \u2014 Challenger + Rubik\'s Cube + Paths</h3>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">"Lo que no mostr\u00e1s no existe." Cada mensaje debe usar N\u00daMEROS REALES de la cuenta.</p>' +
+    '<h3 style="font-size:13px;margin-bottom:8px">9 LIST Challenger Messages</h3>' +
+    '<ol class="en-list">'+D.list_challenger.map(function(m,i){return '<li><span class="en-num">'+(i+1)+'</span>'+m+'</li>';}).join('')+'</ol>' +
+    rubikHtml + pathsHtml + coverageHtml + leadingHtml;
+
+  // SELL sub-tab
+  var flowHtml = '';
+  if(D.sell_7stage_flow) {
+    flowHtml = '<h3 style="font-size:13px;margin-bottom:8px">7-Stage Decision Flow</h3>' +
+      '<p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">Cada etapa gatekeepea la siguiente. No mandar tr\u00e1fico a una tienda vac\u00eda.</p>' +
+      '<table style="width:100%;font-size:12px;border-collapse:collapse">' +
+      '<tr style="background:#f1f5f9"><th style="padding:6px 8px;text-align:left;width:30px">#</th><th>Stage</th><th>Question</th><th>If NO \u2192 Fix</th></tr>' +
+      D.sell_7stage_flow.map(function(s){return '<tr><td style="padding:6px 8px;font-weight:700;color:var(--blue)">'+s.stage+'</td><td style="font-weight:600">'+s.name+'</td><td>'+s.question+'</td><td style="color:var(--red);font-size:11px">'+s.if_no+'</td></tr>';}).join('') +
+      '</table>';
+  }
+
+  var sustainHtml = '';
+  if(D.sell_sustainability_score) {
+    var ss = D.sell_sustainability_score;
+    sustainHtml = '<div class="en-card" style="margin-top:16px"><h4>Sustainability Score</h4>' +
+      '<ul style="font-size:12px;padding-left:16px;margin-top:6px">' +
+        '<li><strong>Concentration:</strong> '+ss.concentration+'</li>' +
+        '<li><strong>Repeat rate:</strong> '+ss.repeat_rate+'</li>' +
+        '<li><strong>Channel diversification:</strong> '+ss.channel_diversification+'</li>' +
+        '<li><strong>Fee yield:</strong> '+ss.fee_yield+'</li>' +
+      '</ul></div>';
+  }
+
+  var paymentGateHtml = '';
+  if(D.sell_payment_gate) {
+    paymentGateHtml = '<div class="en-card" style="margin-top:12px;border-left:3px solid var(--amber)">' +
+      '<h4>\u26a0\ufe0f Payment Escalation Gate</h4>' +
+      '<p style="font-size:12px">'+D.sell_payment_gate+'</p></div>';
+  }
+
+  var onboardingHtml = '';
+  if(D.sell_buyer_onboarding) {
+    onboardingHtml = '<div class="en-card" style="margin-top:16px"><h4>Buyer Onboarding Steps</h4>' +
+      '<ol style="font-size:12px;padding-left:16px;margin-top:6px">'+D.sell_buyer_onboarding.map(function(s){return '<li style="margin:4px 0">'+s+'</li>';}).join('')+'</ol></div>';
+  }
+
+  var benchHtml = '';
+  if(D.sell_benchmarks) {
+    benchHtml = Object.entries(D.sell_benchmarks).map(function(entry) {
+      var b = entry[1];
+      return '<div class="en-card" style="margin-top:8px;border-left:3px solid var(--green)">' +
+        '<h4>\ud83d\udcca Benchmark: '+b.name+'</h4>' +
+        '<div style="font-size:12px;margin-top:6px">' +
+          (b.max_age ? '<p>MaxAge: <strong>'+b.max_age+'d</strong></p>' : '') +
+          (b.standing_orders ? '<p>Standing Orders: <strong>'+b.standing_orders+'</strong></p>' : '') +
+          (b.online_sell_pct ? '<p>Online sell: <strong>'+b.online_sell_pct+'%</strong></p>' : '') +
+          (b.buyers ? '<p>Buyers: <strong>'+b.buyers+'</strong></p>' : '') +
+          (b.repeat_rate_pct ? '<p>Repeat rate: <strong>'+b.repeat_rate_pct+'%</strong></p>' : '') +
+          (b.fees_h1 ? '<p>Fees H1: <strong>$'+b.fees_h1+' ('+b.fees_yoy+')</strong></p>' : '') +
+          (b.with_eshop ? '<p>With eShop: '+b.with_eshop+'</p>' : '') +
+          (b.without_eshop ? '<p>Without eShop: '+b.without_eshop+'</p>' : '') +
+          (b.note ? '<p style="font-size:11px;color:var(--text-muted);margin-top:4px">'+b.note+'</p>' : '') +
+        '</div></div>';
+    }).join('');
+  }
+
+  var programHtml = '';
+  if(D.sell_program_levels) {
+    var gb = D.sell_program_levels.green_belt;
+    var bb = D.sell_program_levels.black_belt;
+    programHtml = '<h3 style="font-size:13px;margin:20px 0 8px">Program Levels</h3>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div class="en-card" style="border-left:3px solid var(--green)">' +
+          '<h4>\ud83d\udfe2 Green Belt \u2014 Self-Serve</h4>' +
+          '<p style="font-size:12px"><strong>Who:</strong> '+gb.who+'</p>' +
+          '<p style="font-size:12px"><strong>What:</strong> '+gb.what+'</p>' +
+          '<p style="font-size:12px"><strong>Cost:</strong> '+gb.cost+'</p>' +
+          '<p style="font-size:12px"><strong>Scale:</strong> '+gb.scale+'</p>' +
+        '</div>' +
+        '<div class="en-card" style="border-left:3px solid var(--text)">' +
+          '<h4>\u26ab Black Belt \u2014 Intensive</h4>' +
+          '<p style="font-size:12px"><strong>Who:</strong> '+bb.who+'</p>' +
+          '<p style="font-size:12px"><strong>Cost:</strong> '+bb.cost+'</p>' +
+          '<p style="font-size:12px"><strong>Scale:</strong> '+bb.scale+'</p>' +
+          '<p style="font-size:12px;margin-top:6px"><strong>5 Criteria:</strong></p>' +
+          '<ol style="font-size:11px;padding-left:16px">'+bb.criteria.map(function(c){return '<li>'+c+'</li>';}).join('')+'</ol>' +
+        '</div>' +
+      '</div>';
+  }
+
+  document.getElementById('sub-sell').innerHTML =
+    '<h3 style="font-size:14px;margin-bottom:4px">SELL \u2014 7-Stage Flow + Buyer Onboarding + Benchmarks</h3>' +
+    '<p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">Cada stage gatekeepea la siguiente. No mandar tr\u00e1fico (Stage 4) a un eShop vac\u00edo (Stage 2/3).</p>' +
+    flowHtml + sustainHtml + paymentGateHtml + onboardingHtml + benchHtml + programHtml;
+}
+
+// ─── DEFINITIONS ────────────────────────────────────────────
+function renderDefinitions() {
+  var el = document.getElementById('tab-definitions');
+  var html = '';
+
+  // Product types
+  html += '<div class="def-section"><h3>Product Types</h3><div class="def-grid">';
+  Object.entries(DEFINITIONS.product_types).forEach(function(entry) {
+    var pt = entry[1];
+    html += '<div class="def-card"><h4>'+pt.display+'</h4><p>'+pt.desc+'</p>'+(pt.examples ? '<p style="margin-top:4px"><strong>Examples:</strong> '+pt.examples+'</p>' : '')+'</div>';
+  });
+  html += '</div></div>';
+
+  // Trust journey
+  html += '<div class="def-section"><h3>Trust Journey</h3><div class="def-grid">';
+  DEFINITIONS.trust_journey.forEach(function(step) {
+    html += '<div class="def-card"><h4>Step '+step.step+': '+step.name+'</h4><p>'+step.desc+'</p><p style="margin-top:4px"><strong>Action:</strong> '+step.action+'</p></div>';
+  });
+  html += '</div></div>';
+
+  // Abbreviations
+  html += '<div class="def-section"><h3>Abbreviations</h3><div class="abbr-grid">';
+  Object.entries(DEFINITIONS.abbreviations).forEach(function(entry) {
+    html += '<span class="abbr-key">'+entry[0]+'</span><span>'+entry[1]+'</span>';
+  });
+  html += '</div></div>';
+
+  el.innerHTML = html;
+}
+
+// ─── TAB SWITCHING ──────────────────────────────────────────
+document.getElementById('mainTabs').addEventListener('click', function(e) {
+  var tab = e.target.closest('.tab');
+  if(!tab) return;
+  document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.tab-content').forEach(function(t){t.classList.remove('active');});
+  tab.classList.add('active');
+  document.getElementById('tab-'+tab.dataset.tab).classList.add('active');
+});
+
+document.getElementById('enSubTabs').addEventListener('click', function(e) {
+  var tab = e.target.closest('.sub-tab');
+  if(!tab) return;
+  document.querySelectorAll('.sub-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.sub-content').forEach(function(t){t.classList.remove('active');});
+  tab.classList.add('active');
+  document.getElementById('sub-'+tab.dataset.sub).classList.add('active');
+});
+
+// ─── SORT HANDLING ──────────────────────────────────────────
+document.querySelectorAll('th[data-sort]').forEach(function(th) {
+  th.addEventListener('click', function() {
+    var col = this.dataset.sort;
+    if(sortCol === col) { sortDir *= -1; } else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('th').forEach(function(h){h.classList.remove('sorted');});
+    this.classList.add('sorted');
+    this.querySelector('.sort-arrow').innerHTML = sortDir === 1 ? '&#9650;' : '&#9660;';
+    renderAccounts();
+  });
+});
+
+// ─── FILTER EVENTS ──────────────────────────────────────────
+document.getElementById('repFilter').addEventListener('change', renderAccounts);
+document.getElementById('searchInput').addEventListener('input', renderAccounts);
+document.getElementById('priorityFilter').addEventListener('change', renderAccounts);
+document.getElementById('configFilter').addEventListener('change', renderAccounts);
+document.getElementById('buyFilter').addEventListener('change', renderAccounts);
+document.getElementById('listFilter').addEventListener('change', renderAccounts);
+document.getElementById('sellFilter').addEventListener('change', renderAccounts);
+document.getElementById('implFilter').addEventListener('change', renderAccounts);
+
+// ─── BOOT ───────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
