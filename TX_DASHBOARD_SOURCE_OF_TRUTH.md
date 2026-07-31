@@ -34,6 +34,22 @@ At portfolio level it must also:
 
 The dashboard does not remove Facu's approval gate. It makes the reasoning and recommended order visible so that priorities can be defined deliberately and then executed consistently by the responsible team.
 
+## Complete account universe and historical priority views
+
+The operating surface must retain **all accounts**, not only the accounts selected for the current cycle. Priority is a time-bound view over the full universe.
+
+For every two-week cycle (and its constituent weeks), the system should preserve:
+
+- the complete account universe available at that snapshot;
+- which accounts were selected as priorities;
+- the priority bucket or rank;
+- the explicit reason/evidence for selection;
+- the relevant CONFIG / BUY / LIST / SELL / Revenue Growth bottleneck;
+- which owner/team was expected to act;
+- whether the account remained, entered or left the priority set in the next cycle.
+
+The user must be able to move easily between **all accounts**, **current priorities**, and **historical priority views by cycle/week** without losing the account's underlying data. A historical filter must explain *why* the account was priority at that time; it must not rewrite today's account state.
+
 ## Delivery priority
 
 ### P0 — correct Tab 1 structure
