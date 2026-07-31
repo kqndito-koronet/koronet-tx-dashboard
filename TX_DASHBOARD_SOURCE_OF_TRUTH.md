@@ -65,6 +65,13 @@ Accounts cockpit
 
 The POTENTIAL / CONFIG / BUY / LIST / SELL blocks in Tab 1 are compact triage summaries. They must expose enough evidence to route the next click, but they should not become a second copy of the Client Deep Dive or a full playbook. Initiative tabs and enablement surfaces explain the reusable logic and execution method; the Client Deep Dive explains how that logic applies to one client.
 
+There are two valid deep links from an account row:
+
+1. **Account understanding path:** `Accounts → Account Deep Dive` in the existing Client Deep Dive workflow/repository, for the complete client-specific history, evidence, diagnosis and context. This dashboard routes to that workflow; it does not create a parallel deep-dive system.
+2. **Execution path:** `Accounts → opportunity / initiative enablement tab`, filtered to that account (and eventually by owner, product type, priority, status or other useful dimensions), for the reusable play, talk track, checks, owner and next action. The filtered view must show which opportunities of that type apply to the selected account and how to execute them.
+
+The first path answers **“what is true about this client?”**. The second answers **“how do we execute this specific opportunity with this client?”**. Both must preserve the account identifier and source context so the user never loses where the recommendation came from.
+
 ### Later operating layer
 
 Once Tab 1 is trusted, the dashboard should support a two-week priority cycle:
