@@ -23,6 +23,17 @@ The dashboard is operational only when a person can use it to answer, for a spec
 - What customer outcome will confirm that the action worked?
 - What changed since the previous review, and what should be escalated or learned?
 
+At portfolio level it must also:
+
+- understand the business priorities and the evidence behind them;
+- help define and rank the priority accounts and priority problems;
+- make the chosen priority explicit rather than leaving CS or Implementations to infer it;
+- tell CS **which client**, **why now**, **what conversation or follow-up is needed**, and **what outcome to capture**;
+- tell Implementations **which client**, **which configuration or activation step is blocking**, **who owns the fix**, and **what proves readiness**;
+- give Facu a review surface where priorities, exceptions and proposed changes can be accepted, corrected or rejected.
+
+The dashboard does not remove Facu's approval gate. It makes the reasoning and recommended order visible so that priorities can be defined deliberately and then executed consistently by the responsible team.
+
 Metrics are inputs to that loop. A tab, card or lead that does not help move the loop forward is informational, not operational, and must not be presented as a completed capability.
 
 ## Scope
