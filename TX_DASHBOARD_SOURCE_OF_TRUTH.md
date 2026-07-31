@@ -51,6 +51,20 @@ The immediate goal is not to build the entire operating loop. It is to make the 
 
 Tab 1 must earn trust before the system expands into workflow tracking.
 
+### Navigation hierarchy
+
+Tab 1 is the **Accounts cockpit**, not the complete account analysis. Its job is to help Facu or a team lead decide which account to open and why. The intended navigation is:
+
+```text
+Accounts cockpit
+  → Client Deep Dive (account-specific evidence, history and diagnosis)
+    → initiative / opportunity for that account
+      → enablement (what the team says, checks and does)
+        → execution tracking and outcome
+```
+
+The POTENTIAL / CONFIG / BUY / LIST / SELL blocks in Tab 1 are compact triage summaries. They must expose enough evidence to route the next click, but they should not become a second copy of the Client Deep Dive or a full playbook. Initiative tabs and enablement surfaces explain the reusable logic and execution method; the Client Deep Dive explains how that logic applies to one client.
+
 ### Later operating layer
 
 Once Tab 1 is trusted, the dashboard should support a two-week priority cycle:
