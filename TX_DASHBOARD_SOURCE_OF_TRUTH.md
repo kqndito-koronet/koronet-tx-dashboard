@@ -6,9 +6,28 @@
 
 This document explains what the dashboard is for, what each tab is allowed to answer, how the information is obtained, and which Facu feedback is already applied or still open. It is the operating contract for future updates.
 
+## What “operational” means
+
+This is not a reporting destination. It is the weekly operating loop for priority accounts:
+
+```text
+priority account → evidence → bottleneck → next action → owner → customer result → learning → next review
+```
+
+The dashboard is operational only when a person can use it to answer, for a specific account:
+
+- Why is this account a priority now?
+- What is the first unresolved prerequisite: CONFIG, BUY, LIST or SELL?
+- What evidence proves the bottleneck and how trustworthy is it?
+- What action should the owner take next, with whom and by when?
+- What customer outcome will confirm that the action worked?
+- What changed since the previous review, and what should be escalated or learned?
+
+Metrics are inputs to that loop. A tab, card or lead that does not help move the loop forward is informational, not operational, and must not be presented as a completed capability.
+
 ## Scope
 
-The dashboard is an account-first operating surface for Transactions. It answers: **how much potential does this account have, what do we capture, what is blocking the next stage, and what should be reviewed next?**
+The dashboard is an account-first operating surface for Transactions. It answers: **how much potential does this account have, what do we capture, what is blocking the next stage, who acts next, and how will we know it worked?**
 
 The operating sequence is **CONFIG → BUY → LIST → SELL**. SELL interpretations are not valid when LIST is not ready; LIST interpretations are not valid when BUY is not happening. The dashboard shows evidence and bottlenecks. Facu decides priorities; it does not autonomously make strategy decisions.
 
