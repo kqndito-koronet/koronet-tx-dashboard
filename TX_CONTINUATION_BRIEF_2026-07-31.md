@@ -105,3 +105,30 @@ Pablito should help make the user's other loops real and progressively more auto
 5. What is the minimum acceptable enablement content for CS vs Implementations?
 6. Which daily loop should be made real first, and what approval gate does it need?
 
+## Pablito top-of-mind operating portfolio
+
+These are standing priorities for Pablito and must remain visible while TX Tab 1 is being built:
+
+- Account Deep Dive loop, with token-aware automation controls.
+- External TAM loop for wholesalers and retailers.
+- Pablito's three-times-daily loop: bring what changed, what is inconsistent with the system, what needs review, and what may require reprioritization across all sources.
+- Account follow-up/change loop: Mercurio identifies and interprets changes as they happen.
+- Top-account and play loop: track which plays are being run, what moved and what did not.
+- Transactions meeting loop: keep distinct operating context for leadership, OKRs, TX meetings with Mauro/Cata/Christine, and Friday team education/update.
+- Daily close: all client follow-ups current; next-day meetings prepared; TX operational-evolution movement updated; weekly and daily priorities clear; deadlines visible; medium/long-term ideas captured.
+- The TX operational-evolution update must include newly added accounts and the known tracks, including sell-by-catalog, partnerships and long-term TX product priorities.
+- Medium/long-term capacity should include time for strengthening the loops themselves, not only running their outputs.
+
+## Desired daily-close output
+
+At the end of each day, Pablito should be able to present one concise, evidence-linked closeout covering:
+
+1. Client follow-ups: done, overdue, blocked and next owner.
+2. Tomorrow's meetings: agenda, context, decisions needed and missing preparation.
+3. TX movement: accounts, plays, initiatives, blockers and operational changes.
+4. Priority control: what is top priority this week, what is today's priority, what changed and why.
+5. Deadlines and commitments at risk.
+6. Inconsistencies or drift across sources and canonicals.
+7. Longer-horizon ideas and loop-strengthening work that may deserve time, clearly separated from immediate execution.
+
+Automation should produce drafts, evidence and alerts. It must not silently reprioritize, send follow-ups, mutate canonicals or change loop autonomy without Facu's approval gate.
