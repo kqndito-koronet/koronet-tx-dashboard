@@ -2091,8 +2091,8 @@ function renderAccounts() {
     var tdOffline = findOfflineTimeDepth(a.name);
     var tdBest = window.TIME_DEPTH_OFFLINE ? window.TIME_DEPTH_OFFLINE.best_in_class : null;
     if(tdV2 || tdOffline) {
-      html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Sales Time Depth (% of varieties SOLD at each horizon)</div>';
-      html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Note: this shows what they SOLD (from SALES_SV), not what they LIST in the eShop. Sales include K2K, prebooks, standing orders which bypass eShop MaxAge limits.</div>';
+      html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Variety Freshness (recency of last online sale per variety)</div>';
+      html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">How recently was each variety last sold online? Low 0-3d = fresh (sold in last 3 days of H1). High 90d+ = stale (not sold since early H1). Online = eCommerce + K2K + API.</div>';
       var tdBuckets = [
         {key:'pct_0_3_days',  label:'0-3d',    color:'var(--red)'},
         {key:'pct_4_7_days',  label:'4-7d',    color:'var(--amber)'},
@@ -2115,8 +2115,8 @@ function renderAccounts() {
         return h;
       }
 
-      if(tdV2) html += renderTdBar(tdV2, 'ONLINE SALES', tdV2.total_varieties);
-      if(tdOffline) html += renderTdBar(tdOffline, 'OFFLINE SALES', tdOffline.total_varieties);
+      if(tdV2) html += renderTdBar(tdV2, 'ONLINE (freshness)', tdV2.total_varieties);
+      if(tdOffline) html += renderTdBar(tdOffline, 'OFFLINE (freshness)', tdOffline.total_varieties);
       if(tdBest) html += renderTdBar(tdBest, 'BEST (Kennicott)', tdBest.total_varieties);
 
       // Legend
