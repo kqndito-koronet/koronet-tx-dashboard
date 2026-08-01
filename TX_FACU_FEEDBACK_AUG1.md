@@ -31,12 +31,12 @@ Feedback directo de Facu durante browser review. Organizado por CARD para tracki
 
 | # | Feedback | Applied? | Enablement note |
 |---|---|---|---|
-| OPP1 | NO es solo config — es ALL opps priorizadas (config + BUY/LIST/SELL) | ✅ restructured | Para ENABLE: this card is "por qué deberías actuar en esta cuenta" — the executive summary |
-| OPP2 | Para cada product type: potencial, best-in-class, known limitations | ❌ no benchmarks per type | Para ENABLE: "cuentas Core con bunches + time depth 90d+ tienen 22% CVR" — this IS the pitch |
-| OPP3 | Opps sin $ cuantificado no son opps | partial (bunches has $) | Para ENABLE: every opp = "if you fix X → $Y impact" — that's what makes CS act |
-| OPP4 | LIST opps never generated | ✅ 4 types added | — |
-| OPP5 | Estructura invertida: opps primero, config después | ✅ | — |
-| OPP6 | Links a los tabs correspondientes | partial | Para ENABLE: click → goes to the playbook for that opp type |
+| OPP1 | NO es solo config — es ALL opps priorizadas (config + BUY/LIST/SELL) | ✅ restructured + prioritized by impact | Para ENABLE: this card is "por qué deberías actuar en esta cuenta" — the executive summary. Opps sorted P1-P5 by revenue impact. |
+| OPP2 | Para cada product type: potencial, best-in-class, known limitations | ✅ benchmarks.json wired per segment | Para ENABLE: "cuentas Core con bunches + time depth 90d+ tienen 22% CVR" — this IS the pitch. Product profile shows POTENTIAL (what the setup can achieve), BEST-IN-CLASS (segment medians + best account from benchmarks.json), and KNOWN LIMITATIONS (eSuite ~5% of Core TAM, etc.) |
+| OPP3 | Opps sin $ cuantificado no son opps | ✅ $ impact on 7+ opp types | Para ENABLE: every opp now shows "if you fix X = $Y impact". Offline GMV at $0 fees, leakage recovery $, offline buyer conversion potential, indirect fee potential. Total $ at stake shown as banner. |
+| OPP4 | LIST opps never generated | ✅ 5 types (variety coverage, time depth, bunches, open market, category gap) | — |
+| OPP5 | Estructura invertida: opps primero, config después | ✅ SELL > BUY > LIST > CONFIG order | — |
+| OPP6 | Links a los tabs correspondientes | ✅ clickable links scroll to card with highlight | Para ENABLE: click "see BUY card" → scrolls to and highlights BUY card within the same account |
 
 ## CARD 3: BUY
 
@@ -162,3 +162,65 @@ Feedback directo de Facu durante browser review. Organizado por CARD para tracki
 | Channel fees use company_name match | sell_by_channel.json has no company_id | Rose: add company_id to sell_by_channel query |
 | Indirect fee rate hardcoded 1.5% | No config source for actual rate | Facu decision: where does the rate live? |
 | No benchmarks by product type | No cross-account benchmark data | Rose: compute network averages per ct_id |
+
+---
+
+## CARD 2 OPPORTUNITIES — ENABLEMENT NOTES (Aug 1 improvement cycle)
+
+### What a CS rep needs to know about this card
+
+**Purpose:** This is the executive summary of why you should act on this account. It answers: "What are the biggest opportunities, prioritized by revenue impact?" Every opportunity has a SO WHAT with $ impact where data exists.
+
+**Reading order:**
+1. **Total $ at stake** (green banner at top) -- the sum of all quantified opportunities
+2. **Revenue opportunities** (SELL > BUY > LIST, sorted by priority P1/P2/P3) -- what to DO
+3. **Config opportunities** (amber section below) -- enablers that unlock revenue
+4. **Bottleneck + Next Action** -- the single most important thing to address first
+5. **Product profile** -- what this account type CAN achieve, benchmarks, and known limitations
+
+**Key concepts:**
+- **P1 = highest priority, P2 = medium, P3 = lower.** Opps are sorted by priority first, then by $ impact within each priority level.
+- **Every $ amount is either calculated or estimated.** Offline GMV at $0 fees is real. "If 10% moves online = $X" is a projection using conservative take rates.
+- **Revenue opps link to the detailed cards.** Click "see BUY card" to scroll directly to the BUY analysis for this account.
+- **Product profile is NOT just what the account has -- it's what the account CAN achieve.** The POTENTIAL section shows the ceiling. BEST-IN-CLASS shows actual benchmarks from similar accounts. KNOWN LIMITATIONS shows structural constraints.
+- **Config issues are blockers or limiters.** A blocker (red) prevents online sales entirely (MaxAge=0, no eShop). A limiter (amber) reduces potential but doesn't block (low MaxAge, bunches OFF).
+
+### Discovery questions the rep should ask based on what they see
+
+1. **Large offline GMV ($100K+):** "You have $X in offline sales generating $0 in platform fees. What would it take to move even 10% online? That's $Y in new fee revenue."
+2. **Many offline buyers (5+):** "You have X buyers who only purchase offline. Are they aware of the eShop? What prevents them from ordering online?"
+3. **Low repeat rate (<40%):** "Your repeat rate is X%. The network median for your segment is Y%. Buyers are trying your eShop but not coming back -- what's their experience?"
+4. **High concentration (top 5 >50%):** "Your top 5 buyers represent X% of your online GMV. If one churns, the impact is significant. How can we diversify?"
+5. **K2K leakage:** "You have X vendors connected via K2K who still buy offline. That's $Y recoverable today -- they already have the connection, they just need to use it."
+6. **Offline procurement ($50K+):** "You have $X in offline procurement generating $0 indirect fees. Each vendor you move online generates 1.5% in indirect revenue."
+7. **Low variety count (below median):** "You have X varieties online vs the segment median of Y. More varieties = more search results for buyers = more sales."
+8. **No long-term inventory:** "Your eShop shows 0% inventory at 30+ days. Buyers planning ahead can't find you."
+9. **Bunches OFF:** "Your bunches flag is OFF. This means 95% of retail buyers can't see bunch-level inventory. That's a 5-minute config fix."
+10. **eSuite account with low activity:** "As an eSuite account, your addressable market is ~5% of what a Core account can reach. The primary value driver is K2K buying."
+
+### What changed in this improvement cycle (for tracking)
+
+| Fix | What | Why it matters |
+|---|---|---|
+| Opportunity generator rewritten | 15+ opportunity types (was 9), each with text/type/gmv_impact/priority/action | Opps are now prioritized by impact and have actionable next steps |
+| $ impact on all viable opps | Offline GMV, leakage cost, indirect fee potential, offline buyer conversion all quantified | Reps see dollars, not just descriptions |
+| Product profile with 3 layers | POTENTIAL + BEST-IN-CLASS (from benchmarks.json) + KNOWN LIMITATIONS per ct_id | Explains what the setup CAN achieve, not just what it has |
+| Best-in-class benchmarks wired | Online sell %, repeat rate, variety count, catalog freshness from benchmarks.json per segment | "Your segment median is X, best is Y" -- concrete targets |
+| Revenue opps sorted SELL > BUY > LIST | SELL opportunities shown first (highest direct revenue impact) | What matters most appears first |
+| Clickable card links | "see BUY card" scrolls to and highlights BUY card within the same row | No more manual scrolling to find the detail |
+| Total $ at stake banner | Green banner showing sum of all quantified opportunities | Operator sees the total prize at a glance |
+| Next Action uses best action | Uses the action field from highest-priority opp (not just first opp text) | More actionable guidance |
+| SELL opps enriched | Offline GMV at $0 fees, low repeat rate with benchmark, high concentration, offline buyers with conversion potential | SELL opps were minimal (2 types), now 5 types |
+| BUY opps enriched | Leakage recovery with $, offline procurement at $0 indirect fees | BUY opps were minimal (2 types), now 4 types |
+| LIST opps enriched | Category gap detection, below-median variety detection with benchmarks | LIST opps were 4 types, now 5 types with benchmark comparisons |
+| eSuite limitations quantified | "~5% of Core TAM", "only 6 of 79 sold in 30 days" | Known limitations are data-backed, not generic |
+
+### Remaining gaps (documented, not invented)
+
+| Gap | Why it can't be fixed now | What would fix it |
+|---|---|---|
+| Take rate not available per segment | benchmarks.json metric 9_take_rate is NOT_COMPUTABLE (fees not in source files) | Rose: load fee-by-account data from Snowflake |
+| CVR benchmarks not shown in profile | GA4 CVR only available for 8 accounts with own hostname | Fix GA4 per-company attribution |
+| Hardgoods visibility | No product_type segmentation in any data source | Rose: new query splitting perishable vs hardgoods |
+| Temporal benchmarks | All benchmarks are point-in-time | Rose: compute benchmarks per period for trending |
+| APPROVED vs DRAFT workflow | All opps shown, no approval gate | Facu decision: define approval workflow |

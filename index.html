@@ -932,70 +932,165 @@ function getBenchmark(metricKey, segment) {
 }
 
 // === OPPORTUNITY GENERATOR ===
+// Generates ALL opportunities (config + BUY + LIST + SELL), each with:
+//   - text: human-readable description with SO WHAT
+//   - type: 'config' | 'buy' | 'list' | 'sell'
+//   - gmv_impact: estimated $ impact (null if unknown)
+//   - priority: 1 (highest) to 5 (lowest) — used for sorting/display
+//   - action: what to DO about it (for reps)
 function getOpportunities(acct) {
   var id = acct.company_id;
   if(!id) return [];
   var cfg = CONFIG[id];
   var met = METRICS[id];
   var bun = BUNCHES[id];
+  var vd = (window.VENDOR_DETAIL||{})[id];
   var opps = [];
-  if(cfg) {
-    if(cfg.max_age === 0 || cfg.max_age === null) {
-      opps.push({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config'});
-    } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      opps.push({text:'MaxAge='+cfg.max_age+'d. Benchmark: 300. 5-min fix.', type:'config'});
-    }
-    if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      // FIX F: Add $ from bun.total_bunch_gmv + 95% TAM framing
-      var bunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
-      var bunchGmvStr = bunchGmvAmt ? ' '+fmt$(bunchGmvAmt)+' offline bunch GMV. 95% TAM blocked.' : ' 95% TAM blocked.';
-      opps.push({text:'Bunches OFF \u2192'+bunchGmvStr+' 5-min fix.', type:'config', gmv_impact: bunchGmvAmt});
-    }
-    if(!cfg.future && acct.ct_id === 'WH_CORE') {
-      opps.push({text:'Future Sales OFF. eShop shows today only.', type:'config'});
-    }
-    if(!cfg.on_hand && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      opps.push({text:'Checkout may require payment. Verify hideCheckoutWithoutPayment.', type:'config'});
-    }
+
+  // === SELL OPPORTUNITIES (revenue first — highest impact) ===
+
+  // S1: Large offline GMV at $0 direct fees
+  if(met && met.sell_offline > 10000) {
+    var tenPctOffline = Math.round(met.sell_offline * 0.10);
+    var tenPctFeeEst = Math.round(tenPctOffline * 0.005); // conservative 0.5% take rate
+    opps.push({text:fmt$(met.sell_offline)+' selling offline at $0 direct fees. If 10% moves online = '+fmt$(tenPctFeeEst)+'/yr in fees.', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Review offline buyer list. Identify top 5 offline buyers for eShop activation.'});
+  } else if(met && met.online_pct < 5 && met.sell_total > 100000) {
+    opps.push({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Why is the eShop not being used? Check inventory, pricing, buyer awareness.'});
   }
+
+  // S2: No eShop — cannot sell online at all
+  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+    opps.push({text:'No eShop. Cannot sell online.', type:'sell', gmv_impact: null, priority:1, action:'Enable eShop. This is a prerequisite for online sales.'});
+  }
+
+  // S3: Low repeat rate (below network median)
+  var repeatData = findRepeatRate(acct.name);
+  var repeatBm = getBenchmark('4_repeat_rate_pct', acct.ct_id);
+  if(repeatData && repeatData.repeat_rate_pct < 40) {
+    var rrBmStr = repeatBm ? ' Network median: '+fmtPct(repeatBm.median)+'%.' : '';
+    opps.push({text:'Low repeat rate: '+fmtPct(repeatData.repeat_rate_pct)+'%.'+rrBmStr+' Buyers are not coming back.', type:'sell', gmv_impact: null, priority:2, action:'Check inventory freshness, pricing competitiveness, fulfillment quality.'});
+  }
+
+  // S4: High buyer concentration (top 5 > 50%)
+  var concV2 = findConcentrationV2(acct.name);
+  if(concV2 && concV2.top5_pct > 50) {
+    opps.push({text:'Top 5 buyers = '+fmtPct(concV2.top5_pct)+' of online GMV. Concentration risk.', type:'sell', gmv_impact: null, priority:3, action:'Diversify buyer base. Increase new buyer acquisition via eShop visibility.'});
+  }
+
+  // S5: Many offline buyers not buying online
+  var buyerData = findBuyerData(id);
+  var bf = findBuyersFull(acct.name);
+  var offlineBuyers = bf ? (bf.offline_buyers || 0) : (buyerData ? (buyerData.total_buyers - buyerData.online_buyers) : 0);
+  var onlineBuyers = bf ? (bf.online_buyers || 0) : (buyerData ? buyerData.online_buyers : 0);
+  if(offlineBuyers > 5 && onlineBuyers > 0) {
+    var aovOnline = null;
+    var aovData = findAOV ? findAOV(acct.name) : null;
+    if(aovData && aovData.aov_online > 0) aovOnline = aovData.aov_online;
+    var potentialGmv = aovOnline ? Math.round(offlineBuyers * aovOnline * 6) : null; // 6 months estimate
+    var potentialStr = potentialGmv ? ' If converted: ~'+fmt$(potentialGmv)+' in online GMV.' : '';
+    opps.push({text:offlineBuyers+' buyers only purchase offline.'+potentialStr, type:'sell', gmv_impact: potentialGmv, priority:2, action:'Identify top offline buyers by volume. Start with buyers who already have eShop access.'});
+  }
+
+  // === BUY OPPORTUNITIES ===
+
+  // B1: Buy stage early — no connections or no purchases
   if(met) {
     if(met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY') {
-      opps.push({text:'BUY stage: '+met.buy_stage.replace(/_/g,' ')+'. Needs activation.', type:'buy'});
-    }
-    if(met.k2k_total > 0 && met.k2k_active / met.k2k_total < 0.7) {
-      var inactive = met.k2k_total - met.k2k_active;
-      opps.push({text:inactive+'/'+met.k2k_total+' K2K inactive. Reactivation opp.', type:'buy'});
+      opps.push({text:'BUY stage: '+met.buy_stage.replace(/_/g,' ')+'. Needs activation.', type:'buy', gmv_impact: null, priority:2, action:'Activate K2K connections. Each connection requires agreement + selling effort.'});
     }
   }
-  if(met) {
-    if(met.online_pct < 5 && met.sell_total > 100000) {
-      opps.push({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell'});
+
+  // B2: K2K inactive connections — investment lost
+  if(met && met.k2k_total > 0 && met.k2k_active / met.k2k_total < 0.7) {
+    var inactive = met.k2k_total - met.k2k_active;
+    opps.push({text:inactive+'/'+met.k2k_total+' K2K inactive. Each connection required sales effort to establish.', type:'buy', gmv_impact: null, priority:2, action:'Reactivate dormant connections. Identify why they stopped buying.'});
+  }
+
+  // B3: Leakage — vendors WITH K2K buying offline
+  if(vd && vd.leakage_vendors > 0 && vd.leakage_cost > 0) {
+    opps.push({text:vd.leakage_vendors+' vendors with K2K still buying offline. '+fmt$(vd.leakage_cost)+' recoverable today.', type:'buy', gmv_impact: vd.leakage_cost, priority:1, action:'These vendors already have K2K. Move their procurement online for indirect fee revenue.'});
+  }
+
+  // B4: Large offline procurement at $0 indirect fees
+  if(met && met.proc_total > 0 && met.proc_online !== undefined) {
+    var procOffline = met.proc_total - (met.proc_online || 0);
+    if(procOffline > 50000) {
+      var potentialIndirect = Math.round(procOffline * 0.015); // 1.5% indirect
+      opps.push({text:fmt$(procOffline)+' in offline procurement at $0 indirect fees. '+fmt$(potentialIndirect)+' potential if moved online.', type:'buy', gmv_impact: procOffline, priority:2, action:'Map offline vendors. Identify K2K connection candidates.'});
     }
   }
-  if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-    opps.push({text:'No eShop. Cannot sell online.', type:'sell'});
-  }
-  // LIST opportunities
+
+  // === LIST OPPORTUNITIES ===
+
   if(acct.has_eshops) {
+    // L1: Low variety coverage
     var listU = findListUsage(id);
+    var varBm = getBenchmark('8_distinct_varieties', acct.ct_id);
     if(listU && listU.distinct_varieties < 50) {
-      opps.push({text:'Low variety coverage: only '+listU.distinct_varieties+' varieties online.', type:'list'});
+      var varBmStr = varBm ? ' Segment median: '+Math.round(varBm.median)+' varieties.' : '';
+      opps.push({text:'Low variety coverage: only '+listU.distinct_varieties+' varieties online.'+varBmStr, type:'list', gmv_impact: null, priority:2, action:'Increase variety count. More varieties = more relevant search results for buyers.'});
+    } else if(listU && varBm && listU.distinct_varieties < varBm.median * 0.5) {
+      opps.push({text:'Below-median variety count: '+listU.distinct_varieties+' vs segment median '+Math.round(varBm.median)+'.', type:'list', gmv_impact: null, priority:3, action:'Compare variety list to best-in-class. What categories are missing?'});
     }
+
+    // L2: No long-term inventory
     var tdV2check = findListTimeDepthV2(id);
     if(tdV2check && (tdV2check.pct_31_90_days === 0 || !tdV2check.pct_31_90_days) && (tdV2check.pct_over_90_days === 0 || !tdV2check.pct_over_90_days)) {
-      opps.push({text:'No long-term inventory listed (0% at 30d+).', type:'list'});
+      opps.push({text:'No long-term inventory listed (0% at 30d+). Buyers planning ahead cannot find this account.', type:'list', gmv_impact: null, priority:2, action:'Enable future inventory visibility. Check MaxAge, Future Sales, and time depth settings.'});
     }
+
+    // L3: Bunches not listed — 95% TAM invisible
     if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      // FIX G: Add $ offline bunch GMV to the list opp
       var listBunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
-      var listBunchDollar = listBunchGmvAmt ? ' \u2014 '+fmt$(listBunchGmvAmt)+' in offline bunch GMV not visible online.' : '.';
-      opps.push({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers'+listBunchDollar, type:'list'});
+      var listBunchDollar = listBunchGmvAmt ? ' '+fmt$(listBunchGmvAmt)+' in offline bunch GMV not visible online.' : '.';
+      opps.push({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers'+listBunchDollar, type:'list', gmv_impact: listBunchGmvAmt, priority:1, action:'Enable bunches flag. 5-min fix. Opens the retail buyer segment.'});
     }
+
+    // L4: No Open Market GMV
     var bdCheck = findBuyDetail(acct.name);
     if(bdCheck && bdCheck.open_market_gmv === 0) {
-      opps.push({text:'No Open Market GMV \u2014 no future inventory uploaded.', type:'list'});
+      opps.push({text:'No Open Market GMV \u2014 no future inventory uploaded (proxy).', type:'list', gmv_impact: null, priority:3, action:'Check if wholesaler uploads future inventory. Open Market = forward visibility for buyers.'});
+    }
+
+    // L5: Category gap — offline categories not sold online
+    var supSell = findSupplySell(acct.name);
+    if(supSell && supSell.total_categories_sold > 0) {
+      var offlineCats = supSell.total_categories_sold - (supSell.online_categories_sold || 0);
+      if(offlineCats > 3) {
+        opps.push({text:offlineCats+' categories sold offline but not online. Invisible to online buyers.', type:'list', gmv_impact: null, priority:3, action:'Review category gaps. Each missing category = buyers who cannot find what they need online.'});
+      }
     }
   }
+
+  // === CONFIG OPPORTUNITIES (lower priority — enablers, not revenue) ===
+
+  if(cfg) {
+    if(cfg.max_age === 0 || cfg.max_age === null) {
+      opps.push({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config', gmv_impact: null, priority:1, action:'Set MaxAge to at least 10. Without it, inventory is invisible.'});
+    } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      opps.push({text:'MaxAge='+cfg.max_age+'d. Benchmark: 300. Blocks 47% of volume (Kennicott reference). 5-min fix.', type:'config', gmv_impact: null, priority:2, action:'Increase MaxAge. MaxAge=10 means eShop only shows inventory arriving in next 10 days.'});
+    }
+    if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      var bunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
+      var bunchGmvStr = bunchGmvAmt ? ' '+fmt$(bunchGmvAmt)+' offline bunch GMV. 95% TAM blocked.' : ' 95% TAM blocked.';
+      opps.push({text:'Bunches OFF \u2192'+bunchGmvStr+' 5-min fix.', type:'config', gmv_impact: bunchGmvAmt, priority:1, action:'Enable bunches flag in config. Opens eShop bunches tab for retail buyers.'});
+    }
+    if(!cfg.future && acct.ct_id === 'WH_CORE') {
+      opps.push({text:'Future Sales OFF. eShop shows today only \u2014 blocks forward-planned buyers.', type:'config', gmv_impact: null, priority:2, action:'Enable Future Sales to show inventory beyond current on-hand.'});
+    }
+    if(!cfg.on_hand && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      opps.push({text:'Checkout may require payment method. Verify hideCheckoutWithoutPayment.', type:'config', gmv_impact: null, priority:3, action:'Check if buyers can checkout. Hidden payment requirement kills conversion silently.'});
+    }
+  }
+
+  // Sort by priority (1=highest), then by gmv_impact descending
+  opps.sort(function(a, b) {
+    if(a.priority !== b.priority) return a.priority - b.priority;
+    var aImpact = a.gmv_impact || 0;
+    var bImpact = b.gmv_impact || 0;
+    return bImpact - aImpact;
+  });
+
   return opps;
 }
 
@@ -1494,7 +1589,7 @@ function renderAccounts() {
     var indirectFees = potBuyOnline != null ? Math.round(potBuyOnline * 0.015) : (met ? Math.round(met.proc_online * 0.015) : 0);
     var buyOnlinePct = potBuyTotal && potBuyTotal > 0 && potBuyOnline != null ? (potBuyOnline / potBuyTotal * 100) : (met && met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0);
     var bottleneck = computeBottleneck(a, cfg, met);
-    var nextAction = opps.length > 0 ? opps[0].text : '\u2014';
+    var nextAction = opps.length > 0 ? (opps[0].action || opps[0].text) : '\u2014';
 
     // --- Card 1: POTENTIAL — "¿Cuán grande es?" ---
     // Use V2 sell_total if available for gap/pen calculations in card header
@@ -1674,29 +1769,53 @@ function renderAccounts() {
     }
     html += '</div>';
 
-    // --- Card 2: OPPORTUNITIES — "¿Cuáles son las oportunidades?" ---
-    // (formerly CONFIG — renamed per Scope v2. All CONFIG logic preserved. New sections marked DRAFT.)
-    // Account profile based on ct_id
-    var _cfgProfiles = {
-      'WH_CORE': {desc:'Full stack — Core is their ERP. Can list, sell, use SOs, Future Sales, Open Market.', short:'Full capabilities'},
-      'WH_ESUITE': {desc:'Digital layer + another ERP. Can upload inventory (XLS), sell bunches, K2K buying. No SOs or Future Sales.', short:'Upload + K2K'},
-      'WH_K2K': {desc:'Drop-ship only — shows vendor inventory. Cannot upload own. Depends 100% on vendor quality.', short:'Vendor inventory only'},
-      'WH_PROC': {desc:'Buy-only — no eShop, no selling online. Value = more vendors, more options, better prices via procurement.', short:'Buy only, no sell'},
-      'IMP_CORE': {desc:'Importer — sells INTO the network. Different plays: connect wholesaler buyers, publish inventory.', short:'Sells to wholesalers'},
-    };
-    var _cfgProfile = _cfgProfiles[a.ct_id] || {desc:'Unknown product type', short:'\u2014'};
+    // --- Card 2: OPPORTUNITIES — "¿Cuáles son las oportunidades priorizadas?" ---
+    // Scope v2: ALL opps (config + BUY + LIST + SELL) prioritized by impact.
+    // Product profile with POTENTIAL, best-in-class benchmarks, and known limitations.
 
-    // Build issues FIRST to show count in header
+    // === PRODUCT PROFILE — potential, best-in-class, limitations per ct_id ===
+    var _cfgProfiles = {
+      'WH_CORE': {
+        desc:'Full stack — Core is their ERP. Can list, sell, use SOs, Future Sales, Open Market.',
+        short:'Full capabilities',
+        potential:'Highest potential. Can monetize eCommerce, K2K, API, and indirect fees. Best-in-class accounts achieve 22.8% eShop CVR (Kennicott), 93%+ repeat rate, and 5,800+ varieties listed.',
+        limitations:'Requires proper config (MaxAge, Bunches, Future) to unlock full potential. Standing Orders are offline-only.'
+      },
+      'WH_ESUITE': {
+        desc:'Digital layer + another ERP. Upload inventory (XLS), sell bunches, K2K buying. No SOs or Future Sales.',
+        short:'Upload + K2K',
+        potential:'Limited addressable market — ~5% of Core TAM (boxes only). K2K buying is the primary value driver. Best eSuite accounts achieve 96%+ online sell.',
+        limitations:'No Standing Orders. No Future Sales. Cannot sell forward inventory. Addressable market limited to boxes — retail bunch buyers invisible. Only 6 of 79 enabled eSuite accounts sold in last 30 days.'
+      },
+      'WH_K2K': {
+        desc:'Drop-ship only — shows vendor inventory in eShop. Cannot upload own inventory.',
+        short:'Vendor inventory only',
+        potential:'Value depends 100% on vendor quality and K2K connection health. Best K2K accounts achieve 100% online sell (all through vendor network).',
+        limitations:'No own inventory control. If vendors have poor inventory or go dormant, eShop suffers. Cannot list own products.'
+      },
+      'WH_PROC': {
+        desc:'Buy-only — no eShop, no selling online. Value = more vendors, more options, better prices via procurement.',
+        short:'Buy only, no sell',
+        potential:'Revenue from indirect fees only (1.5% of online procurement). Best Proc accounts achieve 100% online procurement.',
+        limitations:'No sell-side revenue. No eShop. Cannot generate direct fees. Value is entirely on the buy side.'
+      },
+      'IMP_CORE': {
+        desc:'Importer — sells INTO the network. Connects to wholesaler buyers, publishes inventory.',
+        short:'Sells to wholesalers',
+        potential:'Feeds the wholesaler network with product. Value = more K2K connections, wider distribution. Best importers connect to 50+ wholesalers.',
+        limitations:'Different monetization model than wholesalers. Plays focus on connecting to more buyers, not on eShop configuration.'
+      }
+    };
+    var _cfgProfile = _cfgProfiles[a.ct_id] || {desc:'Unknown product type', short:'\u2014', potential:'No profile available.', limitations:'Unknown.'};
+
+    // Build config issues list for status display
     var configIssues = [];
     if(cfg) {
-      // Product-type-aware checks
       if(a.ct_id === 'WH_PROC') {
         configIssues.push({text:'Procurement only \u2014 no eShop settings apply', severity:'info'});
       } else if(a.ct_id === 'WH_K2K') {
-        // K2K: only vendor_avail matters
         if(cfg.vendor_avail === false) configIssues.push({text:'Vendor Availability OFF (K2K invisible in eShop)', severity:'blocking'});
       } else {
-        // WH_CORE, WH_ESUITE, IMP_CORE, others — full checks
         if(cfg.max_age === 0 || cfg.max_age === null) configIssues.push({text:'MaxAge=0/null (inventory invisible)', severity:'blocking'});
         else if(cfg.max_age <= 10 && (a.ct_id === 'WH_CORE' || a.ct_id === 'WH_ESUITE')) configIssues.push({text:'MaxAge='+cfg.max_age+'d (low, benchmark 300)', severity:'limiting'});
         if(!cfg.bunches_flag && !cfg.on_hand && (a.ct_id === 'WH_CORE' || a.ct_id === 'WH_ESUITE')) configIssues.push({text:'No bunches + no on-hand = eShop catalog empty', severity:'blocking'});
@@ -1709,49 +1828,65 @@ function renderAccounts() {
     var blocking = configIssues.filter(function(i){return i.severity==='blocking';});
     var limiting = configIssues.filter(function(i){return i.severity==='limiting';});
     var headerColor = blocking.length > 0 ? 'var(--red)' : limiting.length > 0 ? 'var(--amber)' : 'var(--green)';
-    var cfgStatusText = configIssues.length === 0 ? '\u2705 Config OK' : 'Config Issues ('+configIssues.length+')';
 
     html += '<div class="expand-section" style="border-left:3px solid '+headerColor+'">';
-    html += '<h4>OPPORTUNITIES <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(revenue + config — DRAFT)</span></h4>';
+    html += '<h4>OPPORTUNITIES <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(revenue + config \u2014 prioritized by impact \u2014 DRAFT)</span></h4>';
 
-    // === FIX 1: OPPORTUNITIES AT THE TOP — revenue opportunities FIRST, config details BELOW ===
-    // Revenue opportunities (BUY/LIST/SELL) are PROMINENT, not afterthought
+    // === TOTAL $ AT STAKE (summary banner at top) ===
+    var totalImpact = 0;
+    var impactCount = 0;
+    opps.forEach(function(o) { if(o.gmv_impact && o.gmv_impact > 0) { totalImpact += o.gmv_impact; impactCount++; } });
+    if(totalImpact > 0) {
+      html += '<div style="margin-bottom:8px;padding:6px 10px;background:rgba(5,150,105,0.08);border-radius:6px;font-size:12px;font-weight:700;color:var(--green)">';
+      html += fmt$(totalImpact)+' total quantified opportunity across '+impactCount+' items';
+      html += ' <span style="font-size:10px;font-weight:400;color:var(--text-muted)">('+opps.length+' total opps detected)</span>';
+      html += '</div>';
+    }
+
+    // === REVENUE OPPORTUNITIES FIRST (sorted by priority, with $ impact and actions) ===
     if(opps.length > 0) {
       var configOpps = opps.filter(function(o){ return o.type === 'config'; });
+      var sellOpps = opps.filter(function(o){ return o.type === 'sell'; });
       var buyOpps = opps.filter(function(o){ return o.type === 'buy'; });
       var listOpps = opps.filter(function(o){ return o.type === 'list'; });
-      var sellOpps = opps.filter(function(o){ return o.type === 'sell'; });
-      var revenueOpps = buyOpps.concat(listOpps).concat(sellOpps);
+      var revenueOpps = sellOpps.concat(buyOpps).concat(listOpps); // SELL first — highest revenue impact
 
       if(revenueOpps.length > 0) {
         html += '<div style="margin-bottom:8px;padding:6px 10px;background:rgba(5,150,105,0.06);border:1px solid rgba(5,150,105,0.2);border-radius:6px">';
-        html += '<div style="font-weight:700;font-size:12px;color:var(--green);margin-bottom:4px">REVENUE OPPORTUNITIES ('+revenueOpps.length+')</div>';
-        if(buyOpps.length > 0) {
-          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase">BUY <span style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue)">\u2192 see BUY card</span></div>';
-          buyOpps.forEach(function(o) {
-            html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udce6 '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
+        html += '<div style="font-weight:700;font-size:12px;color:var(--green);margin-bottom:6px">REVENUE OPPORTUNITIES ('+revenueOpps.length+')</div>';
+        // Group by type with clickable scroll-to-card links
+        var _oppGroups = [
+          {type:'sell', label:'SELL', icon:'\ud83d\udcb0', opps:sellOpps, cardIndex:4},
+          {type:'buy', label:'BUY', icon:'\ud83d\udce6', opps:buyOpps, cardIndex:2},
+          {type:'list', label:'LIST', icon:'\ud83d\udcdd', opps:listOpps, cardIndex:3}
+        ];
+        _oppGroups.forEach(function(grp) {
+          if(grp.opps.length === 0) return;
+          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:6px;text-transform:uppercase">'+grp.label+' ';
+          html += '<span class="opp-card-link" data-expand="'+i+'" data-card="'+grp.cardIndex+'" style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue);text-decoration:underline">\u2192 see '+grp.label+' card</span></div>';
+          grp.opps.forEach(function(o) {
+            var priorityBadge = o.priority === 1 ? '<span style="background:var(--red);color:#fff;font-size:9px;padding:0 4px;border-radius:3px;margin-right:4px">P1</span>' :
+                                o.priority === 2 ? '<span style="background:var(--amber);color:#fff;font-size:9px;padding:0 4px;border-radius:3px;margin-right:4px">P2</span>' : '';
+            var impactBadge = o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '';
+            html += '<div style="font-size:11px;padding:3px 0;padding-left:8px;border-bottom:1px solid rgba(0,0,0,0.04)">';
+            html += priorityBadge + grp.icon+' '+o.text+impactBadge;
+            if(o.action) html += '<div style="font-size:10px;color:var(--blue);margin-top:1px;padding-left:16px">\u2192 '+o.action+'</div>';
+            html += '</div>';
           });
-        }
-        if(listOpps.length > 0) {
-          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase">LIST <span style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue)">\u2192 see LIST card</span></div>';
-          listOpps.forEach(function(o) {
-            html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udcdd '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
-          });
-        }
-        if(sellOpps.length > 0) {
-          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase">SELL <span style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue)">\u2192 see SELL card</span></div>';
-          sellOpps.forEach(function(o) {
-            html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udcb0 '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
-          });
-        }
+        });
         html += '</div>';
       }
 
+      // === CONFIG OPPORTUNITIES (below revenue — enablers, not direct revenue) ===
       if(configOpps.length > 0) {
         html += '<div style="margin-bottom:6px;padding:6px 10px;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.2);border-radius:6px">';
         html += '<div style="font-weight:700;font-size:12px;color:var(--amber);margin-bottom:4px">CONFIG OPPORTUNITIES ('+configOpps.length+')</div>';
         configOpps.forEach(function(o) {
-          html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udd27 '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
+          var impactBadge = o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '';
+          html += '<div style="font-size:11px;padding:3px 0;padding-left:8px;border-bottom:1px solid rgba(0,0,0,0.04)">';
+          html += '\ud83d\udd27 '+o.text+impactBadge;
+          if(o.action) html += '<div style="font-size:10px;color:var(--blue);margin-top:1px;padding-left:16px">\u2192 '+o.action+'</div>';
+          html += '</div>';
         });
         html += '</div>';
       }
@@ -1759,13 +1894,14 @@ function renderAccounts() {
       html += '<div style="font-size:11px;color:var(--text-muted);padding:6px 0">\u2014 no opportunities detected</div>';
     }
 
-    // Bottleneck + Next Action
+    // === BOTTLENECK + NEXT ACTION (improved: uses highest-priority opp action, not just first) ===
+    var bestAction = opps.length > 0 ? (opps[0].action || opps[0].text) : '\u2014';
     html += '<div style="margin:6px 0;padding:4px 8px;background:#f8fafc;border-radius:4px">';
     html += '<div class="detail-row"><span class="detail-label">Bottleneck</span><span style="font-weight:600;color:'+(bottleneck.includes('GATE') ? 'var(--red)' : bottleneck === '\u2014' ? 'var(--text-muted)' : 'var(--amber)')+'">'+bottleneck+'</span></div>';
-    html += '<div class="detail-row"><span class="detail-label">Next Action</span><span style="font-size:11px">'+nextAction+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Next Action</span><span style="font-size:11px">'+bestAction+'</span></div>';
     html += '</div>';
 
-    // SFDC Opportunities
+    // === SFDC Opportunities ===
     if(sfdcMatches.length) {
       html += '<div style="margin-top:4px;margin-bottom:6px">';
       html += '<div class="detail-row"><span class="detail-label" style="font-weight:600">SFDC Opps</span><span></span></div>';
@@ -1775,24 +1911,63 @@ function renderAccounts() {
       html += '</div>';
     }
 
-    // === CONFIG DETAILS (below opportunities) ===
+    // === PRODUCT PROFILE — potential, best-in-class, limitations (OPP2) ===
     html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Config status: <strong style="color:'+headerColor+'">'+cfgStatusText+'</strong></div>';
-    html += '<div style="font-size:11px;margin-bottom:6px;padding:4px 8px;background:#f1f5f9;border-radius:4px"><strong>'+a.ct_id+':</strong> '+_cfgProfile.desc+'</div>';
+    html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">PRODUCT PROFILE</div>';
 
-    // Config issues
+    // Type + capabilities
+    html += '<div style="font-size:11px;margin-bottom:4px;padding:4px 8px;background:#f1f5f9;border-radius:4px"><strong>'+a.ct_id+':</strong> '+_cfgProfile.desc+'</div>';
+
+    // Potential (what this setup CAN achieve)
+    if(_cfgProfile.potential) {
+      html += '<div style="font-size:11px;margin-bottom:4px;padding:4px 8px;background:rgba(5,150,105,0.04);border-left:2px solid var(--green);border-radius:0 4px 4px 0">';
+      html += '<span style="font-weight:600;color:var(--green);font-size:10px">POTENTIAL:</span> '+_cfgProfile.potential;
+      html += '</div>';
+    }
+
+    // Best-in-class benchmarks from benchmarks.json — show segment-specific data
+    var bmOnlineSell = getBenchmark('1_online_sell_pct_ytd', a.ct_id);
+    var bmSellTotal = getBenchmark('2_sell_total_ytd', a.ct_id);
+    var bmRepeatRate = getBenchmark('4_repeat_rate_pct', a.ct_id);
+    var bmConc = getBenchmark('5_top2_pct_concentration', a.ct_id);
+    var bmVarieties = getBenchmark('8_distinct_varieties', a.ct_id);
+    var bmTimeFresh = getBenchmark('7_time_depth_pct_over_90_days', a.ct_id);
+    var bmParts = [];
+    if(bmOnlineSell && bmOnlineSell.n > 1) bmParts.push('Online sell: median '+fmtPct(bmOnlineSell.median)+'% (best: '+bmOnlineSell.best_account+' '+fmtPct(bmOnlineSell.best_value)+'%)');
+    if(bmRepeatRate && bmRepeatRate.n > 1) bmParts.push('Repeat rate: median '+fmtPct(bmRepeatRate.median)+'% (best: '+fmtPct(bmRepeatRate.best_value)+'%)');
+    if(bmVarieties && bmVarieties.n > 1) bmParts.push('Varieties: median '+Math.round(bmVarieties.median)+' (best: '+bmVarieties.best_value+')');
+    if(bmTimeFresh && bmTimeFresh.n > 1) bmParts.push('Stale catalog (>90d): median '+fmtPct(bmTimeFresh.median)+'% (freshest: '+fmtPct(bmTimeFresh.best_value)+'%)');
+    if(bmParts.length > 0) {
+      html += '<div style="font-size:11px;margin-bottom:4px;padding:4px 8px;background:rgba(37,99,235,0.04);border-left:2px solid var(--blue);border-radius:0 4px 4px 0">';
+      html += '<span style="font-weight:600;color:var(--blue);font-size:10px">BEST-IN-CLASS ('+a.ct_id+', n='+((bmOnlineSell||{}).n || '?')+'):</span><br>';
+      html += bmParts.join('<br>');
+      html += '</div>';
+    }
+
+    // Known limitations
+    if(_cfgProfile.limitations) {
+      html += '<div style="font-size:11px;margin-bottom:4px;padding:4px 8px;background:rgba(239,68,68,0.04);border-left:2px solid var(--red);border-radius:0 4px 4px 0">';
+      html += '<span style="font-weight:600;color:var(--red);font-size:10px">KNOWN LIMITATIONS:</span> '+_cfgProfile.limitations;
+      html += '</div>';
+    }
+
+    // === CONFIG DETAIL (compact — status + settings) ===
+    html += '<div style="margin-top:6px;padding-top:4px;border-top:1px solid var(--border)">';
+    var cfgStatusText = configIssues.length === 0 ? '\u2705 Config OK' : 'Config Issues ('+configIssues.length+')';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Config status: <strong style="color:'+headerColor+'">'+cfgStatusText+'</strong></div>';
+
+    // Config issues (compact)
     if(configIssues.length > 0) {
       configIssues.forEach(function(issue) {
         var ic = issue.severity === 'blocking' ? 'var(--red)' : issue.severity === 'limiting' ? 'var(--amber)' : 'var(--text-muted)';
         var icon = issue.severity === 'blocking' ? '\ud83d\uded1' : issue.severity === 'limiting' ? '\u26a0\ufe0f' : '\u2139\ufe0f';
-        html += '<div style="font-size:11px;padding:2px 0;color:'+ic+'">'+icon+' '+issue.text+'</div>';
+        html += '<div style="font-size:11px;padding:1px 0;color:'+ic+'">'+icon+' '+issue.text+'</div>';
       });
-      html += '<div style="height:4px"></div>';
     }
 
     // Settings table (compact)
     if(cfg) {
-      html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
+      html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
       html += '<tr><td style="padding:2px 8px;color:var(--text-muted)">MaxAge</td><td style="text-align:right'+(cfg.max_age!=null&&cfg.max_age<=10?';color:var(--red);font-weight:600':'')+'">'+(cfg.max_age!=null?cfg.max_age+'d':'\u2014')+'</td>';
       html += '<td style="padding:2px 8px;color:var(--text-muted)">Future</td><td style="text-align:right;color:'+(cfg.future?'var(--green)':'var(--red)')+'">'+(cfg.future?'ON':'OFF')+(a.ct_id!=='WH_CORE'?' <span style="color:var(--text-muted)">(N/A)</span>':'')+'</td></tr>';
       html += '<tr><td style="padding:2px 8px;color:var(--text-muted)">Bunches</td><td style="text-align:right;color:'+(cfg.bunches_flag?'var(--green)':'var(--red)')+'">'+(cfg.bunches_flag?'ON':'OFF')+'</td>';
@@ -1803,8 +1978,9 @@ function renderAccounts() {
     } else {
       html += '<div style="font-size:11px;color:var(--text-muted)">\u2014 no config data</div>';
     }
+    html += '</div>'; // close config detail
 
-    // Bunch data (if sells bunches with flag OFF = explain)
+    // Bunch discrepancy callout (preserved)
     if(bun && bun.discrepancy) {
       html += '<div style="margin-top:6px;background:rgba(217,119,6,0.08);border-left:3px solid var(--amber);padding:4px 8px;border-radius:0 4px 4px 0;font-size:11px">';
       html += '\u26a0 Sells '+fmt$(bun.total_bunch_gmv)+' bunches but flag OFF \u2014 flag controls eShop UI tab only (API/K2K bypass it)';
@@ -1813,7 +1989,7 @@ function renderAccounts() {
       html += '<div style="font-size:11px;margin-top:4px;color:var(--text-muted)">Bunch GMV: '+fmt$(bun.total_bunch_gmv)+' \u2014 flag '+(bun.bunches_flag?'ON \u2705':'OFF')+'</div>';
     }
 
-    // Product type + modules
+    // Modules
     var _modules = [];
     if(a) {
       var _sys = (a.system_type||'').toLowerCase();
@@ -1824,7 +2000,7 @@ function renderAccounts() {
       if(a.has_eshops) _modules.push('eShop');
     }
     if(_modules.length) {
-      html += '<div style="margin-top:6px;font-size:11px"><span style="color:var(--text-muted)">Modules:</span> '+_modules.join(' + ')+'</div>';
+      html += '<div style="margin-top:4px;font-size:11px"><span style="color:var(--text-muted)">Modules:</span> '+_modules.join(' + ')+'</div>';
     }
 
     // Implementation (if IMPL)
@@ -1838,9 +2014,9 @@ function renderAccounts() {
       html += '</div>';
     }
 
-    html += '</div>'; // close config details section
+    html += '</div>'; // close product profile section
 
-    html += '</div>';
+    html += '</div>'; // close OPPORTUNITIES card
 
     // --- Card 3: BUY — "¿Compra por la plataforma?" ---
     html += '<div class="expand-section"><h4>BUY \u2014 \u00bfCompra por la plataforma?</h4>';
@@ -2477,6 +2653,32 @@ function renderAccounts() {
       var row = document.querySelector('tr[data-expand="'+idx+'"]');
       this.classList.toggle('open');
       row.classList.toggle('open');
+    });
+  });
+
+  // Bind "see BUY/LIST/SELL card" links in OPPORTUNITIES card
+  // These scroll to the corresponding expand-section (card) within the same row
+  document.querySelectorAll('.opp-card-link').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var expandIdx = this.dataset.expand;
+      var cardIdx = parseInt(this.dataset.card);
+      var row = document.querySelector('tr[data-expand="'+expandIdx+'"]');
+      if(!row) return;
+      // Ensure the row is open
+      if(!row.classList.contains('open')) {
+        var btn = document.querySelector('.expand-btn[data-idx="'+expandIdx+'"]');
+        if(btn) { btn.classList.add('open'); row.classList.add('open'); }
+      }
+      // Find the nth expand-section within this row (0-indexed: 0=POTENTIAL, 1=OPPORTUNITIES, 2=BUY, 3=LIST, 4=SELL)
+      var sections = row.querySelectorAll('.expand-section');
+      if(sections[cardIdx]) {
+        sections[cardIdx].scrollIntoView({behavior:'smooth', block:'start'});
+        // Brief highlight to show where they landed
+        sections[cardIdx].style.transition = 'box-shadow 0.3s';
+        sections[cardIdx].style.boxShadow = '0 0 0 2px var(--blue)';
+        setTimeout(function() { sections[cardIdx].style.boxShadow = ''; }, 2000);
+      }
     });
   });
 }

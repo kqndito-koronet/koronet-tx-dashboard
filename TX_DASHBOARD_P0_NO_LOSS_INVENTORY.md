@@ -330,12 +330,12 @@
 
 | # | Card | Scope v2 requirement | Exists today? | What's missing | Who resolves |
 |---|---|---|---|---|---|
-| G15 | CONFIG | For each product type: explain potential | Partial | `_cfgProfiles` explains capabilities but not revenue potential. Need "WH_CORE can earn fees via eShop, K2K, Future Sales -- max seen: $X/yr". | Rose data (benchmark per ct_id) |
-| G16 | CONFIG | For each product type: best in class | No | No benchmark data per ct_id. Need: best-performing account per product type, their config, their fees. | Rose data |
-| G17 | CONFIG | For each product type: known limitations | Partial | Static strings in `_cfgProfiles`. Need: dynamic limitation list from config data + metrics. | Builder logic |
-| G18 | CONFIG | LIST opportunities generator | No | `type:'list'` opps never generated. HTML renderer at lines 1244-1245 is ready but receives empty array. Need: LIST opp generator (no listings, low coverage, stale inventory). | Builder logic |
-| G19 | CONFIG | Card renamed from CONFIG to OPPORTUNITIES | No | Header still says "CONFIG" / "CONFIG Issues". Scope v2 says rename to "OPPORTUNITIES". | Builder logic |
-| G20 | CONFIG | Next action with priority logic | Partial | Current: `opps[0].text` = first opp. No priority weighting or playbook linkage. | Builder logic + Facu decision |
+| G15 | CONFIG | For each product type: explain potential | ✅ FIXED (Aug 1) | `_cfgProfiles` now includes `potential` field with revenue potential, best-in-class references, and data-backed claims per ct_id. | Builder logic |
+| G16 | CONFIG | For each product type: best in class | ✅ FIXED (Aug 1) | benchmarks.json wired per segment (ct_id). Shows median and best account for online sell %, repeat rate, variety count, catalog freshness. | Builder logic (using getBenchmark()) |
+| G17 | CONFIG | For each product type: known limitations | ✅ FIXED (Aug 1) | `_cfgProfiles` now includes `limitations` field with quantified constraints (eSuite ~5% of Core TAM, K2K vendor dependency, Proc no sell-side). | Builder logic |
+| G18 | CONFIG | LIST opportunities generator | ✅ FIXED (Aug 1) | 5 LIST opp types: low variety coverage (with benchmark), no long-term inventory, bunches not listed ($), no open market GMV, category gap. | Builder logic |
+| G19 | CONFIG | Card renamed from CONFIG to OPPORTUNITIES | ✅ FIXED | Header says "OPPORTUNITIES (revenue + config — prioritized by impact — DRAFT)". | Builder logic |
+| G20 | CONFIG | Next action with priority logic | ✅ FIXED (Aug 1) | Opps sorted by priority (1-5) then by $ impact. Next action uses `opps[0].action` (the actionable guidance from highest-priority opp). | Builder logic |
 
 ### BUY gaps
 

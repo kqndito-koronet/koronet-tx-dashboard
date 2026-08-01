@@ -121,10 +121,14 @@ Cuando cambiás el timeframe, los números de Koronet Sell, Koronet Buy, Fees y 
 
 **Product profile:** Explica qué significa el tipo de producto de esta cuenta (Core, eSuite, K2K, Proc). Qué puede hacer, qué no puede.
 
-**Lo que falta (en progreso):**
-- Best-in-class por tipo de setup ("cuentas Core con bunches + time depth 90d+ tienen 22% CVR")
-- Known limitations cuantificadas
-- $ impact en todas las opps
+**Lo que se agregó (Aug 1 improvement cycle):**
+- ✅ Best-in-class benchmarks por tipo de setup (from benchmarks.json per segment — online sell %, repeat rate, variety count, catalog freshness)
+- ✅ Known limitations cuantificadas per product type (eSuite ~5% Core TAM, K2K vendor dependency, etc.)
+- ✅ $ impact en 7+ tipos de oportunidades (offline GMV, leakage, indirect fees, buyer conversion potential)
+- ✅ 15+ opportunity types (was 9), sorted by priority P1-P3
+- ✅ Clickable links to BUY/LIST/SELL cards with scroll + highlight
+- ✅ Total $ at stake banner
+- ✅ Each opp has actionable next step for reps
 
 ---
 
@@ -390,7 +394,7 @@ Cada nivel se gana con runs limpios + Facu confirmando que sirve.
 - ❌ New User CVR
 - ❌ Anticipación real (ORDER_DATE no existe)
 - ❌ Hardgoods visibility
-- ❌ Best-in-class benchmarks en OPPORTUNITIES card
+- ✅ Best-in-class benchmarks en OPPORTUNITIES card (wired from benchmarks.json per segment, Aug 1)
 - ❌ Trust labels (DRAFT/APPROVED workflow)
 - ❌ Coverage >80% (hoy 28% en metrics snapshot)
 - ❌ Data refresh automatizado
