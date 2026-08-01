@@ -109,3 +109,56 @@ Feedback directo de Facu durante browser review. Organizado por CARD para tracki
 3. **LIST data is a proxy.** All "listing" data comes from SALES_SV. No catalog/listing data exists.
 4. **Config vs reality:** MaxAge/Future config controls eShop display, but sales happen through K2K/prebooks/SOs that bypass config limits.
 5. **Empty columns = questions to answer.** If Offline shows dashes, either get the data or remove the column. Don't show meaningless comparisons.
+
+---
+
+## CARD 1 POTENTIAL — ENABLEMENT NOTES (Aug 1 improvement cycle)
+
+### What a CS rep needs to know about this card
+
+**Reading order (Facu flow):** Est GMV (how big is the prize?) -> Koronet GMV (how much do we capture?) -> Penetration % (what share?) -> Online % (how digital?) -> THEN drill into the fee table.
+
+**Key concepts:**
+- **Penetration qualifiers:** <20% = "big opportunity" (most of their business is outside Koronet). 20-50% = "room to grow." 50-80% = "majority captured." >80% = "saturated" (focus on monetization, not volume).
+- **Online % qualifiers:** 0% = "no online" (need activation). <20% = "mostly offline" (biggest lever is moving offline volume online). 20-50% = "healthy." >50% = "digital-first" (focus on growing the pie, not the share).
+- **Est Buy uses a 3-tier cascade:** (1) direct estimate if available, (2) actual buy/sell ratio x est sell, (3) 54% default. Source is shown -- if it says "avg ratio 54%", the estimate is rough.
+- **Indirect fees are estimated at 1.5% of Buy Online.** This is NOT from invoices -- it's a calculation. The "[est.]" label makes this clear. If the actual rate changes, the dashboard must be updated.
+- **Take rate = (direct fees + indirect fees) / (sell GMV + buy GMV).** This is the monetization efficiency. Higher = better. If take rate is low but GMV is high, there's a pricing or monetization gap.
+
+### Discovery questions the rep should ask based on what they see
+
+1. **Sell penetration <20%:** "We see your total sales are ~$XM but only $Y goes through Koronet. Where is the rest going? Direct orders? Other platforms?"
+2. **Buy penetration <20%:** "Your estimated procurement is ~$XM but only $Y comes through Koronet. Are you buying from vendors not connected to the platform?"
+3. **Online % <20%:** "Most of your Koronet volume is offline. What prevents your clients from ordering online? Is the eShop inventory complete?"
+4. **Channel NOT MONETIZED:** "You have $X in [channel] GMV but $0 in fees. Is this a special agreement, or should we review the pricing setup?"
+5. **API take rate <0.5%:** "Your API sales show a very low fee rate. Is the fee schedule configured correctly?"
+6. **ORA/calc diverge >30%:** "Our two estimates of your business size are far apart. Can you help us calibrate -- is your annual sales volume closer to $X or $Y?"
+7. **Large offline GMV ($100K+):** "You have $X in offline sales at $0 fees. If even 10% of that moved online, that's $Y in new platform volume."
+8. **Pre go-live (blue banner):** "You haven't gone live yet. Once you do, there's $X in sell potential based on your estimated size."
+
+### What changed in this improvement cycle (for tracking)
+
+| Fix | What | Why it matters |
+|---|---|---|
+| Take rate formula | Fixed from fees/sell_online to (fees+indirect)/(sell+buy) | Old formula inflated rate by dividing by online-only sell |
+| Sell penetration fallback | Falls back to calc estimate when ORA is null | 60% of accounts have no ORA; now they can show penetration |
+| Buy gap banner | Shows "$XM of estimated procurement not through Koronet" | Buy side now has same SO WHAT as sell side |
+| Penetration qualifiers | Inline text: big opportunity / room to grow / majority captured / saturated | Numbers mean nothing without context |
+| Online % qualifiers | Inline text: no online / mostly offline / healthy / digital-first | Same as above |
+| Offline row V2 wired | Uses temporal sell_offline from V2 with delta arrow | Offline value now updates when timeframe changes |
+| Indirect fee display fix | Shows V2-aware buy online value in formula, not stale static | Formula display matches calculation |
+| Take rate on TOTAL row | Shows overall take rate next to total fees | Monetization efficiency visible at a glance |
+| Offline SO WHAT | "move 10% online = $XK GMV" when offline >$100K | Quantifies the offline opportunity |
+| NOT MONETIZED guidance | "verify pricing agreement" instead of just flag | Rep knows what to DO, not just what's wrong |
+| ORA divergence guidance | "ask account manager which estimate is current" | Actionable, not just a warning |
+| Focus summary | Bottom of card: biggest levers listed | Operator sees priority at a glance |
+
+### Remaining gaps (documented, not invented)
+
+| Gap | Why it can't be fixed now | What would fix it |
+|---|---|---|
+| Channel fees not temporal | No V2 per-channel fee breakdown exists | Rose: query fees by channel with temporal structure |
+| Channel GMV not temporal | No V2 sell_by_channel exists | Rose: query channel GMV with temporal structure |
+| Channel fees use company_name match | sell_by_channel.json has no company_id | Rose: add company_id to sell_by_channel query |
+| Indirect fee rate hardcoded 1.5% | No config source for actual rate | Facu decision: where does the rate live? |
+| No benchmarks by product type | No cross-account benchmark data | Rose: compute network averages per ct_id |

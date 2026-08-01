@@ -1492,7 +1492,6 @@ function renderAccounts() {
     var v2SourceLabel = v2Sell ? '<span style="font-size:10px;color:var(--text-muted);font-style:italic"> [V2 ' + tf.replace('_',' ') + ']</span>' : '';
 
     var indirectFees = potBuyOnline != null ? Math.round(potBuyOnline * 0.015) : (met ? Math.round(met.proc_online * 0.015) : 0);
-    var takeRate = met && met.sell_online > 0 ? (met.fees_total / met.sell_online * 100) : 0;
     var buyOnlinePct = potBuyTotal && potBuyTotal > 0 && potBuyOnline != null ? (potBuyOnline / potBuyTotal * 100) : (met && met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0);
     var bottleneck = computeBottleneck(a, cfg, met);
     var nextAction = opps.length > 0 ? opps[0].text : '\u2014';
@@ -1502,13 +1501,15 @@ function renderAccounts() {
     // FIX 4: annualize for monthly/quarterly timeframes before computing penetration
     var potCardSellTotal = potSellTotal != null ? potSellTotal : (met ? met.sell_total : null);
     var potCardSellTotalAnnualized = potCardSellTotal != null ? potCardSellTotal * tfMultiplier : null;
-    var sellPenPct = (a.annual_sales_est && a.annual_sales_est > 0 && potCardSellTotalAnnualized != null) ? (potCardSellTotalAnnualized / a.annual_sales_est * 100) : null;
+    // Sell penetration: prefer ORA, fall back to est_gmv calc estimate (G11 fix)
+    var sellEstDenom = (a.annual_sales_est && a.annual_sales_est > 0) ? a.annual_sales_est : (estData && estData.est_sell_gmv > 0 ? estData.est_sell_gmv : null);
+    var sellPenPct = (sellEstDenom && potCardSellTotalAnnualized != null) ? (potCardSellTotalAnnualized / sellEstDenom * 100) : null;
     var sellPenColor = sellPenPct === null ? 'var(--text-muted)' : sellPenPct > 50 ? 'var(--green)' : sellPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var potCardBuyTotal = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : null);
     var potCardBuyTotalAnnualized = potCardBuyTotal != null ? potCardBuyTotal * tfMultiplier : null;
     var buyPenPct = (estData && estData.est_buy_gmv > 0 && potCardBuyTotalAnnualized != null) ? (potCardBuyTotalAnnualized / estData.est_buy_gmv * 100) : null;
     var buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
-    var sellGap = a.annual_sales_est && potCardSellTotalAnnualized != null ? (a.annual_sales_est - potCardSellTotalAnnualized) : null;
+    var sellGap = sellEstDenom && potCardSellTotalAnnualized != null ? (sellEstDenom - potCardSellTotalAnnualized) : null;
     var oraCalcDiverge = a.annual_sales_est && estData && estData.est_sell_gmv > 0 ? Math.abs(a.annual_sales_est - estData.est_sell_gmv) / Math.max(a.annual_sales_est, estData.est_sell_gmv) * 100 : 0;
     html += '<div class="expand-section"><h4>POTENTIAL \u2014 \u00bfCu\u00e1n grande es?</h4>';
     // FIX 4: Pre go-live SO WHAT + FIX 5: Show impl stage
@@ -1525,7 +1526,7 @@ function renderAccounts() {
       html += '<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;padding-left:10px">Implementation: '+impl.stage+(impl.type ? ' \u00b7 '+impl.type : '')+'</div>';
     }
     if(oraCalcDiverge > 30) {
-      html += '<div style="background:rgba(220,38,38,0.08);border-left:3px solid var(--red);padding:4px 10px;border-radius:0 4px 4px 0;margin-bottom:8px;font-size:11px;color:var(--red)">\u26a0 ORA y calc divergen '+Math.round(oraCalcDiverge)+'% \u2014 estimate needs validation</div>';
+      html += '<div style="background:rgba(220,38,38,0.08);border-left:3px solid var(--red);padding:4px 10px;border-radius:0 4px 4px 0;margin-bottom:8px;font-size:11px;color:var(--red)">\u26a0 ORA y calc divergen '+Math.round(oraCalcDiverge)+'% \u2014 ask account manager which estimate is current</div>';
     }
     html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0">';
     html += '<tr style="background:#f1f5f9"><th colspan="3" style="padding:4px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text-muted)">SELL SIDE</th></tr>';
@@ -1539,12 +1540,27 @@ function renderAccounts() {
     }
     // Koronet Sell value for POTENTIAL card — V2 preferred (FIX 4: annualized)
     var potSellTotalAnnualized = potSellTotal != null ? potSellTotal * tfMultiplier : null;
-    var potSellPenPct = (a.annual_sales_est && a.annual_sales_est > 0 && potSellTotalAnnualized != null) ? (potSellTotalAnnualized / a.annual_sales_est * 100) : sellPenPct;
+    var potSellPenPct = (sellEstDenom && potSellTotalAnnualized != null) ? (potSellTotalAnnualized / sellEstDenom * 100) : sellPenPct;
     var potSellPenColor = potSellPenPct == null ? 'var(--text-muted)' : potSellPenPct > 50 ? 'var(--green)' : potSellPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var potOnlineColor = 'var(--text)';
     if(potOnlinePct != null) { if(potOnlinePct >= 20) potOnlineColor='var(--green)'; else if(potOnlinePct > 0) potOnlineColor='var(--amber)'; else potOnlineColor='var(--red)'; }
-    html += '<tr><td style="padding:3px 8px">Koronet Sell</td><td style="text-align:right;font-weight:600">'+(potSellTotal!=null?fmt$(potSellTotal):'\u2014')+(potSellDelta?' '+potSellDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+potSellPenColor+';font-weight:600">'+(potSellPenPct!==null?fmtPct(potSellPenPct)+' penetration':'')+'</span>'+v2SourceLabel+'</td></tr>';
-    html += '<tr><td style="padding:3px 8px">Online Sell</td><td style="text-align:right;color:'+potOnlineColor+'">'+(potSellOnline!=null?fmt$(potSellOnline):'\u2014')+(potSellOnlineDelta?' '+potSellOnlineDelta.html:'')+'</td><td style="padding-left:6px;color:'+potOnlineColor+'">'+(potOnlinePct!=null?fmtPct(potOnlinePct):'')+'</td></tr>';
+    // Penetration qualifier: helps operator understand what the number means
+    var sellPenQual = '';
+    if(potSellPenPct != null) {
+      if(potSellPenPct > 80) sellPenQual = ' (saturated)';
+      else if(potSellPenPct > 50) sellPenQual = ' (majority captured)';
+      else if(potSellPenPct > 20) sellPenQual = ' (room to grow)';
+      else sellPenQual = ' (big opportunity)';
+    }
+    html += '<tr><td style="padding:3px 8px">Koronet Sell</td><td style="text-align:right;font-weight:600">'+(potSellTotal!=null?fmt$(potSellTotal):'\u2014')+(potSellDelta?' '+potSellDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+potSellPenColor+';font-weight:600">'+(potSellPenPct!==null?fmtPct(potSellPenPct)+' pen.'+sellPenQual:'')+'</span>'+v2SourceLabel+'</td></tr>';
+    var onlinePctQual = '';
+    if(potOnlinePct != null) {
+      if(potOnlinePct >= 50) onlinePctQual = ' (digital-first)';
+      else if(potOnlinePct >= 20) onlinePctQual = ' (healthy)';
+      else if(potOnlinePct > 0) onlinePctQual = ' (mostly offline)';
+      else onlinePctQual = ' (no online)';
+    }
+    html += '<tr><td style="padding:3px 8px">Online Sell</td><td style="text-align:right;color:'+potOnlineColor+'">'+(potSellOnline!=null?fmt$(potSellOnline):'\u2014')+(potSellOnlineDelta?' '+potSellOnlineDelta.html:'')+'</td><td style="padding-left:6px;color:'+potOnlineColor+'">'+(potOnlinePct!=null?fmtPct(potOnlinePct)+onlinePctQual:'')+'</td></tr>';
     html += '</table>';
     html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0">';
     html += '<tr style="background:#f1f5f9"><th colspan="3" style="padding:4px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text-muted)">BUY SIDE</th></tr>';
@@ -1572,8 +1588,26 @@ function renderAccounts() {
     buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var potBuyV2Label = v2Buy ? '<span style="font-size:10px;color:var(--text-muted);font-style:italic"> [V2 '+tf.replace('_',' ')+']</span>' : '';
     html += '<tr><td style="padding:3px 8px">Est. Buy</td><td style="text-align:right">'+(estBuyVal>0?fmt$(estBuyVal):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px">'+estBuyNote+'</td></tr>';
-    html += '<tr><td style="padding:3px 8px">Koronet Buy</td><td style="text-align:right;font-weight:600">'+(potBuyTotal!=null?fmt$(potBuyTotal):(met?fmt$(met.proc_total):'\u2014'))+(potBuyTotalDelta?' '+potBuyTotalDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+buyPenColor+';font-weight:600">'+(buyPenPct!==null?fmtPct(buyPenPct)+' penetration':'')+'</span>'+potBuyV2Label+'</td></tr>';
-    html += '<tr><td style="padding:3px 8px">Online Buy</td><td style="text-align:right">'+(potBuyOnline!=null?fmt$(potBuyOnline):(met?fmt$(met.proc_online):'\u2014'))+(potBuyOnlineDelta?' '+potBuyOnlineDelta.html:'')+'</td><td style="padding-left:6px">'+(buyOnlinePct>0?fmtPct(buyOnlinePct):'')+'</td></tr>';
+    var buyPenQual = '';
+    if(buyPenPct != null) {
+      if(buyPenPct > 80) buyPenQual = ' (saturated)';
+      else if(buyPenPct > 50) buyPenQual = ' (majority captured)';
+      else if(buyPenPct > 20) buyPenQual = ' (room to grow)';
+      else buyPenQual = ' (big opportunity)';
+    }
+    html += '<tr><td style="padding:3px 8px">Koronet Buy</td><td style="text-align:right;font-weight:600">'+(potBuyTotal!=null?fmt$(potBuyTotal):(met?fmt$(met.proc_total):'\u2014'))+(potBuyTotalDelta?' '+potBuyTotalDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+buyPenColor+';font-weight:600">'+(buyPenPct!==null?fmtPct(buyPenPct)+' pen.'+buyPenQual:'')+'</span>'+potBuyV2Label+'</td></tr>';
+    var buyOnlinePctQual = '';
+    if(buyOnlinePct > 0) {
+      if(buyOnlinePct >= 50) buyOnlinePctQual = ' (digital-first)';
+      else if(buyOnlinePct >= 20) buyOnlinePctQual = ' (healthy)';
+      else if(buyOnlinePct > 0) buyOnlinePctQual = ' (mostly offline)';
+    }
+    html += '<tr><td style="padding:3px 8px">Online Buy</td><td style="text-align:right">'+(potBuyOnline!=null?fmt$(potBuyOnline):(met?fmt$(met.proc_online):'\u2014'))+(potBuyOnlineDelta?' '+potBuyOnlineDelta.html:'')+'</td><td style="padding-left:6px">'+(buyOnlinePct>0?fmtPct(buyOnlinePct)+buyOnlinePctQual:'')+'</td></tr>';
+    // Buy gap SO WHAT: show the gap between Est Buy and Koronet Buy
+    var buyGap = estBuyVal > 0 && potBuyTotalForPenAnnualized != null ? (estBuyVal - potBuyTotalForPenAnnualized) : null;
+    if(buyGap != null && buyGap > 0) {
+      html += '<tr><td colspan="3" style="padding:4px 8px;font-size:10px;color:var(--amber);background:rgba(217,119,6,0.05)"><strong>'+fmt$(buyGap)+'</strong> de compra estimada no pasa por Koronet <span style="color:var(--text-muted)">= oportunidad de procurement</span></td></tr>';
+    }
     html += '</table>';
     // FIX A (Audit Run 2 P1): Wire V2 fees — prefer temporal fees_total over static metrics.json
     var v2FeesData = getV2Fees(a.name);
@@ -1587,6 +1621,11 @@ function renderAccounts() {
       directPotential = met ? met.fees_total : 0;
     }
     var indirectPotential = indirectFees;
+    // Take Rate = (direct + indirect fees) / (sell + buy GMV) -- scope v2 formula
+    var potTotalGmv = ((potSellTotal || (met ? met.sell_total : 0) || 0) + (potBuyTotal || (met ? met.proc_total : 0) || 0));
+    var potTakeRate = potTotalGmv > 0 ? ((directPotential + indirectPotential) / potTotalGmv * 100) : 0;
+    // Indirect fee display value: use V2-aware potBuyOnline for formula display consistency
+    var indirectFeeDisplayBase = potBuyOnline != null ? potBuyOnline : (met ? met.proc_online : 0);
     // Build channel GMV lookup from sell_by_channel data
     var channelGmvMap = {};
     if(channels && channels.length > 0) {
@@ -1599,17 +1638,40 @@ function renderAccounts() {
       var chGmv = channelGmvMap[ch] || 0;
       var chTakeRate = chGmv > 0 ? (chFee / chGmv * 100) : 0;
       var flag = '', rs = '';
-      if(chGmv > 10000 && chFee === 0) { flag = '\u26a0 NOT MONETIZED'; rs = 'color:var(--red);font-weight:600'; }
-      else if(ch === 'API' && chTakeRate > 0 && chTakeRate < 0.5) { flag = '\u26a0 <0.5%'; rs = 'color:var(--amber)'; }
+      if(chGmv > 10000 && chFee === 0) { flag = '\u26a0 NOT MONETIZED \u2014 verify pricing agreement'; rs = 'color:var(--red);font-weight:600'; }
+      else if(ch === 'API' && chTakeRate > 0 && chTakeRate < 0.5) { flag = '\u26a0 <0.5% \u2014 check fee schedule'; rs = 'color:var(--amber)'; }
       if(chGmv > 0 || chFee > 0) html += '<tr style="'+rs+'"><td style="padding:2px 6px">'+ch+'</td><td style="padding:2px 6px;text-align:right">'+fmt$(chGmv)+'</td><td style="padding:2px 6px;text-align:right">'+fmt$(chFee)+'</td><td style="padding:2px 6px;text-align:right">'+(chGmv>0?fmtPct(chTakeRate):'\u2014')+'</td><td style="padding:2px 6px;font-size:10px">'+flag+'</td></tr>';
     });
-    var offlineGmv = channelGmvMap['Offline'] || (met ? met.sell_offline : 0);
-    if(offlineGmv > 0) html += '<tr style="color:var(--text-muted)"><td style="padding:2px 6px">Offline</td><td style="padding:2px 6px;text-align:right">'+fmt$(offlineGmv)+'</td><td style="padding:2px 6px;text-align:right">$0</td><td style="padding:2px 6px;text-align:right">\u2014</td><td style="padding:2px 6px;font-size:10px;color:var(--red)">$0 take</td></tr>';
-    html += '<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">Indirect <span style="font-size:10px;color:var(--text-muted);font-weight:400">(1.5% \u00d7 Buy Online) [est.]</span></td><td style="padding:3px 6px;text-align:right;font-size:10px;color:var(--text-muted)">1.5%\u00d7'+fmt$(met?met.proc_online:0)+'</td><td style="padding:3px 6px;text-align:right;font-weight:600">'+fmt$(indirectPotential)+'</td><td colspan="2"></td></tr>';
-    // FIX A: show fee delta inline on TOTAL row
+    // Offline GMV: prefer V2 temporal sell_offline, fall back to sell_by_channel, then static metrics
+    var v2SellOffline = (v2Sell && v2Sell.sell_offline) ? getV2Val(v2Sell.sell_offline, tf) : null;
+    var v2SellOfflineDelta = (v2Sell && v2Sell.sell_offline) ? getV2Delta(v2Sell.sell_offline, tf) : null;
+    var offlineGmv = v2SellOffline != null ? v2SellOffline : (channelGmvMap['Offline'] || (met ? met.sell_offline : 0));
+    if(offlineGmv > 0) {
+      var offlineDeltaHtml = v2SellOfflineDelta ? ' '+v2SellOfflineDelta.html : '';
+      var offlineSoWhat = offlineGmv > 100000 ? ' \u2014 move 10% online = '+fmt$(offlineGmv * 0.1)+' GMV' : '';
+      html += '<tr style="color:var(--text-muted)"><td style="padding:2px 6px">Offline</td><td style="padding:2px 6px;text-align:right">'+fmt$(offlineGmv)+offlineDeltaHtml+'</td><td style="padding:2px 6px;text-align:right">$0</td><td style="padding:2px 6px;text-align:right">\u2014</td><td style="padding:2px 6px;font-size:10px;color:var(--red)">$0 take'+offlineSoWhat+'</td></tr>';
+    }
+    // Indirect fees: display uses V2-aware potBuyOnline for formula consistency
+    html += '<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">Indirect <span style="font-size:10px;color:var(--text-muted);font-weight:400">(1.5% \u00d7 Buy Online) [est.]</span></td><td style="padding:3px 6px;text-align:right;font-size:10px;color:var(--text-muted)">1.5%\u00d7'+fmt$(indirectFeeDisplayBase)+'</td><td style="padding:3px 6px;text-align:right;font-weight:600">'+fmt$(indirectPotential)+'</td><td colspan="2"></td></tr>';
+    // FIX A: show fee delta inline on TOTAL row + take rate summary
     var feesDeltaHtml = v2FeesDelta ? ' ' + v2FeesDelta.html : '';
-    html += '<tr style="background:#f1f5f9"><td style="padding:3px 6px;font-weight:700">TOTAL</td><td></td><td style="padding:3px 6px;text-align:right;font-weight:700;color:var(--green)">'+fmt$(directPotential+indirectPotential)+feesDeltaHtml+'</td><td colspan="2"></td></tr>';
+    html += '<tr style="background:#f1f5f9"><td style="padding:3px 6px;font-weight:700">TOTAL</td><td></td><td style="padding:3px 6px;text-align:right;font-weight:700;color:var(--green)">'+fmt$(directPotential+indirectPotential)+feesDeltaHtml+'</td><td style="padding:3px 6px;text-align:right;font-size:10px;color:var(--text-muted)">'+(potTakeRate > 0 ? fmtPct(potTakeRate)+' take rate' : '')+'</td><td></td></tr>';
     html += '</table>';
+    // Card-bottom SO WHAT: summarize the biggest lever for this account
+    var soWhatParts = [];
+    if(sellGap != null && sellGap > 50000) soWhatParts.push(fmt$(sellGap)+' sell gap');
+    if(buyGap != null && buyGap > 50000) soWhatParts.push(fmt$(buyGap)+' buy gap');
+    if(offlineGmv > 100000) soWhatParts.push(fmt$(offlineGmv)+' offline at $0 fees');
+    var notMonetizedChannels = [];
+    ['eCommerce','K2K','API'].forEach(function(ch) {
+      var chGmvCheck = channelGmvMap[ch] || 0;
+      var chFeeCheck = (met && met.fees_by_type && met.fees_by_type[ch]) ? met.fees_by_type[ch] : 0;
+      if(chGmvCheck > 10000 && chFeeCheck === 0) notMonetizedChannels.push(ch);
+    });
+    if(notMonetizedChannels.length > 0) soWhatParts.push(notMonetizedChannels.join(', ')+' not monetized');
+    if(soWhatParts.length > 0) {
+      html += '<div style="margin-top:6px;padding:5px 8px;background:rgba(37,99,235,0.05);border-radius:4px;font-size:11px;color:var(--blue)"><strong>Focus:</strong> '+soWhatParts.join(' | ')+'</div>';
+    }
     html += '</div>';
 
     // --- Card 2: OPPORTUNITIES — "¿Cuáles son las oportunidades?" ---
