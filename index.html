@@ -153,6 +153,14 @@ tr.eco-row:hover { opacity:1; }
 .discovery-list { list-style:decimal; padding-left:20px; }
 .discovery-list li { padding:3px 0; font-size:12px; }
 
+/* TIMEFRAME + DELTA */
+.tf-label { font-size:10px; color:var(--text-muted); font-style:italic; }
+.delta-up { color:var(--green); font-weight:600; font-size:10px; }
+.delta-down { color:var(--red); font-weight:600; font-size:10px; }
+.delta-flat { color:var(--text-muted); font-size:10px; }
+#timeframeSelect { font-size:12px; padding:5px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg-card); font-weight:600; color:var(--blue); outline:none; cursor:pointer; }
+#timeframeSelect:focus { border-color:var(--blue); box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+
 /* RESPONSIVE */
 @media (max-width: 768px) {
   .nav { flex-direction:column; gap:6px; align-items:flex-start; }
@@ -183,7 +191,17 @@ tr.eco-row:hover { opacity:1; }
 
 <!-- TAB 1: ACCOUNTS -->
 <div class="tab-content active" id="tab-accounts">
+  <div id="freshnessBanner" style="margin:10px 0 8px;padding:8px 14px;background:rgba(37,99,235,0.07);border:1px solid rgba(37,99,235,0.25);border-radius:6px;font-size:12px;color:#1e40af;line-height:1.6">
+    <strong>Loading data...</strong>
+  </div>
   <div class="filters">
+    <select id="timeframeSelect" title="Select time period for sell/buy columns">
+      <option value="ytd" selected>YTD 2026</option>
+      <option value="current_month">This Month (Jul)</option>
+      <option value="prior_month">Last Month (Jun)</option>
+      <option value="current_quarter">This Quarter (Q3)</option>
+      <option value="prior_quarter">Last Quarter (Q2)</option>
+    </select>
     <select id="repFilter">
       <option value="all">All Reps</option>
     </select>
@@ -245,16 +263,19 @@ tr.eco-row:hover { opacity:1; }
           <th data-sort="priority_order">Priority <span class="sort-arrow">&#9650;</span></th>
           <th>Products</th>
           <th data-sort="est_sell" style="text-align:right">Est. Sell GMV <span class="sort-arrow">&#9650;</span></th>
-          <th data-sort="koronet_sell" style="text-align:right">Koronet Sell <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="koronet_sell" style="text-align:right" id="thKoronetSell">Koronet Sell <span class="sort-arrow">&#9650;</span><br><span class="tf-label" id="tfLabelSell">YTD</span></th>
           <th data-sort="penetration" style="text-align:right">Penetr. % <span class="sort-arrow">&#9650;</span></th>
-          <th data-sort="online_pct" style="text-align:right">Online % <span class="sort-arrow">&#9650;</span></th>
-          <th>CONFIG</th>
-          <th>BUY</th>
-          <th>LIST</th>
-          <th>SELL</th>
-          <th>SFDC Opp</th>
-          <th data-sort="opp_count" style="text-align:center">Opps <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="online_pct" style="text-align:right">Online Sell % <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="est_buy" style="text-align:right">Est Buy GMV <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="koronet_buy" style="text-align:right" id="thKoronetBuy">Koronet Buy <span class="sort-arrow">&#9650;</span><br><span class="tf-label" id="tfLabelBuy">YTD</span></th>
+          <th data-sort="buy_penetration" style="text-align:right">Buy Pen. % <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="online_buy_pct" style="text-align:right">Online Buy % <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="fees" style="text-align:right">Fees <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="take_rate" style="text-align:right">Take Rate <span class="sort-arrow">&#9650;</span></th>
+          <th style="text-align:center" title="Requires temporal data (P0.2)">Trend</th>
+          <th style="text-align:center" title="Requires GA4 by company (P0.2)">eShop CVR</th>
+          <th data-sort="opp_count" style="text-align:center">Opps <span class="sort-arrow">&#9650;</span></th>
+          <th>SFDC Opp</th>
         </tr>
       </thead>
       <tbody id="accountsBody"></tbody>
@@ -456,9 +477,16 @@ tr.eco-row:hover { opacity:1; }
 <div class="tab-content" id="tab-glossary"></div>
 
 <script>
-// === DATA LOAD (ALL 12 FILES) ===
+// === DATA LOAD (ALL 12 FILES + V2 TEMPORAL) ===
 var ACCOUNTS=[], METRICS={}, CONFIG={}, BUNCHES={}, SFDC=[], CHRISTINE={}, DEFINITIONS={};
 var BUYERS=[], SELL_BY_CHANNEL={}, BUYER_CONCENTRATION={}, REPEAT_RATE={}, SUPPLY_MATRIX={};
+
+// V2 temporal data — loaded separately with .catch() so failures don't block render
+window.METRICS_V2_SELL = null;
+window.METRICS_V2_BUY = null;
+
+// Active timeframe — default YTD
+var ACTIVE_TIMEFRAME = 'ytd';
 
 async function loadData() {
   var base = 'data/';
@@ -500,11 +528,111 @@ async function loadData() {
   window.LIST_TIME_DEPTH = Array.isArray(LIST_TIME_DEPTH) ? LIST_TIME_DEPTH : (LIST_TIME_DEPTH.data || LIST_TIME_DEPTH.records || []);
   window.BUYERS_V2 = Array.isArray(BUYERS_V2) ? BUYERS_V2 : (BUYERS_V2.data || BUYERS_V2.records || []);
   window.SELL_FORMAT = SELL_FORMAT;
+
+  // Load V2 temporal files (non-blocking — failures show placeholder)
+  await Promise.all([
+    fetch(base+'metrics_v2_sell.json').then(function(r){return r.json();}).then(function(d){
+      window.METRICS_V2_SELL = d;
+    }).catch(function(){ window.METRICS_V2_SELL = null; }),
+    fetch(base+'metrics_v2_buy.json').then(function(r){return r.json();}).then(function(d){
+      window.METRICS_V2_BUY = d;
+    }).catch(function(){ window.METRICS_V2_BUY = null; }),
+  ]);
+
+  updateFreshnessBanner();
   populateFilters();
   renderAccounts();
   renderHealth();
   renderOpps();
   renderDefinitions();
+}
+
+// === V2 LOOKUP HELPERS ===
+
+// Get V2 sell data for a company by name (normName match)
+function getV2Sell(name) {
+  if(!name || !window.METRICS_V2_SELL || !window.METRICS_V2_SELL.companies) return null;
+  var n = normName(name);
+  var companies = window.METRICS_V2_SELL.companies;
+  for(var key in companies) {
+    if(normName(key) === n) return companies[key];
+  }
+  return null;
+}
+
+// Get V2 buy data for a company by name (normName match)
+function getV2Buy(name) {
+  if(!name || !window.METRICS_V2_BUY || !window.METRICS_V2_BUY.companies) return null;
+  var n = normName(name);
+  var companies = window.METRICS_V2_BUY.companies;
+  for(var key in companies) {
+    if(normName(key) === n) return companies[key];
+  }
+  return null;
+}
+
+// Get a specific timeframe value from a V2 metric object
+// tf = 'ytd' | 'current_month' | 'prior_month' | 'current_quarter' | 'prior_quarter'
+function getV2Val(metricObj, tf) {
+  if(!metricObj || !tf) return null;
+  var v = metricObj[tf];
+  return (v != null && !isNaN(v)) ? v : null;
+}
+
+// Get delta for the active timeframe
+// Returns {pct, label, html} where html is the colored arrow indicator
+function getV2Delta(metricObj, tf) {
+  if(!metricObj || !metricObj.deltas) return null;
+  var deltaMap = {
+    'ytd': 'yoy',
+    'current_month': 'mom',
+    'prior_month': 'mom',
+    'current_quarter': 'qoq',
+    'prior_quarter': 'qoq'
+  };
+  var deltaKey = deltaMap[tf] || 'yoy';
+  var pct = metricObj.deltas[deltaKey];
+  if(pct == null || isNaN(pct)) return null;
+  var absPct = Math.abs(pct);
+  if(absPct < 1) {
+    return {pct: pct, label: deltaKey.toUpperCase(), html: '<span style="color:var(--text-muted)">\u2014</span>'};
+  }
+  var color = pct > 0 ? 'var(--green)' : 'var(--red)';
+  var arrow = pct > 0 ? '\u25b2' : '\u25bc';
+  return {
+    pct: pct,
+    label: deltaKey.toUpperCase(),
+    html: '<span style="color:'+color+';font-size:10px;font-weight:600">'+arrow+' '+(pct > 0 ? '+' : '')+pct.toFixed(1)+'% '+deltaKey.toUpperCase()+'</span>'
+  };
+}
+
+// Render "$45K ▲ +7% MoM" inline value with delta
+function fmtV2WithDelta(val, delta) {
+  if(val == null) return '\u2014';
+  var base = fmt$(val);
+  if(!delta) return base;
+  return base + ' ' + delta.html;
+}
+
+// === FRESHNESS BANNER ===
+function updateFreshnessBanner() {
+  var banner = document.getElementById('freshnessBanner');
+  if(!banner) return;
+  var asOf = '\u2014';
+  var sellCount = 0, buyCount = 0;
+  if(window.METRICS_V2_SELL && window.METRICS_V2_SELL._metadata) {
+    asOf = window.METRICS_V2_SELL._metadata.as_of || asOf;
+    sellCount = window.METRICS_V2_SELL._metadata.total_companies || 0;
+  }
+  if(window.METRICS_V2_BUY && window.METRICS_V2_BUY._metadata) {
+    buyCount = window.METRICS_V2_BUY._metadata.total_companies || 0;
+  }
+  var coverageNote = (sellCount > 0 || buyCount > 0)
+    ? 'Temporal coverage: ' + sellCount + ' sell / ' + buyCount + ' buy companies.'
+    : 'Temporal data: not loaded.';
+  banner.innerHTML = '<strong>Data as of ' + asOf + '.</strong> ' + coverageNote +
+    ' Snapshot coverage: 112/399 accounts with metrics (28%).' +
+    ' <span style="color:#64748b;margin-left:8px">Fields marked <em>MISSING</em> = data not yet available, not zero.</span>';
 }
 
 // === HELPERS ===
@@ -626,6 +754,11 @@ function findBuyDetail(name) {
   var n = normName(name);
   return window.BUY_DETAIL.order_types.find(function(r){ return normName(r.company_name) === n; });
 }
+function findAnticipation(name) {
+  if(!name || !window.BUY_DETAIL || !window.BUY_DETAIL.anticipation) return null;
+  var n = normName(name);
+  return window.BUY_DETAIL.anticipation.find(function(r){ return normName(r.company_name) === n; });
+}
 function findSellL30D(name) {
   if(!name || !window.SELL_DETAIL || !window.SELL_DETAIL.buyers_l30d) return null;
   var n = normName(name);
@@ -648,9 +781,10 @@ function findTimeDepth(name) {
   return window.LISTING_DETAIL.time_depth.find(function(r){ return normName(r.company_name) === n; });
 }
 function findListingCats(name) {
-  if(!name || !window.LISTING_DETAIL || !window.LISTING_DETAIL.categories) return null;
+  // BUG FIX (P0.0 BUG-1): JSON key is 'varieties', not 'categories'
+  if(!name || !window.LISTING_DETAIL || !window.LISTING_DETAIL.varieties) return null;
   var n = normName(name);
-  return window.LISTING_DETAIL.categories.find(function(r){ return normName(r.company_name) === n; });
+  return window.LISTING_DETAIL.varieties.find(function(r){ return normName(r.company_name) === n; });
 }
 function findGA4(name) {
   if(!name || !window.GA4 || !window.GA4.eshops) return null;
@@ -722,6 +856,24 @@ function getOpportunities(acct) {
   }
   if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
     opps.push({text:'No eShop. Cannot sell online.', type:'sell'});
+  }
+  // LIST opportunities
+  if(acct.has_eshops) {
+    var listU = findListUsage(id);
+    if(listU && listU.distinct_varieties < 50) {
+      opps.push({text:'Low variety coverage: only '+listU.distinct_varieties+' varieties online.', type:'list'});
+    }
+    var tdV2check = findListTimeDepthV2(id);
+    if(tdV2check && (tdV2check.pct_31_90_days === 0 || !tdV2check.pct_31_90_days) && (tdV2check.pct_over_90_days === 0 || !tdV2check.pct_over_90_days)) {
+      opps.push({text:'No long-term inventory listed (0% at 30d+).', type:'list'});
+    }
+    if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+      opps.push({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers.', type:'list'});
+    }
+    var bdCheck = findBuyDetail(acct.name);
+    if(bdCheck && bdCheck.open_market_gmv === 0) {
+      opps.push({text:'No Open Market GMV \u2014 no future inventory uploaded.', type:'list'});
+    }
   }
   return opps;
 }
@@ -848,13 +1000,100 @@ function renderAccounts() {
     var cfg = id ? CONFIG[id] : null;
     var opps = getOpportunities(a);
     var estSell = a.annual_sales_est;
-    var koronetSell = m ? m.sell_total : null;
-    var penetration = (estSell && estSell > 0 && koronetSell != null) ? (koronetSell / estSell * 100) : null;
-    var onlinePct = m ? m.online_pct : null;
+    var tf = ACTIVE_TIMEFRAME;
+
+    // V2 temporal data — supplement metrics.json where available
+    var v2Sell = getV2Sell(a.name);
+    var v2Buy = getV2Buy(a.name);
+
+    // Koronet Sell: prefer V2 temporal, fall back to metrics.json
+    var koronetSell, koronetSellDelta;
+    if(v2Sell && v2Sell.sell_total) {
+      koronetSell = getV2Val(v2Sell.sell_total, tf);
+      koronetSellDelta = getV2Delta(v2Sell.sell_total, tf);
+    }
+    if(koronetSell == null) koronetSell = m ? m.sell_total : null;
+
+    // Online Sell (for %) — prefer V2
+    var sellOnlineVal, onlinePct;
+    if(v2Sell && v2Sell.sell_online) {
+      sellOnlineVal = getV2Val(v2Sell.sell_online, tf);
+    }
+    if(sellOnlineVal == null && m) sellOnlineVal = m.sell_online;
+    // Online pct: prefer V2 online_pct metric, fall back to computed or metrics.json
+    if(v2Sell && v2Sell.online_pct) {
+      onlinePct = getV2Val(v2Sell.online_pct, tf);
+    }
+    if(onlinePct == null && m) onlinePct = m.online_pct;
+    if(onlinePct == null && koronetSell && sellOnlineVal != null) {
+      onlinePct = koronetSell > 0 ? (sellOnlineVal / koronetSell * 100) : 0;
+    }
+
+    // FIX 4: Annualize for penetration when using monthly or quarterly timeframes
+    // Sell penetration denominator is always an annual estimate — must annualize numerator for apples-to-apples
+    var tfMultiplier = 1;
+    if(tf === 'current_month' || tf === 'prior_month') tfMultiplier = 12;
+    else if(tf === 'current_quarter' || tf === 'prior_quarter') tfMultiplier = 4;
+    var koronetSellAnnualized = koronetSell != null ? koronetSell * tfMultiplier : null;
+    var penetration = (estSell && estSell > 0 && koronetSellAnnualized != null) ? (koronetSellAnnualized / estSell * 100) : null;
     var fees = m ? m.fees_total : null;
+
+    // BUY columns — V2 preferred, fall back to metrics + est_gmv cascade
+    var estData = id ? (window.EST_GMV || {})[id] : null;
+    var koronetBuy, onlineBuy, koronetBuyDelta;
+    if(v2Buy && v2Buy.buy_total) {
+      koronetBuy = getV2Val(v2Buy.buy_total, tf);
+      koronetBuyDelta = getV2Delta(v2Buy.buy_total, tf);
+    }
+    if(koronetBuy == null) koronetBuy = m ? (m.proc_total || 0) : 0;
+    if(v2Buy && v2Buy.buy_online) {
+      onlineBuy = getV2Val(v2Buy.buy_online, tf);
+    }
+    if(onlineBuy == null) onlineBuy = m ? (m.proc_online || 0) : 0;
+
+    // Est Buy cascade (unchanged)
+    var estBuyVal = 0;
+    if(estData && estData.est_buy_gmv > 0) {
+      estBuyVal = estData.est_buy_gmv;
+    } else {
+      var estSellRef = (estData && estData.est_sell_gmv > 0) ? estData.est_sell_gmv : (a.annual_sales_est || 0);
+      var mSellTotal = m ? m.sell_total : 0;
+      var mProcTotal = m ? m.proc_total : 0;
+      if(mProcTotal > 0 && mSellTotal > 0 && estSellRef > 0) {
+        estBuyVal = Math.round((mProcTotal / mSellTotal) * estSellRef);
+      } else if(estSellRef > 0) {
+        estBuyVal = Math.round(0.54 * estSellRef);
+      }
+    }
+
+    // FIX 4 (buy side): annualize koronetBuy before dividing by annual estimate
+    var koronetBuyAnnualized = koronetBuy != null ? koronetBuy * tfMultiplier : null;
+    var buyPen = (estBuyVal > 0 && koronetBuyAnnualized) ? (koronetBuyAnnualized / estBuyVal * 100) : null;
+    var onlineBuyPct = (koronetBuy > 0) ? (onlineBuy / koronetBuy * 100) : null;
+
+    // Take Rate = fees / (sell_total + proc_total)
+    var totalGmv = (koronetSell || 0) + (koronetBuy || 0);
+    var takeRate = (totalGmv > 0 && fees) ? (fees / totalGmv * 100) : null;
+
+    // Trend: use V2 YoY delta for sell_total (primary metric)
+    // Always use YoY regardless of selected timeframe (trend = YoY signal)
+    var trendDelta = null;
+    if(v2Sell && v2Sell.sell_total && v2Sell.sell_total.deltas) {
+      var yoy = v2Sell.sell_total.deltas.yoy;
+      if(yoy != null && !isNaN(yoy)) {
+        trendDelta = yoy;
+      }
+    }
+
     return Object.assign({}, a, {
       _m: m,
       _cfg: cfg,
+      _estData: estData,
+      _v2Sell: v2Sell,
+      _v2Buy: v2Buy,
+      _koronetSellDelta: koronetSellDelta || null,
+      _koronetBuyDelta: koronetBuyDelta || null,
+      _trendDelta: trendDelta,
       rep: getRep(a),
       priority_order: PRIORITY_ORDER[a.priority_level] != null ? PRIORITY_ORDER[a.priority_level] : 99,
       est_sell: estSell || 0,
@@ -862,6 +1101,11 @@ function renderAccounts() {
       penetration: penetration || 0,
       online_pct_val: onlinePct || 0,
       fees: fees || 0,
+      est_buy: estBuyVal || 0,
+      koronet_buy: koronetBuy || 0,
+      buy_penetration: buyPen || 0,
+      online_buy_pct: onlineBuyPct || 0,
+      take_rate: takeRate || 0,
       opp_count: opps.length,
       _opps: opps,
     });
@@ -886,9 +1130,10 @@ function renderAccounts() {
       if(va > vb) return 1 * sortDir;
       return 0;
     }
-    // Numeric sort
-    var va = a[sortCol] || 0, vb = b[sortCol] || 0;
-    return (va - vb) * sortDir;
+    // Numeric sort — all other columns
+    var sortA = sortCol === 'online_pct' ? (a.online_pct_val||0) : (a[sortCol] || 0);
+    var sortB = sortCol === 'online_pct' ? (b.online_pct_val||0) : (b[sortCol] || 0);
+    return (sortA - sortB) * sortDir;
   });
 
   var tbody = document.getElementById('accountsBody');
@@ -908,10 +1153,42 @@ function renderAccounts() {
 
     // Compute display values
     var estSellDisplay = a.annual_sales_est ? fmt$(a.annual_sales_est) : '\u2014';
-    var koronetSellDisplay = met ? fmt$(met.sell_total) : '\u2014';
-    var penetrationDisplay = (a.annual_sales_est && a.annual_sales_est > 0 && met) ? fmtPct(met.sell_total / a.annual_sales_est * 100) : '\u2014';
-    var onlinePctDisplay = met ? fmtPct(met.online_pct) : '\u2014';
-    var feesDisplay = met ? fmt$(met.fees_total) : '\u2014';
+    // Koronet Sell: if V2 data available show value + inline delta badge
+    var koronetSellDisplay;
+    if(a.koronet_sell > 0) {
+      koronetSellDisplay = fmt$(a.koronet_sell);
+      if(a._koronetSellDelta) koronetSellDisplay += '<br><span style="font-size:10px">' + a._koronetSellDelta.html + '</span>';
+    } else {
+      koronetSellDisplay = '\u2014';
+    }
+    var penetrationDisplay = (a.annual_sales_est && a.annual_sales_est > 0 && a.koronet_sell > 0) ? fmtPct(a.koronet_sell / a.annual_sales_est * 100) : '\u2014';
+    var onlinePctDisplay = a.online_pct_val > 0 ? fmtPct(a.online_pct_val) : (met ? fmtPct(met.online_pct) : '\u2014');
+    var feesDisplay = (met && met.fees_total) ? fmt$(met.fees_total) : '\u2014';
+    // BUY columns display
+    var estBuyDisplay = a.est_buy > 0 ? fmt$(a.est_buy) : '\u2014';
+    var koronetBuyDisplay;
+    if(a.koronet_buy > 0) {
+      koronetBuyDisplay = fmt$(a.koronet_buy);
+      if(a._koronetBuyDelta) koronetBuyDisplay += '<br><span style="font-size:10px">' + a._koronetBuyDelta.html + '</span>';
+    } else {
+      koronetBuyDisplay = '\u2014';
+    }
+    var buyPenDisplay = (a.buy_penetration > 0) ? fmtPct(a.buy_penetration) : '\u2014';
+    var onlineBuyPctDisplay = (a.koronet_buy > 0) ? fmtPct(a.online_buy_pct) : '\u2014';
+    var takeRateDisplay = (a.take_rate > 0) ? fmtPct(a.take_rate) : '\u2014';
+
+    // Trend: YoY delta of sell_total (from V2). ▲ green / ▼ red / — gray
+    var trendHtml = '<span style="color:var(--text-muted)" title="Temporal data available (V2)">\u2014</span>';
+    if(a._trendDelta != null) {
+      var td = a._trendDelta;
+      if(Math.abs(td) < 1) {
+        trendHtml = '<span style="color:var(--text-muted);font-size:11px">\u2014 flat</span>';
+      } else if(td > 0) {
+        trendHtml = '<span style="color:var(--green);font-size:11px;font-weight:600">\u25b2 +'+(td).toFixed(0)+'%</span>';
+      } else {
+        trendHtml = '<span style="color:var(--red);font-size:11px;font-weight:600">\u25bc '+(td).toFixed(0)+'%</span>';
+      }
+    }
 
     // Totals
     if(a.annual_sales_est) totals.est_sell += a.annual_sales_est;
@@ -992,11 +1269,12 @@ function renderAccounts() {
       ? '<span class="opp-count has-opps" title="'+opps.map(function(o){return o.text;}).join('\n')+'">'+opps.length+'</span>'
       : '<span class="opp-count no-opps">0</span>';
 
-    // Online % color
+    // Online % color — use V2 or metrics.json
     var onlineColor = 'var(--text)';
-    if(met) {
-      if(met.online_pct >= 20) onlineColor = 'var(--green)';
-      else if(met.online_pct > 0) onlineColor = 'var(--amber)';
+    var onlinePctForColor = a.online_pct_val != null ? a.online_pct_val : (met ? met.online_pct : null);
+    if(onlinePctForColor != null) {
+      if(onlinePctForColor >= 20) onlineColor = 'var(--green)';
+      else if(onlinePctForColor > 0) onlineColor = 'var(--amber)';
       else onlineColor = 'var(--red)';
     }
 
@@ -1011,17 +1289,31 @@ function renderAccounts() {
     html += '<td style="text-align:right">'+koronetSellDisplay+'</td>';
     html += '<td style="text-align:right">'+penetrationDisplay+'</td>';
     html += '<td style="text-align:right;color:'+onlineColor+'">'+onlinePctDisplay+'</td>';
-    html += '<td>'+configHtml+'</td>';
-    html += '<td>'+buyHtml+'</td>';
-    html += '<td>'+listHtml+'</td>';
-    html += '<td>'+sellHtml+'</td>';
-    html += '<td>'+sfdcType+'</td>';
-    html += '<td style="text-align:center">'+oppBadge+'</td>';
+    html += '<td style="text-align:right;color:var(--text-muted)">'+estBuyDisplay+'</td>';
+    html += '<td style="text-align:right">'+koronetBuyDisplay+'</td>';
+    html += '<td style="text-align:right">'+buyPenDisplay+'</td>';
+    html += '<td style="text-align:right">'+onlineBuyPctDisplay+'</td>';
     html += '<td style="text-align:right;font-weight:600">'+feesDisplay+'</td>';
+    html += '<td style="text-align:right;color:var(--text-muted)">'+takeRateDisplay+'</td>';
+    html += '<td style="text-align:center">' + trendHtml + '</td>';
+    // FIX 5: Wire eShop CVR from GA4 data
+    var ga4Portfolio = findGA4(a.name);
+    var cvrHtml;
+    if(ga4Portfolio && ga4Portfolio.sessions > 0 && ga4Portfolio.transactions > 0) {
+      var cvrPct = ga4Portfolio.transactions / ga4Portfolio.sessions * 100;
+      var cvrColor = cvrPct > 10 ? 'var(--green)' : cvrPct > 3 ? 'var(--amber)' : 'var(--red)';
+      var cvrTooltip = ga4Portfolio.sessions.toLocaleString()+' sessions \u2192 '+ga4Portfolio.transactions.toLocaleString()+' transactions';
+      cvrHtml = '<span style="color:'+cvrColor+';font-weight:600;font-size:11px" title="'+cvrTooltip+'">'+cvrPct.toFixed(1)+'%</span>';
+    } else {
+      cvrHtml = '<span style="color:var(--text-muted)" title="No GA4 data — hostname-based, may be missing for app.kometsales.com accounts">\u2014</span>';
+    }
+    html += '<td style="text-align:center">'+cvrHtml+'</td>';
+    html += '<td style="text-align:center">'+oppBadge+'</td>';
+    html += '<td>'+sfdcType+'</td>';
     html += '</tr>';
 
-    // === EXPAND ROW (17 fields from spec) ===
-    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="16"><div class="expand-cell"><div class="expand-grid">';
+    // === EXPAND ROW — cards: POTENTIAL | OPPORTUNITIES | BUY | LIST | SELL ===
+    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="19"><div class="expand-cell"><div class="expand-grid">';
 
     // Data lookups needed across cards
     var estData = a.company_id ? (window.EST_GMV||{})[a.company_id] : null;
@@ -1034,18 +1326,55 @@ function renderAccounts() {
     var gapCat = findGapCategories(a.name);
     var channels = findChannelMix(a.name);
     var vd = a.company_id ? (window.VENDOR_DETAIL||{})[a.company_id] : null;
-    var indirectFees = met ? Math.round(met.proc_online * 0.015) : 0;
+
+    // V2 temporal lookups for this account (already on enriched object)
+    var v2Sell = a._v2Sell;
+    var v2Buy = a._v2Buy;
+    var tf = ACTIVE_TIMEFRAME;
+    // FIX 4: annualization multiplier (same logic as in enrichment loop)
+    var tfMultiplier = 1;
+    if(tf === 'current_month' || tf === 'prior_month') tfMultiplier = 12;
+    else if(tf === 'current_quarter' || tf === 'prior_quarter') tfMultiplier = 4;
+
+    // POTENTIAL card: prefer V2 temporal values, fall back to metrics.json
+    var potSellTotal = (v2Sell && v2Sell.sell_total) ? getV2Val(v2Sell.sell_total, tf) : null;
+    if(potSellTotal == null && met) potSellTotal = met.sell_total;
+    var potSellOnline = (v2Sell && v2Sell.sell_online) ? getV2Val(v2Sell.sell_online, tf) : null;
+    if(potSellOnline == null && met) potSellOnline = met.sell_online;
+    var potOnlinePct = (v2Sell && v2Sell.online_pct) ? getV2Val(v2Sell.online_pct, tf) : null;
+    if(potOnlinePct == null) {
+      potOnlinePct = (potSellTotal && potSellTotal > 0 && potSellOnline != null) ? (potSellOnline / potSellTotal * 100) : (met ? met.online_pct : null);
+    }
+    var potBuyTotal = (v2Buy && v2Buy.buy_total) ? getV2Val(v2Buy.buy_total, tf) : null;
+    if(potBuyTotal == null && met) potBuyTotal = met.proc_total;
+    var potBuyOnline = (v2Buy && v2Buy.buy_online) ? getV2Val(v2Buy.buy_online, tf) : null;
+    if(potBuyOnline == null && met) potBuyOnline = met.proc_online;
+    // Deltas for POTENTIAL card inline display
+    var potSellDelta = (v2Sell && v2Sell.sell_total) ? getV2Delta(v2Sell.sell_total, tf) : null;
+    var potSellOnlineDelta = (v2Sell && v2Sell.sell_online) ? getV2Delta(v2Sell.sell_online, tf) : null;
+    var potBuyTotalDelta = (v2Buy && v2Buy.buy_total) ? getV2Delta(v2Buy.buy_total, tf) : null;
+    var potBuyOnlineDelta = (v2Buy && v2Buy.buy_online) ? getV2Delta(v2Buy.buy_online, tf) : null;
+    // Source label for temporal data
+    var v2SourceLabel = v2Sell ? '<span style="font-size:10px;color:var(--text-muted);font-style:italic"> [V2 ' + tf.replace('_',' ') + ']</span>' : '';
+
+    var indirectFees = potBuyOnline != null ? Math.round(potBuyOnline * 0.015) : (met ? Math.round(met.proc_online * 0.015) : 0);
     var takeRate = met && met.sell_online > 0 ? (met.fees_total / met.sell_online * 100) : 0;
-    var buyOnlinePct = met && met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0;
+    var buyOnlinePct = potBuyTotal && potBuyTotal > 0 && potBuyOnline != null ? (potBuyOnline / potBuyTotal * 100) : (met && met.proc_total > 0 ? (met.proc_online / met.proc_total * 100) : 0);
     var bottleneck = computeBottleneck(a, cfg, met);
     var nextAction = opps.length > 0 ? opps[0].text : '\u2014';
 
     // --- Card 1: POTENTIAL — "¿Cuán grande es?" ---
-    var sellPenPct = (a.annual_sales_est && a.annual_sales_est > 0 && met) ? (met.sell_total / a.annual_sales_est * 100) : null;
+    // Use V2 sell_total if available for gap/pen calculations in card header
+    // FIX 4: annualize for monthly/quarterly timeframes before computing penetration
+    var potCardSellTotal = potSellTotal != null ? potSellTotal : (met ? met.sell_total : null);
+    var potCardSellTotalAnnualized = potCardSellTotal != null ? potCardSellTotal * tfMultiplier : null;
+    var sellPenPct = (a.annual_sales_est && a.annual_sales_est > 0 && potCardSellTotalAnnualized != null) ? (potCardSellTotalAnnualized / a.annual_sales_est * 100) : null;
     var sellPenColor = sellPenPct === null ? 'var(--text-muted)' : sellPenPct > 50 ? 'var(--green)' : sellPenPct > 20 ? 'var(--amber)' : 'var(--red)';
-    var buyPenPct = (estData && estData.est_buy_gmv > 0 && met) ? (met.proc_total / estData.est_buy_gmv * 100) : null;
+    var potCardBuyTotal = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : null);
+    var potCardBuyTotalAnnualized = potCardBuyTotal != null ? potCardBuyTotal * tfMultiplier : null;
+    var buyPenPct = (estData && estData.est_buy_gmv > 0 && potCardBuyTotalAnnualized != null) ? (potCardBuyTotalAnnualized / estData.est_buy_gmv * 100) : null;
     var buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
-    var sellGap = met && a.annual_sales_est ? (a.annual_sales_est - met.sell_total) : null;
+    var sellGap = a.annual_sales_est && potCardSellTotalAnnualized != null ? (a.annual_sales_est - potCardSellTotalAnnualized) : null;
     var oraCalcDiverge = a.annual_sales_est && estData && estData.est_sell_gmv > 0 ? Math.abs(a.annual_sales_est - estData.est_sell_gmv) / Math.max(a.annual_sales_est, estData.est_sell_gmv) * 100 : 0;
     html += '<div class="expand-section"><h4>POTENTIAL \u2014 \u00bfCu\u00e1n grande es?</h4>';
     // FIX 4: Pre go-live SO WHAT + FIX 5: Show impl stage
@@ -1074,12 +1403,18 @@ function renderAccounts() {
     } else {
       html += '<tr><td style="padding:3px 8px">Est. Sell (calc)</td><td style="text-align:right">'+(estData?fmt$(estData.est_sell_gmv):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px">'+(estData?estData.est_sell_source+' ('+estData.est_sell_confidence+')':'')+'</td></tr>';
     }
-    html += '<tr><td style="padding:3px 8px">Koronet Sell</td><td style="text-align:right;font-weight:600">'+(met?fmt$(met.sell_total):'\u2014')+'</td><td style="padding-left:6px"><span style="color:'+sellPenColor+';font-weight:600">'+(sellPenPct!==null?fmtPct(sellPenPct)+' penetration':'')+'</span></td></tr>';
-    html += '<tr><td style="padding:3px 8px">Online Sell</td><td style="text-align:right;color:'+onlineColor+'">'+(met?fmt$(met.sell_online):'\u2014')+'</td><td style="padding-left:6px;color:'+onlineColor+'">'+(met?fmtPct(met.online_pct):'')+'</td></tr>';
+    // Koronet Sell value for POTENTIAL card — V2 preferred (FIX 4: annualized)
+    var potSellTotalAnnualized = potSellTotal != null ? potSellTotal * tfMultiplier : null;
+    var potSellPenPct = (a.annual_sales_est && a.annual_sales_est > 0 && potSellTotalAnnualized != null) ? (potSellTotalAnnualized / a.annual_sales_est * 100) : sellPenPct;
+    var potSellPenColor = potSellPenPct == null ? 'var(--text-muted)' : potSellPenPct > 50 ? 'var(--green)' : potSellPenPct > 20 ? 'var(--amber)' : 'var(--red)';
+    var potOnlineColor = 'var(--text)';
+    if(potOnlinePct != null) { if(potOnlinePct >= 20) potOnlineColor='var(--green)'; else if(potOnlinePct > 0) potOnlineColor='var(--amber)'; else potOnlineColor='var(--red)'; }
+    html += '<tr><td style="padding:3px 8px">Koronet Sell</td><td style="text-align:right;font-weight:600">'+(potSellTotal!=null?fmt$(potSellTotal):'\u2014')+(potSellDelta?' '+potSellDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+potSellPenColor+';font-weight:600">'+(potSellPenPct!==null?fmtPct(potSellPenPct)+' penetration':'')+'</span>'+v2SourceLabel+'</td></tr>';
+    html += '<tr><td style="padding:3px 8px">Online Sell</td><td style="text-align:right;color:'+potOnlineColor+'">'+(potSellOnline!=null?fmt$(potSellOnline):'\u2014')+(potSellOnlineDelta?' '+potSellOnlineDelta.html:'')+'</td><td style="padding-left:6px;color:'+potOnlineColor+'">'+(potOnlinePct!=null?fmtPct(potOnlinePct):'')+'</td></tr>';
     html += '</table>';
     html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0">';
     html += '<tr style="background:#f1f5f9"><th colspan="3" style="padding:4px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text-muted)">BUY SIDE</th></tr>';
-    // FIX 1: Est Buy — calculate from buy/sell ratio if missing
+    // Est Buy — calculate from buy/sell ratio if missing
     var estBuyVal = 0;
     var estBuyNote = '';
     if(estData && estData.est_buy_gmv > 0) {
@@ -1096,12 +1431,15 @@ function renderAccounts() {
         estBuyNote = '(avg ratio 54%)';
       }
     }
-    // Recalculate buyPenPct with new estBuyVal
-    buyPenPct = (estBuyVal > 0 && met) ? (met.proc_total / estBuyVal * 100) : null;
+    // Buy penetration with V2 or fallback (FIX 4: annualized)
+    var potBuyTotalForPen = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : null);
+    var potBuyTotalForPenAnnualized = potBuyTotalForPen != null ? potBuyTotalForPen * tfMultiplier : null;
+    buyPenPct = (estBuyVal > 0 && potBuyTotalForPenAnnualized != null) ? (potBuyTotalForPenAnnualized / estBuyVal * 100) : null;
     buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
+    var potBuyV2Label = v2Buy ? '<span style="font-size:10px;color:var(--text-muted);font-style:italic"> [V2 '+tf.replace('_',' ')+']</span>' : '';
     html += '<tr><td style="padding:3px 8px">Est. Buy</td><td style="text-align:right">'+(estBuyVal>0?fmt$(estBuyVal):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px">'+estBuyNote+'</td></tr>';
-    html += '<tr><td style="padding:3px 8px">Koronet Buy</td><td style="text-align:right;font-weight:600">'+(met?fmt$(met.proc_total):'\u2014')+'</td><td style="padding-left:6px"><span style="color:'+buyPenColor+';font-weight:600">'+(buyPenPct!==null?fmtPct(buyPenPct)+' penetration':'')+'</span></td></tr>';
-    html += '<tr><td style="padding:3px 8px">Online Buy</td><td style="text-align:right">'+(met?fmt$(met.proc_online):'\u2014')+'</td><td style="padding-left:6px">'+(met?fmtPct(buyOnlinePct):'')+'</td></tr>';
+    html += '<tr><td style="padding:3px 8px">Koronet Buy</td><td style="text-align:right;font-weight:600">'+(potBuyTotal!=null?fmt$(potBuyTotal):(met?fmt$(met.proc_total):'\u2014'))+(potBuyTotalDelta?' '+potBuyTotalDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+buyPenColor+';font-weight:600">'+(buyPenPct!==null?fmtPct(buyPenPct)+' penetration':'')+'</span>'+potBuyV2Label+'</td></tr>';
+    html += '<tr><td style="padding:3px 8px">Online Buy</td><td style="text-align:right">'+(potBuyOnline!=null?fmt$(potBuyOnline):(met?fmt$(met.proc_online):'\u2014'))+(potBuyOnlineDelta?' '+potBuyOnlineDelta.html:'')+'</td><td style="padding-left:6px">'+(buyOnlinePct>0?fmtPct(buyOnlinePct):'')+'</td></tr>';
     html += '</table>';
     // FIX 3: Fee breakdown by channel with take rate
     var directPotential = met ? met.fees_total : 0;
@@ -1129,7 +1467,8 @@ function renderAccounts() {
     html += '</table>';
     html += '</div>';
 
-    // --- Card 2: CONFIG — "¿El sistema lo permite?" ---
+    // --- Card 2: OPPORTUNITIES — "¿Cuáles son las oportunidades?" ---
+    // (formerly CONFIG — renamed per Scope v2. All CONFIG logic preserved. New sections marked DRAFT.)
     // Account profile based on ct_id
     var _cfgProfiles = {
       'WH_CORE': {desc:'Full stack — Core is their ERP. Can list, sell, use SOs, Future Sales, Open Market.', short:'Full capabilities'},
@@ -1163,10 +1502,11 @@ function renderAccounts() {
     var blocking = configIssues.filter(function(i){return i.severity==='blocking';});
     var limiting = configIssues.filter(function(i){return i.severity==='limiting';});
     var headerColor = blocking.length > 0 ? 'var(--red)' : limiting.length > 0 ? 'var(--amber)' : 'var(--green)';
-    var headerText = configIssues.length === 0 ? '\u2705 CONFIG OK' : 'CONFIG Issues ('+configIssues.length+')';
+    var cfgStatusText = configIssues.length === 0 ? '\u2705 Config OK' : 'Config Issues ('+configIssues.length+')';
 
     html += '<div class="expand-section" style="border-left:3px solid '+headerColor+'">';
-    html += '<h4 style="color:'+headerColor+'">'+headerText+'</h4>';
+    html += '<h4>OPPORTUNITIES <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(config + revenue — DRAFT)</span></h4>';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;padding:3px 6px;background:#f8fafc;border-radius:3px">Config status: <strong style="color:'+headerColor+'">'+cfgStatusText+'</strong></div>';
     html += '<div style="font-size:11px;margin-bottom:6px;padding:4px 8px;background:#f1f5f9;border-radius:4px"><strong>'+a.ct_id+':</strong> '+_cfgProfile.desc+'</div>';
 
     // Issues first (most important)
@@ -1271,10 +1611,10 @@ function renderAccounts() {
     // --- Card 3: BUY — "¿Compra por la plataforma?" ---
     html += '<div class="expand-section"><h4>BUY \u2014 \u00bfCompra por la plataforma?</h4>';
 
-    // --- RESUMEN ---
+    // --- RESUMEN — prefer V2 temporal values ---
     var buyEstTotal = estBuyVal > 0 ? estBuyVal : (estData ? estData.est_buy_gmv : 0);
-    var buyViaKomet = met ? met.proc_total : 0;
-    var buyOnline = met ? met.proc_online : 0;
+    var buyViaKomet = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : 0);
+    var buyOnline = potBuyOnline != null ? potBuyOnline : (met ? met.proc_online : 0);
     var buyOffline = buyViaKomet - buyOnline;
     var buyKometPct = buyEstTotal > 0 ? (buyViaKomet / buyEstTotal * 100) : 0;
     var buyOnlinePctCard = buyViaKomet > 0 ? (buyOnline / buyViaKomet * 100) : 0;
@@ -1351,13 +1691,38 @@ function renderAccounts() {
         html += '<tr><td style="padding:4px 8px">SKUs</td><td style="text-align:right;padding:4px 8px">'+fmtN(buyListUsage.distinct_skus)+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
       }
 
-      // Bunches row
-      var bunchOnline = bun ? fmt$(bun.total_bunch_gmv) : '\u2014';
-      var bunchFlag = cfg ? cfg.bunches_flag : null;
-      html += '<tr><td style="padding:4px 8px">Bunches</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+bunchOnline+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px">'+(bunchFlag === false ? '<span style="color:var(--red)">Flag OFF</span>' : (bunchFlag === true ? '<span style="color:var(--green)">Flag ON</span>' : '\u2014'))+'</td></tr>';
+      // FIX 1: Bunches row removed from BUY — bunches is a LIST/SELL concept, not BUY.
+      // Wholesalers sell bunches to buyers; they do not buy bunches. Bunches flag belongs in LIST card.
 
-      // Anticipation row
-      html += '<tr><td style="padding:4px 8px">Anticipation</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;color:var(--text-muted);font-style:italic">needs data</td></tr>';
+      // FIX 2: Anticipation row — wire from buy_detail.json anticipation array
+      var antData = findAnticipation(a.name);
+      if(antData && antData.total_orders > 0) {
+        var ant0  = antData.orders_0_3d   || 0;
+        var ant4  = antData.orders_4_7d   || 0;
+        var ant8  = antData.orders_8_14d  || 0;
+        var ant15 = antData.orders_15_30d || 0;
+        var ant30 = antData.orders_30plus_d || 0;
+        var antTotal = antData.total_orders;
+        var antBars = [
+          {n:ant0,  label:'0-3d',  pct: ant0/antTotal*100,  color:'var(--red)'},
+          {n:ant4,  label:'4-7d',  pct: ant4/antTotal*100,  color:'var(--amber)'},
+          {n:ant8,  label:'8-14d', pct: ant8/antTotal*100,  color:'#2563eb'},
+          {n:ant15, label:'15-30d',pct: ant15/antTotal*100, color:'#7c3aed'},
+          {n:ant30, label:'30d+',  pct: ant30/antTotal*100, color:'var(--green)'}
+        ];
+        var antBarHtml = antBars.map(function(b) {
+          return b.pct > 0.5 ? '<div style="width:'+b.pct.toFixed(1)+'%;background:'+b.color+';color:#fff;font-size:9px;text-align:center;line-height:16px;min-width:2px" title="'+b.label+': '+Math.round(b.pct)+'%">'+Math.round(b.pct)+'%</div>' : '';
+        }).join('');
+        html += '<tr><td style="padding:4px 8px" colspan="4">';
+        html += '<strong style="font-size:10px;color:var(--text-muted)">ANTICIPATION (logistics lead time — arrival→shipping gap)</strong>';
+        html += '<div style="display:flex;gap:0;height:16px;border-radius:3px;overflow:hidden;margin:3px 0">'+antBarHtml+'</div>';
+        html += '<div style="font-size:10px;color:var(--text-muted)">';
+        antBars.forEach(function(b){ html += '<span style="color:'+b.color+'">&#9632;</span> '+b.label+' '; });
+        html += ' &middot; '+antTotal.toLocaleString()+' orders &middot; <em style="font-size:9px">Note: measures arrival→shipping gap, not order creation date</em>';
+        html += '</div></td></tr>';
+      } else {
+        html += '<tr><td style="padding:4px 8px">Anticipation</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;color:var(--text-muted);font-style:italic">'+(antData ? 'no orders' : 'no data')+'</td></tr>';
+      }
 
       html += '</table>';
 
@@ -1534,6 +1899,34 @@ function renderAccounts() {
     html += '<div class="detail-row"><span class="detail-label" style="color:var(--amber);font-weight:600">SO WHAT</span><span style="color:var(--amber)">'
       + fmt$(sellOfflineVal) + ' vendiendo offline a $0 direct fees</span></div>';
 
+    // FIX 3: SELL UNIT ECONOMICS — impact of moving more buyers online
+    if(met && met.sell_total > 0) {
+      var sellBuyerData = findBuyerData(id);
+      var totalBuyers = sellBuyerData ? sellBuyerData.total_buyers : null;
+      var onlineBuyersCount = sellBuyerData ? sellBuyerData.online_buyers : null;
+      var sellFeesTotal = met.fees_total || 0;
+      var sellTotal = met.sell_total || 0;
+      // GMV per buyer (online estimate)
+      var gmvPerBuyer = (onlineBuyersCount && onlineBuyersCount > 0 && sellOnlineVal > 0) ? (sellOnlineVal / onlineBuyersCount) : (totalBuyers && totalBuyers > 0 ? sellTotal / totalBuyers : null);
+      // 10% more online buyers = how many buyers
+      var tenPctBuyers = totalBuyers ? Math.round(totalBuyers * 0.10) : null;
+      var tenPctGmv = (tenPctBuyers && gmvPerBuyer) ? Math.round(tenPctBuyers * gmvPerBuyer) : null;
+      // Fees estimate: use actual take rate if available, else 0.5% as proxy
+      var sellTakeRateEst = (sellFeesTotal > 0 && sellOnlineVal > 0) ? (sellFeesTotal / sellOnlineVal) : 0.005;
+      var tenPctFees = tenPctGmv ? Math.round(tenPctGmv * sellTakeRateEst) : null;
+      html += '<div style="background:rgba(37,99,235,0.06);border-left:3px solid var(--blue);padding:6px 10px;border-radius:0 4px 4px 0;margin:6px 0;font-size:11px">';
+      html += '<div style="font-weight:600;margin-bottom:3px">UNIT ECONOMICS — SELL</div>';
+      if(tenPctBuyers && tenPctGmv) {
+        html += '<div style="padding-left:8px">For every 10% more online buyers (+'+tenPctBuyers+' buyers):</div>';
+        html += '<div style="padding-left:16px">= <strong>'+fmt$(tenPctGmv)+'</strong> in sell GMV</div>';
+        html += '<div style="padding-left:16px">= <strong>'+fmt$(tenPctFees)+'</strong> in fees ('+fmtPct(sellTakeRateEst*100)+' take rate)</div>';
+      } else {
+        html += '<div style="padding-left:8px;color:var(--text-muted)">Needs buyer count + GMV data to compute</div>';
+      }
+      html += '<div style="margin-top:4px;color:var(--text-muted)">Currently: <strong>'+fmtPct(sellOnlinePctVal)+'</strong> online \u2192 <strong>'+fmt$(sellFeesTotal)+'</strong> in direct fees</div>';
+      html += '</div>';
+    }
+
     // BUYERS TABLE (consolidated: Online / Offline / Total)
     var repeatColor = 'var(--text-muted)';
     var repeatLabel = '';
@@ -1564,7 +1957,8 @@ function renderAccounts() {
     html += '<tr><td>Conversion</td><td>' + (convPctSell !== null ? fmtPct(convPctSell) : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
     html += '<tr><td>Concentration Top 2</td><td style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
     html += '</tbody></table>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-top:2px;font-style:italic">Top 5 needs query. Showing Top 2 from available data.</div>';
+    // FIX 7: Style concentration disclaimer as a visible warning, not hidden/muted text
+    html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(217,119,6,0.08);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:10px;color:#92400e">\u26a0 <strong>Data gap:</strong> Top 5 concentration needs query. Showing Top 2 from available data only \u2014 interpret with caution.</div>';
     html += '</div>';
 
     // CHANNEL MIX (compact one-liner)
@@ -1606,6 +2000,17 @@ function renderAccounts() {
   // Total row
   var totalOnlinePct = totals.koronet_sell > 0 ? (totals.sell_online / totals.koronet_sell * 100) : 0;
   var totalPenPct = totals.est_sell > 0 ? (totals.koronet_sell / totals.est_sell * 100) : 0;
+  // Compute BUY totals
+  var totalKoronetBuy = 0, totalFeesFoot = 0;
+  filtered.forEach(function(a) {
+    var m = a._m;
+    if(m) {
+      totalKoronetBuy += m.proc_total || 0;
+      totalFeesFoot += m.fees_total || 0;
+    }
+  });
+  var totalTakeRate = (totals.koronet_sell + totalKoronetBuy) > 0 ? (totalFeesFoot / (totals.koronet_sell + totalKoronetBuy) * 100) : 0;
+
   tfoot.innerHTML = '<tr class="total-row">' +
     '<td></td>' +
     '<td>TOTAL ('+totals.count+' shown)</td>' +
@@ -1614,8 +2019,12 @@ function renderAccounts() {
     '<td style="text-align:right">'+fmt$(totals.koronet_sell)+'</td>' +
     '<td style="text-align:right">'+fmtPct(totalPenPct)+'</td>' +
     '<td style="text-align:right">'+fmtPct(totalOnlinePct)+'</td>' +
-    '<td></td><td></td><td></td><td></td><td></td><td></td>' +
-    '<td style="text-align:right">'+fmt$(totals.fees)+'</td>' +
+    '<td></td>' +
+    '<td style="text-align:right">'+fmt$(totalKoronetBuy)+'</td>' +
+    '<td></td><td></td>' +
+    '<td style="text-align:right">'+fmt$(totalFeesFoot)+'</td>' +
+    '<td style="text-align:right">'+fmtPct(totalTakeRate)+'</td>' +
+    '<td></td><td></td><td></td><td></td>' +
     '</tr>';
 
   document.getElementById('filterCount').textContent = filtered.length+' of '+ACCOUNTS.length+' accounts';
@@ -1631,8 +2040,9 @@ function renderAccounts() {
   });
 }
 
-// === HEALTH SUMMARY (Tab 2) ===
+// === HEALTH SUMMARY (Tab 2) — elements may not exist in current HTML; guards prevent JS errors ===
 function renderHealth() {
+  function setInner(id, html) { var el = document.getElementById(id); if(el) el.innerHTML = html; }
   var totalAccounts = ACCOUNTS.length;
   var withScorecard = ACCOUNTS.filter(function(a){ return a.has_scorecard; }).length;
   var totalGmv = 0, totalFees = 0, totalSellOnline = 0;
@@ -1649,13 +2059,13 @@ function renderHealth() {
   });
   var overallOnlinePct = totalGmv > 0 ? (totalSellOnline / totalGmv * 100) : 0;
 
-  document.getElementById('healthMetrics').innerHTML =
+  setInner('healthMetrics',
     metricCard('Total Accounts', totalAccounts, withScorecard+' with scorecard') +
     metricCard('Total H1 GMV', fmt$(totalGmv), 'All scored accounts') +
     metricCard('Total H1 Fees', fmt$(totalFees), 'K2K + eCommerce + API') +
     metricCard('Overall Online %', fmtPct(overallOnlinePct), 'Sell online / total sell') +
     metricCard('Accounts with Metrics', Object.keys(METRICS).length, 'of '+totalAccounts+' total') +
-    metricCard('CONFIG Entries', Object.keys(CONFIG).length, 'COMPANIES_SV verified');
+    metricCard('CONFIG Entries', Object.keys(CONFIG).length, 'COMPANIES_SV verified'));
 
   // By priority
   var byPriority = {};
@@ -1669,10 +2079,10 @@ function renderHealth() {
       byPriority[p].fees += m.fees_total || 0;
     }
   });
-  document.getElementById('priorityMetrics').innerHTML = Object.entries(byPriority)
+  setInner('priorityMetrics', Object.entries(byPriority)
     .sort(function(a, b) { return (PRIORITY_ORDER[a[0]] != null ? PRIORITY_ORDER[a[0]] : 99) - (PRIORITY_ORDER[b[0]] != null ? PRIORITY_ORDER[b[0]] : 99); })
     .map(function(entry) { return metricCard(entry[0], entry[1].count+' accounts', 'GMV: '+fmt$(entry[1].gmv)+' | Fees: '+fmt$(entry[1].fees)); })
-    .join('');
+    .join(''));
 
   // By CT_ID
   var byCt = {};
@@ -1686,10 +2096,10 @@ function renderHealth() {
       byCt[ct].fees += m.fees_total || 0;
     }
   });
-  document.getElementById('ctMetrics').innerHTML = Object.entries(byCt)
+  setInner('ctMetrics', Object.entries(byCt)
     .sort(function(a, b) { return b[1].fees - a[1].fees; })
     .map(function(entry) { return metricCard(entry[0], entry[1].count+' accounts', 'GMV: '+fmt$(entry[1].gmv)+' | Fees: '+fmt$(entry[1].fees)); })
-    .join('');
+    .join(''));
 
   // CONFIG readiness
   var cfgTotal = Object.keys(CONFIG).length;
@@ -1698,12 +2108,12 @@ function renderHealth() {
   var cfgFuture = Object.values(CONFIG).filter(function(c){ return c.future; }).length;
   var cfgMaxAgeLow = Object.values(CONFIG).filter(function(c){ return c.max_age !== null && c.max_age <= 10; }).length;
   var cfgMaxAgeZero = Object.values(CONFIG).filter(function(c){ return c.max_age === 0 || c.max_age === null; }).length;
-  document.getElementById('configMetrics').innerHTML =
+  setInner('configMetrics',
     metricCard('Audited', cfgAudited+' / '+cfgTotal, fmtPct(cfgTotal > 0 ? cfgAudited/cfgTotal*100 : 0)+' verified') +
     metricCard('Bunches ON', cfgBunches+' / '+cfgTotal, fmtPct(cfgTotal > 0 ? cfgBunches/cfgTotal*100 : 0)) +
     metricCard('Future Sales ON', cfgFuture+' / '+cfgTotal, fmtPct(cfgTotal > 0 ? cfgFuture/cfgTotal*100 : 0)) +
     metricCard('MaxAge <= 10', cfgMaxAgeLow+' / '+cfgTotal, 'Low visibility risk') +
-    metricCard('MaxAge = 0/null', cfgMaxAgeZero, 'GATE fail: inventory invisible');
+    metricCard('MaxAge = 0/null', cfgMaxAgeZero, 'GATE fail: inventory invisible'));
 
   // BUY / LIST / SELL distribution
   var buyDist = {green:0, yellow:0, red:0};
@@ -1726,10 +2136,10 @@ function renderHealth() {
     else if(m.sell_stage === 'GROWING' || m.sell_stage === 'MINIMAL') sellDist.yellow++;
     else sellDist.red++;
   });
-  document.getElementById('blsMetrics').innerHTML =
+  setInner('blsMetrics',
     metricCard('BUY Healthy', buyDist.green, buyDist.yellow+' activating, '+buyDist.red+' inactive') +
     metricCard('LIST Healthy', listDist.green, listDist.yellow+' growing, '+listDist.red+' inactive') +
-    metricCard('SELL Healthy', sellDist.green, sellDist.yellow+' growing, '+sellDist.red+' inactive');
+    metricCard('SELL Healthy', sellDist.green, sellDist.yellow+' growing, '+sellDist.red+' inactive'));
 
   // Total fees by type
   var feeTypeHtml = metricCard('Total Fees', fmt$(totalFees), 'H1 2026');
@@ -1740,15 +2150,16 @@ function renderHealth() {
   var bunchDisc = Object.values(BUNCHES).filter(function(b){ return b.discrepancy; }).length;
   var bunchDiscGmv = Object.values(BUNCHES).filter(function(b){ return b.discrepancy; }).reduce(function(s, b){ return s + (b.total_bunch_gmv || 0); }, 0);
   feeTypeHtml += metricCard('Bunch Discrepancies', bunchDisc, 'At-risk GMV: '+fmt$(bunchDiscGmv));
-  document.getElementById('feeMetrics').innerHTML = feeTypeHtml;
+  setInner('feeMetrics', feeTypeHtml);
 }
 
 function metricCard(label, value, sub) {
   return '<div class="metric-card"><div class="metric-label">'+label+'</div><div class="metric-value">'+value+'</div>'+(sub ? '<div class="metric-sub">'+sub+'</div>' : '')+'</div>';
 }
 
-// === OPPORTUNITIES (Tab 3) ===
+// === OPPORTUNITIES (Tab 3) — elements may not exist in current HTML; guards prevent JS errors ===
 function renderOpps() {
+  function setInner(id, html) { var el = document.getElementById(id); if(el) el.innerHTML = html; }
   var qwList = [];
   Object.entries(BUNCHES).forEach(function(entry) {
     var id = entry[0], b = entry[1];
@@ -1768,9 +2179,9 @@ function renderOpps() {
     }
   });
   qwList.sort(function(a, b){ return b.gmv - a.gmv; });
-  document.getElementById('configQuickWins').innerHTML = qwList.slice(0, 20).map(function(q) {
+  setInner('configQuickWins', qwList.slice(0, 20).map(function(q) {
     return '<div class="qw-card"><div class="qw-name">'+q.name+'</div><div class="qw-issue">'+q.issue+'</div><div class="qw-impact">'+q.impact+'</div></div>';
-  }).join('') || '<div style="color:var(--text-muted)">No quick wins found</div>';
+  }).join('') || '<div style="color:var(--text-muted)">No quick wins found</div>');
 
   var highGmv = [];
   ACCOUNTS.forEach(function(a) {
@@ -1781,23 +2192,23 @@ function renderOpps() {
     }
   });
   highGmv.sort(function(a, b){ return b.gmv - a.gmv; });
-  document.getElementById('highGmvLowOnline').innerHTML = highGmv.slice(0, 15).map(function(h) {
+  setInner('highGmvLowOnline', highGmv.slice(0, 15).map(function(h) {
     var potentialFees = h.sell_offline * 0.005;
     return '<div class="qw-card">' +
       '<div class="qw-name">'+h.name+'</div>' +
       '<div class="qw-issue">Online: '+fmtPct(h.online_pct)+' | GMV: '+fmt$(h.gmv)+' | Offline: '+fmt$(h.sell_offline)+'</div>' +
       '<div class="qw-impact">Current fees: '+fmt$(h.fees)+' | If 10% online at 0.5%: +'+fmt$(potentialFees * 0.1)+'</div></div>';
-  }).join('') || '<div style="color:var(--text-muted)">None found</div>';
+  }).join('') || '<div style="color:var(--text-muted)">None found</div>');
 
   var sortedSfdc = SFDC.slice().sort(function(a, b){ return (b.amount || 0) - (a.amount || 0); });
-  document.getElementById('sfdcOpps').innerHTML = sortedSfdc.map(function(o) {
+  setInner('sfdcOpps', sortedSfdc.map(function(o) {
     var stageCls = o.stage ? 'opp-stage-'+o.stage.toLowerCase() : '';
     return '<div class="opp-card">' +
       '<div><div class="opp-name">'+(o.account_name||'\u2014')+'</div>' +
       '<div class="opp-detail">'+(o.opp_name||'\u2014')+' | '+(o.owner||'\u2014')+' | Close: '+(o.close_date||'\u2014')+'</div></div>' +
       '<div style="text-align:right"><div class="opp-amount">'+fmt$(o.amount)+'</div>' +
       '<span class="opp-stage '+stageCls+'">'+(o.stage||'\u2014')+'</span></div></div>';
-  }).join('');
+  }).join(''));
 
   var totalOffline = 0, totalCurrentFees = 0;
   Object.values(METRICS).forEach(function(m) {
@@ -1807,12 +2218,12 @@ function renderOpps() {
   var uplift5 = totalOffline * 0.05 * 0.005;
   var uplift10 = totalOffline * 0.10 * 0.005;
   var uplift25 = totalOffline * 0.25 * 0.005;
-  document.getElementById('whatIfMetrics').innerHTML =
+  setInner('whatIfMetrics',
     metricCard('Current Total Fees', fmt$(totalCurrentFees), 'H1 2026') +
     metricCard('Total Offline GMV', fmt$(totalOffline), 'Revenue at $0 take-rate') +
     metricCard('If +5% Online', '+'+fmt$(uplift5)+' fees', 'at 0.5% take-rate on new online') +
     metricCard('If +10% Online', '+'+fmt$(uplift10)+' fees', 'at 0.5% take-rate on new online') +
-    metricCard('If +25% Online', '+'+fmt$(uplift25)+' fees', 'at 0.5% take-rate on new online');
+    metricCard('If +25% Online', '+'+fmt$(uplift25)+' fees', 'at 0.5% take-rate on new online'));
 }
 
 // === DEFINITIONS (Tab 4) ===
@@ -1906,6 +2317,23 @@ document.querySelectorAll('th[data-sort]').forEach(function(th) {
 });
 
 // === FILTER EVENTS ===
+document.getElementById('timeframeSelect').addEventListener('change', function() {
+  ACTIVE_TIMEFRAME = this.value;
+  // Update column header labels
+  var tfLabels = {
+    'ytd': 'YTD 2026',
+    'current_month': 'Jul 2026',
+    'prior_month': 'Jun 2026',
+    'current_quarter': 'Q3 2026',
+    'prior_quarter': 'Q2 2026'
+  };
+  var lbl = tfLabels[ACTIVE_TIMEFRAME] || ACTIVE_TIMEFRAME;
+  var el1 = document.getElementById('tfLabelSell');
+  var el2 = document.getElementById('tfLabelBuy');
+  if(el1) el1.textContent = lbl;
+  if(el2) el2.textContent = lbl;
+  renderAccounts();
+});
 document.getElementById('repFilter').addEventListener('change', renderAccounts);
 document.getElementById('searchInput').addEventListener('input', renderAccounts);
 document.getElementById('priorityFilter').addEventListener('change', renderAccounts);
@@ -1913,6 +2341,9 @@ document.getElementById('configFilter').addEventListener('change', renderAccount
 document.getElementById('implFilter').addEventListener('change', renderAccounts);
 document.getElementById('ctFilter').addEventListener('change', renderAccounts);
 document.getElementById('hasDataOnly').addEventListener('change', renderAccounts);
+document.getElementById('buyFilter').addEventListener('change', renderAccounts);
+document.getElementById('listFilter').addEventListener('change', renderAccounts);
+document.getElementById('sellFilter').addEventListener('change', renderAccounts);
 
 // === BOOT ===
 loadData();
