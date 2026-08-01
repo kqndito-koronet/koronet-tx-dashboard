@@ -1222,9 +1222,20 @@ function renderAccounts() {
     } else {
       koronetSellDisplay = '\u2014';
     }
-    var penetrationDisplay = (a.annual_sales_est && a.annual_sales_est > 0 && a.koronet_sell > 0) ? fmtPct(a.koronet_sell / a.annual_sales_est * 100) : '\u2014';
+    // FIX Run9-A: use pre-computed annualized penetration (a.penetration) instead of raw sell/est_sell
+    var penetrationDisplay = a.penetration > 0 ? fmtPct(a.penetration) : '\u2014';
     var onlinePctDisplay = a.online_pct_val > 0 ? fmtPct(a.online_pct_val) : (met ? fmtPct(met.online_pct) : '\u2014');
-    var feesDisplay = (met && met.fees_total) ? fmt$(met.fees_total) : '\u2014';
+    // FIX Run9-B: use temporal V2 fees (responds to timeframe selector) instead of static YTD
+    var _v2fp = getV2Fees(a.name);
+    var feesDisplay = '\u2014';
+    if(_v2fp && _v2fp.fees_total) {
+      var _fv = getV2Val(_v2fp.fees_total, ACTIVE_TIMEFRAME);
+      var _fd = getV2Delta(_v2fp.fees_total, ACTIVE_TIMEFRAME);
+      feesDisplay = _fv != null ? fmt$(_fv) : (met && met.fees_total ? fmt$(met.fees_total) : '\u2014');
+      if(_fd) feesDisplay += '<br><span style="font-size:10px">'+_fd.html+'</span>';
+    } else if(met && met.fees_total) {
+      feesDisplay = fmt$(met.fees_total);
+    }
     // BUY columns display
     var estBuyDisplay = a.est_buy > 0 ? fmt$(a.est_buy) : '\u2014';
     var koronetBuyDisplay;
