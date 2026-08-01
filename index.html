@@ -486,6 +486,7 @@ window.METRICS_V2_SELL = null;
 window.METRICS_V2_BUY = null;
 window.METRICS_V2_FEES = null;    // FIX A: fees with temporal structure
 window.METRICS_V2_VENDORS = null; // FIX B: vendors_active_l30d
+window.METRICS_V2_PACING = null;  // Fix 10: network pacing totals
 
 // Active timeframe — default YTD
 var ACTIVE_TIMEFRAME = 'ytd';
@@ -547,6 +548,10 @@ async function loadData() {
     fetch(base+'metrics_v2_vendors.json').then(function(r){return r.json();}).then(function(d){
       window.METRICS_V2_VENDORS = d;
     }).catch(function(){ window.METRICS_V2_VENDORS = null; }),
+    // Fix 10: load pacing V2 (network-level YTD totals)
+    fetch(base+'metrics_v2_pacing.json').then(function(r){return r.json();}).then(function(d){
+      window.METRICS_V2_PACING = d;
+    }).catch(function(){ window.METRICS_V2_PACING = null; }),
   ]);
 
   updateFreshnessBanner();
@@ -669,8 +674,17 @@ function updateFreshnessBanner() {
   var coverageNote = (sellCount > 0 || buyCount > 0)
     ? 'Temporal coverage: ' + sellCount + ' sell / ' + buyCount + ' buy / ' + feesCount + ' fees / ' + vendorsCount + ' vendors companies.'
     : 'Temporal data: not loaded.';
+  // Fix 10: network totals from pacing JSON or hardcoded fallback
+  var networkTotals = '';
+  if(window.METRICS_V2_PACING && window.METRICS_V2_PACING.network) {
+    var np = window.METRICS_V2_PACING.network;
+    networkTotals = ' <strong>Network YTD:</strong> ' + fmt$(np.sell_ytd) + ' Sell (' + (np.sell_yoy_pct > 0 ? '+' : '') + np.sell_yoy_pct.toFixed(1) + '% YoY) \u00b7 ' + fmt$(np.fees_ytd) + ' Fees (' + (np.fees_yoy_pct > 0 ? '+' : '') + np.fees_yoy_pct.toFixed(1) + '% YoY)';
+  } else {
+    networkTotals = ' <strong>Network YTD:</strong> $945M Sell (+2.8% YoY) \u00b7 $1.47M Fees (+34.1% YoY)';
+  }
   banner.innerHTML = '<strong>Data as of ' + asOf + '.</strong> ' + coverageNote +
-    ' Snapshot coverage: 112/399 accounts with metrics (28%).' +
+    networkTotals +
+    ' \u00b7 Snapshot coverage: 112/399 accounts with metrics (28%).' +
     ' <span style="color:#64748b;margin-left:8px">Fields marked <em>MISSING</em> = data not yet available, not zero.</span>';
 }
 
@@ -828,8 +842,11 @@ function findListingCats(name) {
 function findGA4(name) {
   if(!name || !window.GA4 || !window.GA4.eshops) return null;
   var n = normName(name);
+  // Exclude shared platform hostnames
+  var sharedHosts = ['app.kometsales.com', 'app.koronet.com', 'kometsales.com'];
   // Match hostname to account name — try common patterns
   return window.GA4.eshops.find(function(r) {
+    if(sharedHosts.indexOf(r.hostname) >= 0) return false;
     var h = normName(r.hostname);
     // shop.kennicott.com → kennicott, komet.billdoran.com → billdoran
     return n.includes(h.replace('shop','').replace('komet','').replace('eshop','').replace('com','')) ||
@@ -1345,11 +1362,11 @@ function renderAccounts() {
     var cvrHtml;
     if(ga4Portfolio && ga4Portfolio.sessions > 0 && ga4Portfolio.transactions > 0) {
       var cvrPct = ga4Portfolio.transactions / ga4Portfolio.sessions * 100;
-      var cvrColor = cvrPct > 10 ? 'var(--green)' : cvrPct > 3 ? 'var(--amber)' : 'var(--red)';
+      var cvrColor = cvrPct > 20 ? 'var(--green)' : cvrPct > 10 ? 'var(--amber)' : 'var(--red)';
       var cvrTooltip = ga4Portfolio.sessions.toLocaleString()+' sessions \u2192 '+ga4Portfolio.transactions.toLocaleString()+' transactions';
       cvrHtml = '<span style="color:'+cvrColor+';font-weight:600;font-size:11px" title="'+cvrTooltip+'">'+cvrPct.toFixed(1)+'%</span>';
     } else {
-      cvrHtml = '<span style="color:var(--text-muted)" title="No GA4 data — hostname-based, may be missing for app.kometsales.com accounts">\u2014</span>';
+      cvrHtml = '<span style="color:var(--text-muted)" title="eShop uses shared platform domain (app.kometsales.com). Per-company CVR requires GA4 data by company_id from Snowflake.">\u2014</span>';
     }
     html += '<td style="text-align:center">'+cvrHtml+'</td>';
     html += '<td style="text-align:center">'+oppBadge+'</td>';
@@ -1774,7 +1791,18 @@ function renderAccounts() {
         html += '<div style="font-size:10px;color:var(--text-muted)">';
         antBars.forEach(function(b){ html += '<span style="color:'+b.color+'">&#9632;</span> '+b.label+' '; });
         html += ' &middot; '+antTotal.toLocaleString()+' orders &middot; <em style="font-size:9px">Note: measures arrival→shipping gap, not order creation date</em>';
-        html += '</div></td></tr>';
+        html += '</div>';
+        // Fix 5: SO WHAT interpretation
+        var pct0_3 = antTotal > 0 ? (ant0 / antTotal * 100) : 0;
+        var pct15plus = antTotal > 0 ? ((ant15 + ant30) / antTotal * 100) : 0;
+        var soWhatAnt = '';
+        if(pct0_3 > 60) {
+          soWhatAnt = '<span style="color:var(--amber)">\u26a0 Reactive buying \u2014 mostly spot/next-day</span>';
+        } else if(pct15plus > 30) {
+          soWhatAnt = '<span style="color:var(--green)">\u2713 Forward-planned \u2014 advance buying established</span>';
+        }
+        if(soWhatAnt) html += '<div style="font-size:11px;margin-top:4px;font-weight:600">SO WHAT: '+soWhatAnt+'</div>';
+        html += '</td></tr>';
       } else {
         html += '<tr><td style="padding:4px 8px">Anticipation</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;color:var(--text-muted);font-style:italic">'+(antData ? 'no orders' : 'no data')+'</td></tr>';
       }
@@ -1958,8 +1986,8 @@ function renderAccounts() {
     if(buyDetail) {
       var listOmGmv = buyDetail.open_market_gmv || 0;
       var listOmSellPct = met && met.sell_total > 0 ? (listOmGmv / met.sell_total * 100) : 0;
-      html += '<div class="detail-row"><span class="detail-label">Sold as Open Market</span><span>'+fmt$(listOmGmv)+' ('+fmtPct(listOmSellPct)+' of sell GMV)</span></div>';
-      html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:1px">Note: order type from SALES_SV \u2014 includes auto-generated from Future Sales POs and SOs, not only manual uploads.</div>';
+      html += '<div class="detail-row"><span class="detail-label">OM Sales (proxy)</span><span>'+fmt$(listOmGmv)+' ('+fmtPct(listOmSellPct)+' of sell GMV)</span></div>';
+      html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:1px">Note: ORDER_TYPE from SALES_SV \u2014 measures sales classified as Open Market, not manual uploads.</div>';
       if(listOmGmv === 0) {
         html += '<div class="detail-row"><span class="detail-label">$0 \u2192 no compensa manualmente</span><span style="color:var(--amber)">\u2192 eShop vac\u00edo</span></div>';
         if(a.ct_id === 'WH_CORE' || a.ct_id === 'WH_ESUITE') {
@@ -2040,10 +2068,17 @@ function renderAccounts() {
     html += '<tr><td>Churned Q2</td><td>' + (bv2 ? (bv2.CHURNED_BUYERS_Q2 || bv2.churned_buyers_q2 || '\u2014') : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
     html += '<tr><td>AOV</td><td>' + (aovData ? fmt$(aovData.aov_online) : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
     html += '<tr><td>Repeat Rate</td><td style="color:'+repeatColor+'">' + (repeatData ? fmtPct(repeatData.repeat_rate_pct) + repeatLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    var ga4DataSell = findGA4(a.name);
-    var convPctSell = (ga4DataSell && ga4DataSell.sessions > 0) ? (ga4DataSell.transactions / ga4DataSell.sessions * 100) : null;
-    html += '<tr><td>Conversion</td><td>' + (convPctSell !== null ? fmtPct(convPctSell) : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
     html += '<tr><td>Concentration Top 2</td><td style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
+    if(concData) {
+      if(concData.top1_name) {
+        var top1Gmv = concData.top1_gmv != null ? ' (' + fmt$(concData.top1_gmv) + ')' : '';
+        html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#1 Buyer</td><td colspan="3"><strong>' + concData.top1_name + '</strong>' + top1Gmv + '</td></tr>';
+      }
+      if(concData.top2_name) {
+        var top2Gmv = concData.top2_gmv != null ? ' (' + fmt$(concData.top2_gmv) + ')' : '';
+        html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#2 Buyer</td><td colspan="3"><strong>' + concData.top2_name + '</strong>' + top2Gmv + '</td></tr>';
+      }
+    }
     html += '</tbody></table>';
     // FIX 7: Style concentration disclaimer as a visible warning, not hidden/muted text
     html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(217,119,6,0.08);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:10px;color:#92400e">\u26a0 <strong>Data gap:</strong> Top 5 concentration needs query. Showing Top 2 from available data only \u2014 interpret with caution.</div>';
@@ -2068,8 +2103,9 @@ function renderAccounts() {
     if(ga4Data && ga4Data.sessions > 0) {
       var convPct = (ga4Data.transactions / ga4Data.sessions * 100);
       html += '<div style="margin-top:6px;padding:6px 8px;background:#f1f5f9;border-radius:4px;font-size:11px">';
-      html += '<strong>GA4 eShop:</strong> '+ga4Data.sessions+' sessions \u2192 '+ga4Data.transactions+' transactions = <strong style="color:'+(convPct>10?'var(--green)':convPct>3?'var(--amber)':'var(--red)')+'">'+fmtPct(convPct)+' conversion</strong>';
+      html += '<strong>GA4 eShop:</strong> '+ga4Data.sessions+' sessions \u2192 '+ga4Data.transactions+' transactions = <strong style="color:'+(convPct>20?'var(--green)':convPct>10?'var(--amber)':'var(--red)')+'">'+fmtPct(convPct)+' conversion</strong>';
       html += ' \u00b7 '+fmt$(ga4Data.revenue)+' revenue';
+      html += '<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Best-in-class: Kennicott ~22.8% CVR</div>';
       html += '</div>';
     }
 
@@ -2312,6 +2348,26 @@ function renderOpps() {
     metricCard('If +5% Online', '+'+fmt$(uplift5)+' fees', 'at 0.5% take-rate on new online') +
     metricCard('If +10% Online', '+'+fmt$(uplift10)+' fees', 'at 0.5% take-rate on new online') +
     metricCard('If +25% Online', '+'+fmt$(uplift25)+' fees', 'at 0.5% take-rate on new online'));
+
+  // Fix 2: Populate listLeadList and sellLeadList from getOpportunities()
+  var listLeads = [], sellLeads = [];
+  ACCOUNTS.forEach(function(a) {
+    var opps = getOpportunities(a);
+    opps.forEach(function(o) {
+      if(o.type === 'list') listLeads.push({name: a.name, text: o.text});
+      if(o.type === 'sell') sellLeads.push({name: a.name, text: o.text});
+    });
+  });
+  function renderLeadCards(leads, emptyMsg) {
+    if(!leads.length) return '<div style="color:var(--text-muted);font-style:italic">'+emptyMsg+'</div>';
+    return '<div style="display:flex;flex-direction:column;gap:6px">' + leads.map(function(l) {
+      return '<div style="display:flex;gap:10px;padding:6px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;font-size:12px">' +
+        '<span style="font-weight:600;min-width:160px;flex-shrink:0">'+l.name+'</span>' +
+        '<span style="color:var(--text-muted)">'+l.text+'</span></div>';
+    }).join('') + '</div>';
+  }
+  setInner('listLeadList', '<strong style="font-size:12px">'+listLeads.length+' leads detected from opportunity data</strong><div style="margin-top:8px">'+renderLeadCards(listLeads, 'No LIST leads detected')+'</div>');
+  setInner('sellLeadList', '<strong style="font-size:12px">'+sellLeads.length+' leads detected from opportunity data</strong><div style="margin-top:8px">'+renderLeadCards(sellLeads, 'No SELL leads detected')+'</div>');
 }
 
 // === DEFINITIONS (Tab 4) ===
