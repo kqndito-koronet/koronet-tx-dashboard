@@ -2212,25 +2212,24 @@ function renderAccounts() {
       var concV2Color = concV2.top5_pct > 50 ? 'var(--red)' : concV2.top5_pct >= 25 ? 'var(--amber)' : 'var(--green)';
       var concV2Label = concV2.top5_pct > 50 ? ' \u2014 risk' : concV2.top5_pct >= 25 ? ' \u2014 moderate' : ' \u2014 healthy';
       html += '<tr><td>Concentration Top 5</td><td style="color:'+concV2Color+'">' + fmtPct(concV2.top5_pct) + concV2Label + '</td><td>\u2014</td><td>\u2014</td></tr>';
-      // Show individual top 5 buyers
-      var top5Names = concV2.top5_names || [];
+      // Show top 5 GMV breakdown without names (privacy)
       var top5Gmvs = concV2.top5_gmvs || [];
-      for(var ti = 0; ti < Math.min(5, top5Names.length); ti++) {
-        var tGmv = top5Gmvs[ti] != null ? ' ' + fmt$(top5Gmvs[ti]) : '';
-        var tPct = concV2.total_online_gmv > 0 && top5Gmvs[ti] != null ? ' (' + fmtPct(top5Gmvs[ti] / concV2.total_online_gmv * 100) + ')' : '';
-        html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#' + (ti+1) + '</td><td colspan="3"><strong>' + top5Names[ti] + '</strong>' + tGmv + tPct + '</td></tr>';
+      if(top5Gmvs.length > 0) {
+        var t5Parts = top5Gmvs.map(function(g, i) {
+          var pct = concV2.total_online_gmv > 0 ? fmtPct(g / concV2.total_online_gmv * 100) : '';
+          return '#' + (i+1) + ': ' + fmt$(g) + ' (' + pct + ')';
+        });
+        html += '<tr><td style="padding-left:16px;color:var(--text-muted);font-size:11px" colspan="4">' + t5Parts.join(' · ') + '</td></tr>';
       }
     } else {
       // Fallback: old Top 2
       html += '<tr><td>Concentration Top 2</td><td style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
       if(concData) {
-        if(concData.top1_name) {
-          var top1Gmv = concData.top1_gmv != null ? ' (' + fmt$(concData.top1_gmv) + ')' : '';
-          html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#1 Buyer</td><td colspan="3"><strong>' + concData.top1_name + '</strong>' + top1Gmv + '</td></tr>';
-        }
-        if(concData.top2_name) {
-          var top2Gmv = concData.top2_gmv != null ? ' (' + fmt$(concData.top2_gmv) + ')' : '';
-          html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#2 Buyer</td><td colspan="3"><strong>' + concData.top2_name + '</strong>' + top2Gmv + '</td></tr>';
+        var t2Parts = [];
+        if(concData.top1_gmv != null) t2Parts.push('#1: ' + fmt$(concData.top1_gmv));
+        if(concData.top2_gmv != null) t2Parts.push('#2: ' + fmt$(concData.top2_gmv));
+        if(t2Parts.length > 0) {
+          html += '<tr><td style="padding-left:16px;color:var(--text-muted);font-size:11px" colspan="4">' + t2Parts.join(' · ') + '</td></tr>';
         }
       }
     }
