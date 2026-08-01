@@ -1650,18 +1650,82 @@ function renderAccounts() {
     var cfgStatusText = configIssues.length === 0 ? '\u2705 Config OK' : 'Config Issues ('+configIssues.length+')';
 
     html += '<div class="expand-section" style="border-left:3px solid '+headerColor+'">';
-    html += '<h4>OPPORTUNITIES <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(config + revenue — DRAFT)</span></h4>';
-    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:6px;padding:3px 6px;background:#f8fafc;border-radius:3px">Config status: <strong style="color:'+headerColor+'">'+cfgStatusText+'</strong></div>';
+    html += '<h4>OPPORTUNITIES <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(revenue + config — DRAFT)</span></h4>';
+
+    // === FIX 1: OPPORTUNITIES AT THE TOP — revenue opportunities FIRST, config details BELOW ===
+    // Revenue opportunities (BUY/LIST/SELL) are PROMINENT, not afterthought
+    if(opps.length > 0) {
+      var configOpps = opps.filter(function(o){ return o.type === 'config'; });
+      var buyOpps = opps.filter(function(o){ return o.type === 'buy'; });
+      var listOpps = opps.filter(function(o){ return o.type === 'list'; });
+      var sellOpps = opps.filter(function(o){ return o.type === 'sell'; });
+      var revenueOpps = buyOpps.concat(listOpps).concat(sellOpps);
+
+      if(revenueOpps.length > 0) {
+        html += '<div style="margin-bottom:8px;padding:6px 10px;background:rgba(5,150,105,0.06);border:1px solid rgba(5,150,105,0.2);border-radius:6px">';
+        html += '<div style="font-weight:700;font-size:12px;color:var(--green);margin-bottom:4px">REVENUE OPPORTUNITIES ('+revenueOpps.length+')</div>';
+        if(buyOpps.length > 0) {
+          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase">BUY <span style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue)">\u2192 see BUY card</span></div>';
+          buyOpps.forEach(function(o) {
+            html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udce6 '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
+          });
+        }
+        if(listOpps.length > 0) {
+          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase">LIST <span style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue)">\u2192 see LIST card</span></div>';
+          listOpps.forEach(function(o) {
+            html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udcdd '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
+          });
+        }
+        if(sellOpps.length > 0) {
+          html += '<div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase">SELL <span style="font-size:9px;font-weight:400;cursor:pointer;color:var(--blue)">\u2192 see SELL card</span></div>';
+          sellOpps.forEach(function(o) {
+            html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udcb0 '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
+          });
+        }
+        html += '</div>';
+      }
+
+      if(configOpps.length > 0) {
+        html += '<div style="margin-bottom:6px;padding:6px 10px;background:rgba(217,119,6,0.06);border:1px solid rgba(217,119,6,0.2);border-radius:6px">';
+        html += '<div style="font-weight:700;font-size:12px;color:var(--amber);margin-bottom:4px">CONFIG OPPORTUNITIES ('+configOpps.length+')</div>';
+        configOpps.forEach(function(o) {
+          html += '<div style="font-size:11px;padding:2px 0;padding-left:8px">\ud83d\udd27 '+o.text+(o.gmv_impact ? ' <strong style="color:var(--green)">'+fmt$(o.gmv_impact)+'</strong>' : '')+'</div>';
+        });
+        html += '</div>';
+      }
+    } else {
+      html += '<div style="font-size:11px;color:var(--text-muted);padding:6px 0">\u2014 no opportunities detected</div>';
+    }
+
+    // Bottleneck + Next Action
+    html += '<div style="margin:6px 0;padding:4px 8px;background:#f8fafc;border-radius:4px">';
+    html += '<div class="detail-row"><span class="detail-label">Bottleneck</span><span style="font-weight:600;color:'+(bottleneck.includes('GATE') ? 'var(--red)' : bottleneck === '\u2014' ? 'var(--text-muted)' : 'var(--amber)')+'">'+bottleneck+'</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">Next Action</span><span style="font-size:11px">'+nextAction+'</span></div>';
+    html += '</div>';
+
+    // SFDC Opportunities
+    if(sfdcMatches.length) {
+      html += '<div style="margin-top:4px;margin-bottom:6px">';
+      html += '<div class="detail-row"><span class="detail-label" style="font-weight:600">SFDC Opps</span><span></span></div>';
+      sfdcMatches.forEach(function(o) {
+        html += '<div class="detail-row"><span class="detail-label">'+o.stage+'</span><span>'+o.opp_name+' \u2014 '+fmt$(o.amount)+(o.close_date ? ' \u00b7 close '+o.close_date : '')+'</span></div>';
+      });
+      html += '</div>';
+    }
+
+    // === CONFIG DETAILS (below opportunities) ===
+    html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px">';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Config status: <strong style="color:'+headerColor+'">'+cfgStatusText+'</strong></div>';
     html += '<div style="font-size:11px;margin-bottom:6px;padding:4px 8px;background:#f1f5f9;border-radius:4px"><strong>'+a.ct_id+':</strong> '+_cfgProfile.desc+'</div>';
 
-    // Issues first (most important)
+    // Config issues
     if(configIssues.length > 0) {
       configIssues.forEach(function(issue) {
         var ic = issue.severity === 'blocking' ? 'var(--red)' : issue.severity === 'limiting' ? 'var(--amber)' : 'var(--text-muted)';
         var icon = issue.severity === 'blocking' ? '\ud83d\uded1' : issue.severity === 'limiting' ? '\u26a0\ufe0f' : '\u2139\ufe0f';
         html += '<div style="font-size:11px;padding:2px 0;color:'+ic+'">'+icon+' '+issue.text+'</div>';
       });
-      html += '<div style="height:8px"></div>';
+      html += '<div style="height:4px"></div>';
     }
 
     // Settings table (compact)
@@ -1687,7 +1751,7 @@ function renderAccounts() {
       html += '<div style="font-size:11px;margin-top:4px;color:var(--text-muted)">Bunch GMV: '+fmt$(bun.total_bunch_gmv)+' \u2014 flag '+(bun.bunches_flag?'ON \u2705':'OFF')+'</div>';
     }
 
-    // Product type + modules (CT_ID badge already in main row, show only modules here)
+    // Product type + modules
     var _modules = [];
     if(a) {
       var _sys = (a.system_type||'').toLowerCase();
@@ -1712,44 +1776,7 @@ function renderAccounts() {
       html += '</div>';
     }
 
-    // OPPORTUNITIES section (moved from MONETIZE card)
-    html += '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:6px">';
-    html += '<div style="font-weight:600;font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px">OPPORTUNITIES</div>';
-    if(opps.length > 0) {
-      var configOpps = opps.filter(function(o){ return o.type === 'config'; });
-      var buyOpps = opps.filter(function(o){ return o.type === 'buy'; });
-      var listOpps = opps.filter(function(o){ return o.type === 'list'; });
-      var sellOpps = opps.filter(function(o){ return o.type === 'sell'; });
-      if(configOpps.length > 0) {
-        configOpps.forEach(function(o) { html += '<div style="font-size:11px;padding:2px 0">\ud83d\udd27 '+o.text+'</div>'; });
-      }
-      if(buyOpps.length > 0) {
-        buyOpps.forEach(function(o) { html += '<div style="font-size:11px;padding:2px 0">\ud83d\udce6 '+o.text+'</div>'; });
-      }
-      if(listOpps.length > 0) {
-        listOpps.forEach(function(o) { html += '<div style="font-size:11px;padding:2px 0">\ud83d\udcdd '+o.text+'</div>'; });
-      }
-      if(sellOpps.length > 0) {
-        sellOpps.forEach(function(o) { html += '<div style="font-size:11px;padding:2px 0">\ud83d\udcb0 '+o.text+'</div>'; });
-      }
-    } else {
-      html += '<div style="font-size:11px;color:var(--text-muted)">\u2014 no opportunities detected</div>';
-    }
-    // Bottleneck + Next Action
-    html += '<div style="margin-top:6px">';
-    html += '<div class="detail-row"><span class="detail-label">Bottleneck</span><span style="font-weight:600;color:'+(bottleneck.includes('GATE') ? 'var(--red)' : bottleneck === '\u2014' ? 'var(--text-muted)' : 'var(--amber)')+'">'+bottleneck+'</span></div>';
-    html += '<div class="detail-row"><span class="detail-label">Next Action</span><span style="font-size:11px">'+nextAction+'</span></div>';
-    html += '</div>';
-    // SFDC Opportunities
-    if(sfdcMatches.length) {
-      html += '<div style="margin-top:4px">';
-      html += '<div class="detail-row"><span class="detail-label" style="font-weight:600">SFDC Opps</span><span></span></div>';
-      sfdcMatches.forEach(function(o) {
-        html += '<div class="detail-row"><span class="detail-label">'+o.stage+'</span><span>'+o.opp_name+' \u2014 '+fmt$(o.amount)+(o.close_date ? ' \u00b7 close '+o.close_date : '')+'</span></div>';
-      });
-      html += '</div>';
-    }
-    html += '</div>';
+    html += '</div>'; // close config details section
 
     html += '</div>';
 
@@ -1811,17 +1838,53 @@ function renderAccounts() {
       }
 
     } else {
-      // --- Full ONLINE vs OFFLINE table (non-proc accounts) ---
-      html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">ONLINE vs OFFLINE</strong></div>';
+      // --- FIX 3: UNIFIED VENDOR TABLE (merges old Online vs Offline + Procurement Funnel) ---
+      // Per Facu's feedback: ONE table with Total vendors, Active (L30D), Connected (K2K), Activated, Dormant, Churned
+      // "K2K Connected is NOT just infrastructure - it requires agreements and convincing. Activated = decided to buy. Active = still buying (L30D)."
+      var v2VendorsData = getV2Vendors(a.name);
+      html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">VENDORS (unified view)</strong></div>';
       html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:8px 0">';
-      html += '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Dimension</th><th style="text-align:right;padding:4px 8px">Online</th><th style="text-align:right;padding:4px 8px">Offline</th><th style="padding:4px 8px">Gap</th></tr>';
+      html += '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Row</th><th style="text-align:right;padding:4px 8px;color:var(--green)">Online</th><th style="text-align:right;padding:4px 8px;color:var(--amber)">Offline</th><th style="padding:4px 8px;color:var(--red)">Gap</th></tr>';
 
-      // Vendors row
+      // Row 1: Total vendors
       var onVendors = vd ? vd.online_vendors : '\u2014';
       var offVendors = vd ? (vd.offline_vendors||0) : '\u2014';
       var gapVendorsVal = vd ? (vd.gap_vendors||0) : 0;
       var gapCostVal = vd ? (vd.gap_cost||0) : 0;
-      html += '<tr><td style="padding:4px 8px">Vendors</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onVendors+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offVendors+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapVendorsVal > 0 ? gapVendorsVal+' sin K2K ('+fmt$(gapCostVal)+')' : '\u2014')+'</td></tr>';
+      html += '<tr><td style="padding:4px 8px;font-weight:600">Total vendors</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onVendors+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offVendors+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapVendorsVal > 0 ? gapVendorsVal+' sin K2K ('+fmt$(gapCostVal)+')' : '\u2014')+'</td></tr>';
+
+      // Row 2: Active (buying L30D)
+      var activeL30D = v2VendorsData ? v2VendorsData.vendors_active_l30d : null;
+      var totalV2 = v2VendorsData ? v2VendorsData.vendors_total : null;
+      var l30dPct = totalV2 && totalV2 > 0 && activeL30D != null ? (activeL30D / totalV2 * 100) : 0;
+      var l30dColor = l30dPct>=50?'var(--green)':l30dPct>=25?'var(--amber)':'var(--red)';
+      html += '<tr style="background:rgba(37,99,235,0.03)"><td style="padding:4px 8px;font-weight:600">Active (buying L30D)</td><td style="text-align:right;padding:4px 8px;color:'+l30dColor+'">'+(activeL30D != null ? activeL30D+' ('+fmtPct(l30dPct)+')' : '\u2014')+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
+
+      // Row 3: Connected (K2K agreed) — NOT just infrastructure, requires agreements
+      var k2kConnected = met ? met.k2k_total : (totalV2 || 0);
+      html += '<tr><td style="padding:4px 8px">Connected (K2K agreed)</td><td style="text-align:right;padding:4px 8px">'+k2kConnected+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
+
+      // Row 4: Activated (ever bought)
+      var k2kActivated = met ? met.k2k_active : 0;
+      var k2kPct = k2kConnected > 0 ? (k2kActivated / k2kConnected * 100) : 0;
+      html += '<tr><td style="padding:4px 8px">Activated (ever bought)</td><td style="text-align:right;padding:4px 8px;color:'+(k2kPct>=70?'var(--green)':k2kPct>=40?'var(--amber)':'var(--red)')+'">'+k2kActivated+' ('+fmtPct(k2kPct)+')</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
+
+      // Row 5: Dormant (connected, never bought OR 30-90d no buy)
+      var dormantVal = v2VendorsData ? v2VendorsData.vendors_dormant_30_90d : (vd ? (vd.dormant_vendors||0) : 0);
+      var dormantLabel = v2VendorsData ? 'Dormant (30-90d no buy)' : 'Dormant (connected, never bought)';
+      if(dormantVal > 0) {
+        html += '<tr><td style="padding:4px 8px;color:var(--amber)">'+dormantLabel+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+dormantVal+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;font-size:10px;color:var(--amber)">re-engage</td></tr>';
+      }
+
+      // Row 6: Churned (bought before, stopped)
+      var churnedVal = v2VendorsData ? v2VendorsData.vendors_churned_90plus : (vd ? (vd.churned_vendors||0) : 0);
+      var churnedLabel = v2VendorsData ? 'Churned (90d+ no buy)' : 'Churned (bought before, stopped)';
+      if(churnedVal > 0) {
+        html += '<tr><td style="padding:4px 8px;color:var(--red)">'+churnedLabel+'</td><td style="text-align:right;padding:4px 8px;color:var(--red)">'+churnedVal+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;font-size:10px;color:var(--red)">reactivate</td></tr>';
+      }
+
+      // Separator — catalog dimensions
+      html += '<tr style="background:#f1f5f9"><td colspan="4" style="padding:3px 8px;font-size:10px;text-transform:uppercase;color:var(--text-muted);font-weight:600">Catalog dimensions</td></tr>';
 
       // Categories row
       var onCats = supBuy ? supBuy.online_categories_bought : '\u2014';
@@ -1829,17 +1892,29 @@ function renderAccounts() {
       var gapCats = supBuy ? (supBuy.total_categories_bought - supBuy.online_categories_bought) : 0;
       html += '<tr><td style="padding:4px 8px">Categories</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onCats+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offCats+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapCats > 0 ? gapCats+' no online' : '\u2014')+'</td></tr>';
 
-      // Varieties + SKUs rows (from LIST_USAGE)
+      // FIX 4: Varieties + SKUs — show offline from time_depth_offline.json when available
       var buyListUsage = findListUsage(a.company_id);
-      if(buyListUsage) {
-        html += '<tr><td style="padding:4px 8px">Varieties</td><td style="text-align:right;padding:4px 8px">'+buyListUsage.distinct_varieties+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
-        html += '<tr><td style="padding:4px 8px">SKUs</td><td style="text-align:right;padding:4px 8px">'+fmtN(buyListUsage.distinct_skus)+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
+      var buyTdOffline = findOfflineTimeDepth(a.name);
+      var buyOnlineVarieties = buyListUsage ? buyListUsage.distinct_varieties : null;
+      var buyOfflineVarieties = buyTdOffline ? buyTdOffline.total_varieties : null;
+      var buyVarietyGap = (buyOnlineVarieties != null && buyOfflineVarieties != null && buyOfflineVarieties > buyOnlineVarieties) ? (buyOfflineVarieties - buyOnlineVarieties) : null;
+      html += '<tr><td style="padding:4px 8px">Varieties</td>';
+      html += '<td style="text-align:right;padding:4px 8px">'+(buyOnlineVarieties != null ? fmtN(buyOnlineVarieties) : '\u2014')+'</td>';
+      html += '<td style="text-align:right;padding:4px 8px">'+(buyOfflineVarieties != null ? fmtN(buyOfflineVarieties) : '<span style="color:var(--amber);font-size:10px">needs data</span>')+'</td>';
+      html += '<td style="padding:4px 8px;color:var(--red)">'+(buyVarietyGap != null && buyVarietyGap > 0 ? fmtN(buyVarietyGap)+' not online' : (buyOnlineVarieties != null && buyOfflineVarieties != null ? '\u2014' : ''))+'</td></tr>';
+      // SKUs row
+      html += '<tr><td style="padding:4px 8px">SKUs</td>';
+      html += '<td style="text-align:right;padding:4px 8px">'+(buyListUsage ? fmtN(buyListUsage.distinct_skus) : '\u2014')+'</td>';
+      html += '<td style="text-align:right;padding:4px 8px"><span style="color:var(--amber);font-size:10px">needs data</span></td>';
+      html += '<td style="padding:4px 8px"></td></tr>';
+
+      if(v2VendorsData) {
+        html += '<tr><td colspan="4" style="padding:3px 8px;font-size:10px;color:var(--text-muted);font-style:italic">V2 vendor data as of '+v2VendorsData.as_of+' \u2014 L30D = active in last 30 days. K2K = requires agreement, not just infrastructure.</td></tr>';
       }
 
-      // FIX 1: Bunches row removed from BUY — bunches is a LIST/SELL concept, not BUY.
-      // Wholesalers sell bunches to buyers; they do not buy bunches. Bunches flag belongs in LIST card.
-
-      // FIX 2: Anticipation row — wire from buy_detail.json anticipation array
+      // FIX 2: Anticipation — relabeled as ONLINE procurement lead time per Facu's feedback
+      // This data comes from buy_detail.json which measures ONLINE procurement timing (arrival->shipping gap).
+      // Facu noted "es casi imposible que offline compren 100% a 0-3D" — the data is ONLINE, not offline.
       var antData = findAnticipation(a.name);
       if(antData && antData.total_orders > 0) {
         var ant0  = antData.orders_0_3d   || 0;
@@ -1859,13 +1934,14 @@ function renderAccounts() {
           return b.pct > 0.5 ? '<div style="width:'+b.pct.toFixed(1)+'%;background:'+b.color+';color:#fff;font-size:9px;text-align:center;line-height:16px;min-width:2px" title="'+b.label+': '+Math.round(b.pct)+'%">'+Math.round(b.pct)+'%</div>' : '';
         }).join('');
         html += '<tr><td style="padding:4px 8px" colspan="4">';
-        html += '<strong style="font-size:10px;color:var(--text-muted)">ANTICIPATION (logistics lead time — arrival→shipping gap)</strong>';
+        html += '<strong style="font-size:10px;color:var(--blue)">ONLINE PROCUREMENT LEAD TIME</strong> <span style="font-size:9px;color:var(--text-muted)">(arrival\u2192shipping gap, online orders only)</span>';
         html += '<div style="display:flex;gap:0;height:16px;border-radius:3px;overflow:hidden;margin:3px 0">'+antBarHtml+'</div>';
         html += '<div style="font-size:10px;color:var(--text-muted)">';
         antBars.forEach(function(b){ html += '<span style="color:'+b.color+'">&#9632;</span> '+b.label+' '; });
-        html += ' &middot; '+antTotal.toLocaleString()+' orders &middot; <em style="font-size:9px">Note: measures arrival→shipping gap, not order creation date</em>';
+        html += ' &middot; '+antTotal.toLocaleString()+' online orders';
         html += '</div>';
-        // Fix 5: SO WHAT interpretation
+        html += '<div style="font-size:10px;color:var(--amber);font-style:italic;margin-top:2px;padding:2px 6px;background:rgba(217,119,6,0.06);border-radius:3px">\u26a0 Offline anticipation data not available yet. To compare online vs offline buying horizons, need CREATED_DATE in semantic view.</div>';
+        // SO WHAT interpretation
         var pct0_3 = antTotal > 0 ? (ant0 / antTotal * 100) : 0;
         var pct15plus = antTotal > 0 ? ((ant15 + ant30) / antTotal * 100) : 0;
         var soWhatAnt = '';
@@ -1877,7 +1953,7 @@ function renderAccounts() {
         if(soWhatAnt) html += '<div style="font-size:11px;margin-top:4px;font-weight:600">SO WHAT: '+soWhatAnt+'</div>';
         html += '</td></tr>';
       } else {
-        html += '<tr><td style="padding:4px 8px">Anticipation</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;color:var(--text-muted);font-style:italic">'+(antData ? 'no orders' : 'no data')+'</td></tr>';
+        html += '<tr><td style="padding:4px 8px">Online Procurement Lead Time</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;color:var(--text-muted);font-style:italic">'+(antData ? 'no orders' : 'no data')+'</td></tr>';
       }
 
       html += '</table>';
@@ -1891,51 +1967,8 @@ function renderAccounts() {
         html += '<div style="padding:4px 8px;font-size:11px;color:var(--text-muted)">\u2014 sin leakage detectado</div>';
       }
 
-      // --- PROCUREMENT FUNNEL ---
-      // FIX B (Audit Run 4 P1): Use vendors_active_l30d from metrics_v2_vendors.json
-      // k2k_active in metrics.json = lifetime (ever bought), NOT L30D. Use V2 for L30D active.
-      html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">PROCUREMENT FUNNEL</strong></div>';
-      var v2VendorsData = getV2Vendors(a.name);
-      if(met && met.k2k_total > 0) {
-        var k2kPct = (met.k2k_active / met.k2k_total * 100);
-        var dormant = vd ? (vd.dormant_vendors||0) : 0;
-        var churned = vd ? (vd.churned_vendors||0) : 0;
-        // V2 active L30D (preferred) vs lifetime k2k_active
-        var activeL30D = v2VendorsData ? v2VendorsData.vendors_active_l30d : null;
-        var dormantV2 = v2VendorsData ? v2VendorsData.vendors_dormant_30_90d : null;
-        var churnedV2 = v2VendorsData ? v2VendorsData.vendors_churned_90plus : null;
-        var totalV2 = v2VendorsData ? v2VendorsData.vendors_total : null;
-        html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
-        html += '<tr><td style="padding:2px 6px;color:var(--text-muted)">K2K Connected (lifetime)</td><td style="text-align:right;font-weight:600">'+(totalV2 != null ? totalV2 : met.k2k_total)+'</td><td style="padding-left:8px;font-size:10px;color:var(--text-muted)">\u2190 infrastructure</td></tr>';
-        html += '<tr><td style="padding:2px 6px">\u2192 Activated (ever bought)</td><td style="text-align:right;font-weight:600;color:'+(k2kPct>=70?'var(--green)':k2kPct>=40?'var(--amber)':'var(--red)')+'">'+met.k2k_active+' ('+fmtPct(k2kPct)+')</td><td style="padding-left:8px;font-size:10px;color:var(--text-muted)">\u2190 lifetime</td></tr>';
-        // FIX B: show L30D active from V2 if available (more operationally useful than lifetime)
-        if(activeL30D != null) {
-          var l30dPct = totalV2 && totalV2 > 0 ? (activeL30D / totalV2 * 100) : 0;
-          html += '<tr style="background:rgba(37,99,235,0.05)"><td style="padding:2px 6px;font-weight:600">\u2192 Active L30D</td><td style="text-align:right;font-weight:600;color:'+(l30dPct>=50?'var(--green)':l30dPct>=25?'var(--amber)':'var(--red)')+'">'+activeL30D+' ('+fmtPct(l30dPct)+')</td><td style="padding-left:8px;font-size:10px;color:var(--blue)"><strong>\u2190 L30D (use this)</strong></td></tr>';
-        }
-        if(dormantV2 != null) {
-          html += '<tr><td style="padding:2px 6px;color:var(--amber)">\u2192 Dormant (30-90d no buy)</td><td style="text-align:right;color:var(--amber)">'+dormantV2+'</td><td style="padding-left:8px;font-size:10px;color:var(--amber)">\u2190 re-engage</td></tr>';
-        } else if(dormant > 0) {
-          html += '<tr><td style="padding:2px 6px;color:var(--amber)">\u2192 Dormant (connected, never bought)</td><td style="text-align:right;color:var(--amber)">'+dormant+'</td><td style="padding-left:8px;font-size:10px;color:var(--amber)">\u2190 activate these</td></tr>';
-        }
-        if(churnedV2 != null) {
-          html += '<tr><td style="padding:2px 6px;color:var(--red)">\u2192 Churned (90d+ no buy)</td><td style="text-align:right;color:var(--red)">'+churnedV2+'</td><td style="padding-left:8px;font-size:10px;color:var(--red)">\u2190 reactivate</td></tr>';
-        } else if(churned > 0) {
-          html += '<tr><td style="padding:2px 6px;color:var(--red)">\u2192 Churned (bought before, stopped)</td><td style="text-align:right;color:var(--red)">'+churned+'</td><td style="padding-left:8px;font-size:10px;color:var(--red)">\u2190 reactivate</td></tr>';
-        }
-        if(!v2VendorsData) {
-          var unconverted = met.k2k_total - met.k2k_active - dormant;
-          if(unconverted > 0) html += '<tr><td style="padding:2px 6px;color:var(--text-muted)">\u2192 Not yet activated</td><td style="text-align:right;color:var(--text-muted)">'+unconverted+'</td><td></td></tr>';
-        }
-        html += '</table>';
-        if(v2VendorsData) {
-          html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:2px">V2 vendor data as of '+v2VendorsData.as_of+' \u2014 L30D = active in last 30 days (PROCUREMENTS_SV).</div>';
-        }
-      } else if(met) {
-        html += '<div class="detail-row"><span class="detail-label">K2K</span><span>'+met.k2k_active+' / '+met.k2k_total+'</span></div>';
-      } else {
-        html += '<div class="detail-row"><span class="detail-label">K2K</span><span>\u2014</span></div>';
-      }
+      // PROCUREMENT FUNNEL — now merged into the unified vendor table above.
+      // Keeping LEAKAGE section below as a separate call-out.
 
       // --- ORDER MIX ---
       html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">ORDER MIX (c\u00f3mo compran ellos \u2014 procurement order types)</strong></div>';
@@ -1995,22 +2028,37 @@ function renderAccounts() {
     } else {
       html += '<tr><td style="padding:3px 6px;font-weight:600">Categories</td><td style="padding:3px 6px" colspan="3">\u2014</td></tr>';
     }
+    // FIX 5: Varieties + SKUs — wire offline variety count from time_depth_offline.json
     var listUsage = findListUsage(a.company_id);
-    if(listUsage) {
+    var listTdOffline = findOfflineTimeDepth(a.name);
+    var listOnlineVarieties = listUsage ? listUsage.distinct_varieties : null;
+    var listOfflineVarieties = listTdOffline ? listTdOffline.total_varieties : null;
+    var listVarietyGap = (listOnlineVarieties != null && listOfflineVarieties != null && listOfflineVarieties > listOnlineVarieties) ? (listOfflineVarieties - listOnlineVarieties) : null;
+    if(listUsage || listTdOffline) {
       var bmVar = getBenchmark('8_distinct_varieties', a.ct_id);
       var varBmStr = '';
       if(bmVar) varBmStr = ' <span style="font-size:10px;color:var(--text-muted)" title="Network benchmark for distinct varieties">(net. p75: '+fmtN(bmVar.p75)+')</span>';
-      html += '<tr><td style="padding:3px 6px;font-weight:600">Varieties</td><td style="padding:3px 6px">'+listUsage.distinct_varieties+varBmStr+'</td><td style="padding:3px 6px">\u2014</td><td style="padding:3px 6px"></td></tr>';
-      html += '<tr><td style="padding:3px 6px;font-weight:600">SKUs</td><td style="padding:3px 6px">'+listUsage.distinct_skus+'</td><td style="padding:3px 6px">\u2014</td><td style="padding:3px 6px"></td></tr>';
+      html += '<tr><td style="padding:3px 6px;font-weight:600">Varieties</td>';
+      html += '<td style="padding:3px 6px">'+(listOnlineVarieties != null ? fmtN(listOnlineVarieties)+varBmStr : '\u2014')+'</td>';
+      html += '<td style="padding:3px 6px">'+(listOfflineVarieties != null ? fmtN(listOfflineVarieties) : '<span style="color:var(--amber);font-size:10px">needs data</span>')+'</td>';
+      html += '<td style="padding:3px 6px;color:var(--red)">'+(listVarietyGap != null && listVarietyGap > 0 ? fmtN(listVarietyGap)+' not listed online' : (listOnlineVarieties != null && listOfflineVarieties != null ? '\u2014' : ''))+'</td></tr>';
+      html += '<tr><td style="padding:3px 6px;font-weight:600">SKUs</td>';
+      html += '<td style="padding:3px 6px">'+(listUsage ? fmtN(listUsage.distinct_skus) : '\u2014')+'</td>';
+      html += '<td style="padding:3px 6px"><span style="color:var(--amber);font-size:10px">needs data</span></td>';
+      html += '<td style="padding:3px 6px"></td></tr>';
     }
-    // Row: Time depth
+    // Row: Time depth — FIX 6: show both online and offline indicators, reference the 3-bar chart below
     var listMaxAge = cfg && cfg.max_age != null ? cfg.max_age : null;
     var listMaxAgeStr = listMaxAge != null ? listMaxAge+'d' : '\u2014';
     var listMaxAgeWarn = (listMaxAge != null && listMaxAge <= 10) ? ' (need 30d+)' : '';
+    var listTdV2Row = findListTimeDepthV2(a.company_id);
+    var listTdOffRow = findOfflineTimeDepth(a.name);
+    var listTdOnlineSummary = listTdV2Row ? fmtN(listTdV2Row.total_varieties)+' var, MaxAge '+listMaxAgeStr : 'MaxAge '+listMaxAgeStr;
+    var listTdOfflineSummary = listTdOffRow ? fmtN(listTdOffRow.total_varieties)+' var' : '\u2014';
     html += '<tr><td style="padding:3px 6px;font-weight:600">Time depth</td>';
-    html += '<td style="padding:3px 6px">MaxAge '+listMaxAgeStr+'</td>';
-    html += '<td style="padding:3px 6px">\u2014</td>';
-    html += '<td style="padding:3px 6px;color:'+(listMaxAgeWarn ? 'var(--red)' : 'var(--text-muted)')+'">'+listMaxAgeWarn+'</td></tr>';
+    html += '<td style="padding:3px 6px">'+listTdOnlineSummary+'</td>';
+    html += '<td style="padding:3px 6px">'+listTdOfflineSummary+'</td>';
+    html += '<td style="padding:3px 6px;color:'+(listMaxAgeWarn ? 'var(--red)' : 'var(--text-muted)')+'">'+listMaxAgeWarn+(listTdV2Row || listTdOffRow ? ' <span style="font-size:9px;color:var(--blue)">\u2193 see chart below</span>' : '')+'</td></tr>';
     // Row: Format (bunches)
     var listBunchFlag = cfg ? cfg.bunches_flag : null;
     var listBunchFlagStr = listBunchFlag != null ? (listBunchFlag ? 'ON' : 'OFF') : '\u2014';
@@ -2119,17 +2167,28 @@ function renderAccounts() {
     // --- Card 5: SELL — "¿Vende online?" ---
     html += '<div class="expand-section"><h4>SELL \u2014 \u00bfVende online?</h4>';
 
-    // RESUMEN
+    // FIX 7: SELL RESUMEN — show offline metrics prominently from BUYERS_FULL
     var sellOnlineVal = met ? met.sell_online : 0;
     var sellOfflineVal = met ? met.sell_offline : 0;
     var sellOnlinePctVal = met ? met.online_pct : 0;
+    var sellBf = findBuyersFull(a.name);
+    html += '<div style="margin-bottom:6px">';
     html += '<div class="detail-row"><span class="detail-label" style="font-weight:600">RESUMEN</span><span>'
       + 'Online: ' + fmt$(sellOnlineVal) + ' (' + fmtPct(sellOnlinePctVal) + ')'
       + ' | Offline: ' + fmt$(sellOfflineVal)
       + '</span></div>';
+    // Offline buyer summary from BUYERS_FULL
+    if(sellBf) {
+      html += '<div style="font-size:11px;padding:4px 8px;background:rgba(217,119,6,0.06);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;margin:4px 0">';
+      html += '<strong>Offline:</strong> '+(sellBf.offline_buyers||0)+' total buyers, '+(sellBf.offline_buyers_l30d||0)+' active L30D';
+      html += ' | AOV: '+(sellBf.aov_offline ? fmt$(sellBf.aov_offline) : '\u2014');
+      html += ' | Churned: '+(sellBf.churned_buyers||0);
+      html += '</div>';
+    }
     // SO WHAT
     html += '<div class="detail-row"><span class="detail-label" style="color:var(--amber);font-weight:600">SO WHAT</span><span style="color:var(--amber)">'
       + fmt$(sellOfflineVal) + ' vendiendo offline a $0 direct fees</span></div>';
+    html += '</div>';
 
     // FIX 3: SELL UNIT ECONOMICS — impact of moving more buyers online
     if(met && met.sell_total > 0) {
@@ -2190,28 +2249,29 @@ function renderAccounts() {
     var bfL30DOnlineStr = bfL30DOnline != null ? bfL30DOnline : (bv2 && (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) ? (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) : (sellL30D ? sellL30D.buyers_online_l30d : '\u2014'));
     var bfL30DOfflineStr = bfL30DOffline != null ? bfL30DOffline : '\u2014';
     html += '<tr><td>Active L30D</td><td>' + bfL30DOnlineStr + '</td><td>' + bfL30DOfflineStr + '</td><td>\u2014</td></tr>';
-    html += '<tr><td>New Q2</td><td>' + (bv2 ? (bv2.NEW_BUYERS_Q2 || bv2.new_buyers_q2 || '\u2014') : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    // New This Month — from BUYERS_FULL
+    // New buyers — from BUYERS_FULL (total, not split by channel)
     var bfNewMonth = bf ? bf.new_buyers_current_month : null;
-    html += '<tr><td>New This Month</td><td>\u2014</td><td>\u2014</td><td>' + (bfNewMonth != null ? bfNewMonth : '\u2014') + '</td></tr>';
-    // Churned — from BUYERS_FULL (replaces Q2-only bv2 churn)
+    var newQ2Val = bv2 ? (bv2.NEW_BUYERS_Q2 || bv2.new_buyers_q2 || null) : null;
+    html += '<tr><td>New (this month)</td><td colspan="3">' + (bfNewMonth != null ? bfNewMonth + ' new buyers' : (newQ2Val ? newQ2Val + ' new Q2 (online)' : '\u2014')) + '</td></tr>';
+    // Churned — from BUYERS_FULL (total, not split)
     var bfChurned = bf ? bf.churned_buyers : null;
-    html += '<tr><td>Churned</td><td>\u2014</td><td>\u2014</td><td>' + (bfChurned != null ? bfChurned : (bv2 ? (bv2.CHURNED_BUYERS_Q2 || bv2.churned_buyers_q2 || '\u2014') : '\u2014')) + '</td></tr>';
+    var churnedVal = bfChurned != null ? bfChurned : (bv2 ? (bv2.CHURNED_BUYERS_Q2 || bv2.churned_buyers_q2 || null) : null);
+    html += '<tr><td>Churned</td><td colspan="3">' + (churnedVal != null ? churnedVal + ' buyers' : '\u2014') + '</td></tr>';
     // AOV — prefer BUYERS_FULL for both online+offline, fall back to aovData for online only
     var bfAovOnline = bf ? bf.aov_online : (aovData ? aovData.aov_online : null);
     var bfAovOffline = bf ? bf.aov_offline : null;
-    html += '<tr><td>AOV</td><td>' + (bfAovOnline != null ? fmt$(bfAovOnline) : '\u2014') + '</td><td>' + (bfAovOffline != null ? fmt$(bfAovOffline) : '\u2014') + '</td><td>\u2014</td></tr>';
+    html += '<tr><td>AOV</td><td>' + (bfAovOnline != null ? fmt$(bfAovOnline) : '\u2014') + '</td><td>' + (bfAovOffline != null ? fmt$(bfAovOffline) : '\u2014') + '</td><td>' + (bfAovOnline != null && bfAovOffline != null ? fmt$(Math.round((bfAovOnline + bfAovOffline) / 2)) : '\u2014') + '</td></tr>';
     var bmRepeat = getBenchmark('4_repeat_rate_pct', a.ct_id);
     var repeatBmStr = '';
     if(bmRepeat) repeatBmStr = ' <span style="font-size:10px;color:var(--text-muted)">(net. median: '+fmtPct(bmRepeat.median)+', p75: '+fmtPct(bmRepeat.p75)+')</span>';
-    html += '<tr><td>Repeat Rate</td><td style="color:'+repeatColor+'">' + (repeatData ? fmtPct(repeatData.repeat_rate_pct) + repeatLabel : '\u2014') + repeatBmStr + '</td><td>\u2014</td><td>\u2014</td></tr>';
+    html += '<tr><td>Repeat Rate</td><td colspan="3" style="color:'+repeatColor+'">' + (repeatData ? fmtPct(repeatData.repeat_rate_pct) + repeatLabel : '\u2014') + ' (online)' + repeatBmStr + '</td></tr>';
     // Try V2 Top 5 first, fall back to old Top 2
     var concV2 = findConcentrationV2(a.name);
     if(concV2) {
       // V2 path: show Top 5
       var concV2Color = concV2.top5_pct > 50 ? 'var(--red)' : concV2.top5_pct >= 25 ? 'var(--amber)' : 'var(--green)';
       var concV2Label = concV2.top5_pct > 50 ? ' \u2014 risk' : concV2.top5_pct >= 25 ? ' \u2014 moderate' : ' \u2014 healthy';
-      html += '<tr><td>Concentration Top 5</td><td style="color:'+concV2Color+'">' + fmtPct(concV2.top5_pct) + concV2Label + '</td><td>\u2014</td><td>\u2014</td></tr>';
+      html += '<tr><td>Concentration Top 5</td><td colspan="3" style="color:'+concV2Color+'">' + fmtPct(concV2.top5_pct) + concV2Label + ' (online)' + '</td></tr>';
       // Show top 5 GMV breakdown without names (privacy)
       var top5Gmvs = concV2.top5_gmvs || [];
       if(top5Gmvs.length > 0) {
@@ -2223,7 +2283,7 @@ function renderAccounts() {
       }
     } else {
       // Fallback: old Top 2
-      html += '<tr><td>Concentration Top 2</td><td style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
+      html += '<tr><td>Concentration Top 2</td><td colspan="3" style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel + ' (online)' : '\u2014') + '</td></tr>';
       if(concData) {
         var t2Parts = [];
         if(concData.top1_gmv != null) t2Parts.push('#1: ' + fmt$(concData.top1_gmv));
