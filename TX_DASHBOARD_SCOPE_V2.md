@@ -228,6 +228,16 @@ Open Market en LIST es lo que el wholesaler **SUBE** (publica como disponible), 
 **Tabla de TAM perdido:**
 Muestra el TAM que se pierden por no enable bunches → hacer **lo mismo por categorías, variedades, SKUs y timeframe**. Cada dimensión que no está online = volumen invisible para los buyers.
 
+**DATA RULE — LIST = proxy from SALES (verified Aug 1):**
+No existe data de lo que LISTAN en el eShop (no hay "CATALOG_SV" ni "LISTINGS_SV" en Snowflake). Todo lo que mostramos en LIST viene de SALES_SV — es lo que VENDIERON, no lo que muestran. El mejor proxy es: si lo vendieron online, estaba listado. Pero es un undercount: lo listado sin ventas no aparece. Tener esto en cuenta siempre que se interprete data de LIST.
+
+**Consecuencias de este proxy:**
+- "Varieties online" = varieties que vendieron online, no que están listadas ahora
+- "Time depth" = recency de la última venta, no profundidad del inventario actual
+- "Categories online" = categories en las que vendieron, no las que muestran
+- La data de LIST es retrospectiva (qué vendieron), no actual (qué muestran hoy)
+- Para saber qué LISTAN realmente habría que scrapear el eShop o tener un feed de catálogo
+
 **9 Challenger Messages (existen en definitions.json):**
 Estos son enablement para CS — cómo explicarle al wholesaler POR QUÉ importa listar más. Ejemplo: "Lo que no está en tu eShop no existe para tus clientes online." Van en la capa de enablement del tab LIST.
 

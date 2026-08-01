@@ -1995,8 +1995,9 @@ function renderAccounts() {
 
     html += '</div>';
 
-    // --- Card 4: LIST — "¿Lo muestra online?" ---
-    html += '<div class="expand-section"><h4>LIST \u2014 \u00bfLo muestra online?</h4>';
+    // --- Card 4: LIST — "¿Lo vende online?" (proxy: no listing data, best proxy = sales) ---
+    html += '<div class="expand-section"><h4>LIST \u2014 \u00bfQu\u00e9 vende online vs offline?</h4>';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Proxy: no hay data de lo que LISTAN en el eShop. Mostramos lo que VENDIERON online vs offline (SALES_SV). Si lo vendieron online, estaba listado.</div>';
 
     // Product-type gate: some ct_ids can't list
     if(a.ct_id === 'WH_PROC') {
