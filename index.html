@@ -1842,75 +1842,84 @@ function renderAccounts() {
       // Per Facu's feedback: ONE table with Total vendors, Active (L30D), Connected (K2K), Activated, Dormant, Churned
       // "K2K Connected is NOT just infrastructure - it requires agreements and convincing. Activated = decided to buy. Active = still buying (L30D)."
       var v2VendorsData = getV2Vendors(a.name);
-      html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">VENDORS (unified view)</strong></div>';
-      html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:8px 0">';
-      html += '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left">Row</th><th style="text-align:right;padding:4px 8px;color:var(--green)">Online</th><th style="text-align:right;padding:4px 8px;color:var(--amber)">Offline</th><th style="padding:4px 8px;color:var(--red)">Gap</th></tr>';
 
-      // Row 1: Total vendors
+      // --- SECTION A: SOURCING COMPARISON (Online vs Offline) ---
+      html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">SECTION A — SOURCING (Online vs Offline)</strong></div>';
+      html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0 8px 0">';
+      html += '<tr style="background:#f1f5f9"><th style="padding:4px 8px;text-align:left"></th><th style="text-align:right;padding:4px 8px;color:var(--green)">Online</th><th style="text-align:right;padding:4px 8px;color:var(--amber)">Offline</th><th style="padding:4px 8px;color:var(--red)">Gap</th></tr>';
+
+      // Row: Vendors
       var onVendors = vd ? vd.online_vendors : '\u2014';
       var offVendors = vd ? (vd.offline_vendors||0) : '\u2014';
       var gapVendorsVal = vd ? (vd.gap_vendors||0) : 0;
       var gapCostVal = vd ? (vd.gap_cost||0) : 0;
-      html += '<tr><td style="padding:4px 8px;font-weight:600">Total vendors</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onVendors+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offVendors+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapVendorsVal > 0 ? gapVendorsVal+' sin K2K ('+fmt$(gapCostVal)+')' : '\u2014')+'</td></tr>';
+      html += '<tr><td style="padding:4px 8px;font-weight:600">Vendors</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onVendors+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offVendors+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapVendorsVal > 0 ? gapVendorsVal+' sin K2K ('+fmt$(gapCostVal)+')' : '\u2014')+'</td></tr>';
 
-      // Row 2: Active (buying L30D)
-      var activeL30D = v2VendorsData ? v2VendorsData.vendors_active_l30d : null;
-      var totalV2 = v2VendorsData ? v2VendorsData.vendors_total : null;
-      var l30dPct = totalV2 && totalV2 > 0 && activeL30D != null ? (activeL30D / totalV2 * 100) : 0;
-      var l30dColor = l30dPct>=50?'var(--green)':l30dPct>=25?'var(--amber)':'var(--red)';
-      html += '<tr style="background:rgba(37,99,235,0.03)"><td style="padding:4px 8px;font-weight:600">Active (buying L30D)</td><td style="text-align:right;padding:4px 8px;color:'+l30dColor+'">'+(activeL30D != null ? activeL30D+' ('+fmtPct(l30dPct)+')' : '\u2014')+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
-
-      // Row 3: Connected (K2K agreed) — NOT just infrastructure, requires agreements
-      var k2kConnected = met ? met.k2k_total : (totalV2 || 0);
-      html += '<tr><td style="padding:4px 8px">Connected (K2K agreed)</td><td style="text-align:right;padding:4px 8px">'+k2kConnected+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
-
-      // Row 4: Activated (ever bought)
-      var k2kActivated = met ? met.k2k_active : 0;
-      var k2kPct = k2kConnected > 0 ? (k2kActivated / k2kConnected * 100) : 0;
-      html += '<tr><td style="padding:4px 8px">Activated (ever bought)</td><td style="text-align:right;padding:4px 8px;color:'+(k2kPct>=70?'var(--green)':k2kPct>=40?'var(--amber)':'var(--red)')+'">'+k2kActivated+' ('+fmtPct(k2kPct)+')</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px"></td></tr>';
-
-      // Row 5: Dormant (connected, never bought OR 30-90d no buy)
-      var dormantVal = v2VendorsData ? v2VendorsData.vendors_dormant_30_90d : (vd ? (vd.dormant_vendors||0) : 0);
-      var dormantLabel = v2VendorsData ? 'Dormant (30-90d no buy)' : 'Dormant (connected, never bought)';
-      if(dormantVal > 0) {
-        html += '<tr><td style="padding:4px 8px;color:var(--amber)">'+dormantLabel+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+dormantVal+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;font-size:10px;color:var(--amber)">re-engage</td></tr>';
-      }
-
-      // Row 6: Churned (bought before, stopped)
-      var churnedVal = v2VendorsData ? v2VendorsData.vendors_churned_90plus : (vd ? (vd.churned_vendors||0) : 0);
-      var churnedLabel = v2VendorsData ? 'Churned (90d+ no buy)' : 'Churned (bought before, stopped)';
-      if(churnedVal > 0) {
-        html += '<tr><td style="padding:4px 8px;color:var(--red)">'+churnedLabel+'</td><td style="text-align:right;padding:4px 8px;color:var(--red)">'+churnedVal+'</td><td style="text-align:right;padding:4px 8px">\u2014</td><td style="padding:4px 8px;font-size:10px;color:var(--red)">reactivate</td></tr>';
-      }
-
-      // Separator — catalog dimensions
-      html += '<tr style="background:#f1f5f9"><td colspan="4" style="padding:3px 8px;font-size:10px;text-transform:uppercase;color:var(--text-muted);font-weight:600">Catalog dimensions</td></tr>';
-
-      // Categories row
+      // Row: Categories
       var onCats = supBuy ? supBuy.online_categories_bought : '\u2014';
       var offCats = supBuy ? (supBuy.total_categories_bought - supBuy.online_categories_bought) : '\u2014';
       var gapCats = supBuy ? (supBuy.total_categories_bought - supBuy.online_categories_bought) : 0;
-      html += '<tr><td style="padding:4px 8px">Categories</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onCats+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offCats+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapCats > 0 ? gapCats+' no online' : '\u2014')+'</td></tr>';
+      html += '<tr><td style="padding:4px 8px">Categories</td><td style="text-align:right;padding:4px 8px;color:var(--green)">'+onCats+'</td><td style="text-align:right;padding:4px 8px;color:var(--amber)">'+offCats+'</td><td style="padding:4px 8px;color:var(--red)">'+(gapCats > 0 ? gapCats+' not online' : '\u2014')+'</td></tr>';
 
-      // FIX 4: Varieties + SKUs — show offline from time_depth_offline.json when available
+      // Row: Varieties
       var buyListUsage = findListUsage(a.company_id);
       var buyTdOffline = findOfflineTimeDepth(a.name);
       var buyOnlineVarieties = buyListUsage ? buyListUsage.distinct_varieties : null;
       var buyOfflineVarieties = buyTdOffline ? buyTdOffline.total_varieties : null;
       var buyVarietyGap = (buyOnlineVarieties != null && buyOfflineVarieties != null && buyOfflineVarieties > buyOnlineVarieties) ? (buyOfflineVarieties - buyOnlineVarieties) : null;
       html += '<tr><td style="padding:4px 8px">Varieties</td>';
-      html += '<td style="text-align:right;padding:4px 8px">'+(buyOnlineVarieties != null ? fmtN(buyOnlineVarieties) : '\u2014')+'</td>';
-      html += '<td style="text-align:right;padding:4px 8px">'+(buyOfflineVarieties != null ? fmtN(buyOfflineVarieties) : '<span style="color:var(--amber);font-size:10px">needs data</span>')+'</td>';
+      html += '<td style="text-align:right;padding:4px 8px;color:var(--green)">'+(buyOnlineVarieties != null ? fmtN(buyOnlineVarieties) : '\u2014')+'</td>';
+      html += '<td style="text-align:right;padding:4px 8px;color:var(--amber)">'+(buyOfflineVarieties != null ? fmtN(buyOfflineVarieties) : '<span style="color:var(--amber);font-size:10px">needs data</span>')+'</td>';
       html += '<td style="padding:4px 8px;color:var(--red)">'+(buyVarietyGap != null && buyVarietyGap > 0 ? fmtN(buyVarietyGap)+' not online' : (buyOnlineVarieties != null && buyOfflineVarieties != null ? '\u2014' : ''))+'</td></tr>';
-      // SKUs row
-      html += '<tr><td style="padding:4px 8px">SKUs</td>';
-      html += '<td style="text-align:right;padding:4px 8px">'+(buyListUsage ? fmtN(buyListUsage.distinct_skus) : '\u2014')+'</td>';
-      html += '<td style="text-align:right;padding:4px 8px"><span style="color:var(--amber);font-size:10px">needs data</span></td>';
-      html += '<td style="padding:4px 8px"></td></tr>';
+
+      // Row: Procurement $
+      var procOnlineDisplay = buyOnline > 0 ? fmt$(buyOnline) : '\u2014';
+      var procOfflineDisplay = buyOffline > 0 ? fmt$(buyOffline) : '\u2014';
+      var procOfflineNote = buyOffline > 0 ? fmt$(buyOffline)+' at $0 indirect fees' : '\u2014';
+      html += '<tr style="background:rgba(37,99,235,0.03)"><td style="padding:4px 8px;font-weight:600">Procurement $</td>';
+      html += '<td style="text-align:right;padding:4px 8px;color:var(--green)">'+procOnlineDisplay+'</td>';
+      html += '<td style="text-align:right;padding:4px 8px;color:var(--amber)">'+(buyOffline > 0 ? fmt$(buyOffline) : '\u2014')+'</td>';
+      html += '<td style="padding:4px 8px;color:var(--red);font-size:10px">'+(buyOffline > 0 ? fmt$(buyOffline)+' at $0 indirect fees' : '\u2014')+'</td></tr>';
+
+      html += '</table>';
+
+      // --- SECTION B: K2K VENDOR LIFECYCLE ---
+      html += '<div style="margin-top:4px;margin-bottom:6px">';
+      html += '<strong style="font-size:11px;color:var(--text-muted)">SECTION B — K2K VENDOR LIFECYCLE</strong>';
+
+      // Compute lifecycle values
+      var activeL30D = v2VendorsData ? v2VendorsData.vendors_active_l30d : null;
+      var totalV2 = v2VendorsData ? v2VendorsData.vendors_total : null;
+      var k2kConnected = met ? met.k2k_total : (totalV2 || 0);
+      var k2kActivated = met ? met.k2k_active : 0;
+      var k2kPct = k2kConnected > 0 ? (k2kActivated / k2kConnected * 100) : 0;
+      var dormantVal = v2VendorsData ? v2VendorsData.vendors_dormant_30_90d : (vd ? (vd.dormant_vendors||0) : 0);
+      var churnedVal = v2VendorsData ? v2VendorsData.vendors_churned_90plus : (vd ? (vd.churned_vendors||0) : 0);
+
+      // Build flow line
+      var k2kFlow = '';
+      k2kFlow += k2kConnected + ' connected';
+      if(k2kActivated > 0) {
+        k2kFlow += ' \u2192 ' + k2kActivated + ' activated (' + fmtPct(k2kPct) + ')';
+      }
+      if(activeL30D != null) {
+        k2kFlow += ' \u2192 ' + activeL30D + ' active L30D';
+      }
+      if(dormantVal > 0) { k2kFlow += ' \u00b7 ' + dormantVal + ' dormant'; }
+      if(churnedVal > 0) { k2kFlow += ' \u00b7 ' + churnedVal + ' churned'; }
+
+      html += '<div style="margin-top:3px;font-size:11px;font-family:monospace;background:#f8fafc;border:1px solid var(--border);border-radius:4px;padding:5px 8px;color:var(--text)">';
+      html += 'K2K lifecycle: <strong>'+k2kFlow+'</strong>';
+      html += '</div>';
+      html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:3px">K2K = requires agreement + selling, not just infrastructure</div>';
 
       if(v2VendorsData) {
-        html += '<tr><td colspan="4" style="padding:3px 8px;font-size:10px;color:var(--text-muted);font-style:italic">V2 vendor data as of '+v2VendorsData.as_of+' \u2014 L30D = active in last 30 days. K2K = requires agreement, not just infrastructure.</td></tr>';
+        html += '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">V2 data as of '+v2VendorsData.as_of+' \u2014 L30D = active in last 30 days.</div>';
       }
+      html += '</div>';
+
+      // Re-open table for the anticipation section that follows (it uses <tr> tags)
+      html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0">';
 
       // FIX 2: Anticipation — relabeled as ONLINE procurement lead time per Facu's feedback
       // This data comes from buy_detail.json which measures ONLINE procurement timing (arrival->shipping gap).
@@ -1940,7 +1949,7 @@ function renderAccounts() {
         antBars.forEach(function(b){ html += '<span style="color:'+b.color+'">&#9632;</span> '+b.label+' '; });
         html += ' &middot; '+antTotal.toLocaleString()+' online orders';
         html += '</div>';
-        html += '<div style="font-size:10px;color:var(--amber);font-style:italic;margin-top:2px;padding:2px 6px;background:rgba(217,119,6,0.06);border-radius:3px">\u26a0 Offline anticipation data not available yet. To compare online vs offline buying horizons, need CREATED_DATE in semantic view.</div>';
+        html += '<div style="font-size:10px;color:var(--amber);font-style:italic;margin-top:2px;padding:2px 6px;background:rgba(217,119,6,0.06);border-radius:3px">\u26a0 Offline procurement timing not available \u2014 need ORDER_DATE in Snowflake. This chart shows ONLINE orders only.</div>';
         // SO WHAT interpretation
         var pct0_3 = antTotal > 0 ? (ant0 / antTotal * 100) : 0;
         var pct15plus = antTotal > 0 ? ((ant15 + ant30) / antTotal * 100) : 0;
@@ -2082,7 +2091,8 @@ function renderAccounts() {
     var tdOffline = findOfflineTimeDepth(a.name);
     var tdBest = window.TIME_DEPTH_OFFLINE ? window.TIME_DEPTH_OFFLINE.best_in_class : null;
     if(tdV2 || tdOffline) {
-      html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Time Depth (% of varieties at each horizon)</div>';
+      html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Sales Time Depth (% of varieties SOLD at each horizon)</div>';
+      html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Note: this shows what they SOLD (from SALES_SV), not what they LIST in the eShop. Sales include K2K, prebooks, standing orders which bypass eShop MaxAge limits.</div>';
       var tdBuckets = [
         {key:'pct_0_3_days',  label:'0-3d',    color:'var(--red)'},
         {key:'pct_4_7_days',  label:'4-7d',    color:'var(--amber)'},
@@ -2105,8 +2115,8 @@ function renderAccounts() {
         return h;
       }
 
-      if(tdV2) html += renderTdBar(tdV2, 'ONLINE', tdV2.total_varieties);
-      if(tdOffline) html += renderTdBar(tdOffline, 'OFFLINE', tdOffline.total_varieties);
+      if(tdV2) html += renderTdBar(tdV2, 'ONLINE SALES', tdV2.total_varieties);
+      if(tdOffline) html += renderTdBar(tdOffline, 'OFFLINE SALES', tdOffline.total_varieties);
       if(tdBest) html += renderTdBar(tdBest, 'BEST (Kennicott)', tdBest.total_varieties);
 
       // Legend
