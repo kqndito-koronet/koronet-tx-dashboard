@@ -484,6 +484,8 @@ var BUYERS=[], SELL_BY_CHANNEL={}, BUYER_CONCENTRATION={}, REPEAT_RATE={}, SUPPL
 // V2 temporal data — loaded separately with .catch() so failures don't block render
 window.METRICS_V2_SELL = null;
 window.METRICS_V2_BUY = null;
+window.METRICS_V2_FEES = null;    // FIX A: fees with temporal structure
+window.METRICS_V2_VENDORS = null; // FIX B: vendors_active_l30d
 
 // Active timeframe — default YTD
 var ACTIVE_TIMEFRAME = 'ytd';
@@ -537,6 +539,14 @@ async function loadData() {
     fetch(base+'metrics_v2_buy.json').then(function(r){return r.json();}).then(function(d){
       window.METRICS_V2_BUY = d;
     }).catch(function(){ window.METRICS_V2_BUY = null; }),
+    // FIX A: load fees V2 (temporal structure with deltas)
+    fetch(base+'metrics_v2_fees.json').then(function(r){return r.json();}).then(function(d){
+      window.METRICS_V2_FEES = d;
+    }).catch(function(){ window.METRICS_V2_FEES = null; }),
+    // FIX B: load vendors V2 (vendors_active_l30d — L30D active, not lifetime)
+    fetch(base+'metrics_v2_vendors.json').then(function(r){return r.json();}).then(function(d){
+      window.METRICS_V2_VENDORS = d;
+    }).catch(function(){ window.METRICS_V2_VENDORS = null; }),
   ]);
 
   updateFreshnessBanner();
@@ -565,6 +575,28 @@ function getV2Buy(name) {
   if(!name || !window.METRICS_V2_BUY || !window.METRICS_V2_BUY.companies) return null;
   var n = normName(name);
   var companies = window.METRICS_V2_BUY.companies;
+  for(var key in companies) {
+    if(normName(key) === n) return companies[key];
+  }
+  return null;
+}
+
+// FIX A: Get V2 fees data for a company by name (normName match)
+function getV2Fees(name) {
+  if(!name || !window.METRICS_V2_FEES || !window.METRICS_V2_FEES.companies) return null;
+  var n = normName(name);
+  var companies = window.METRICS_V2_FEES.companies;
+  for(var key in companies) {
+    if(normName(key) === n) return companies[key];
+  }
+  return null;
+}
+
+// FIX B: Get V2 vendors data for a company by name (normName match)
+function getV2Vendors(name) {
+  if(!name || !window.METRICS_V2_VENDORS || !window.METRICS_V2_VENDORS.companies) return null;
+  var n = normName(name);
+  var companies = window.METRICS_V2_VENDORS.companies;
   for(var key in companies) {
     if(normName(key) === n) return companies[key];
   }
@@ -627,8 +659,15 @@ function updateFreshnessBanner() {
   if(window.METRICS_V2_BUY && window.METRICS_V2_BUY._metadata) {
     buyCount = window.METRICS_V2_BUY._metadata.total_companies || 0;
   }
+  var feesCount = 0, vendorsCount = 0;
+  if(window.METRICS_V2_FEES && window.METRICS_V2_FEES._metadata) {
+    feesCount = Object.keys(window.METRICS_V2_FEES.companies || {}).length;
+  }
+  if(window.METRICS_V2_VENDORS && window.METRICS_V2_VENDORS._metadata) {
+    vendorsCount = window.METRICS_V2_VENDORS._metadata.total_companies || 0;
+  }
   var coverageNote = (sellCount > 0 || buyCount > 0)
-    ? 'Temporal coverage: ' + sellCount + ' sell / ' + buyCount + ' buy companies.'
+    ? 'Temporal coverage: ' + sellCount + ' sell / ' + buyCount + ' buy / ' + feesCount + ' fees / ' + vendorsCount + ' vendors companies.'
     : 'Temporal data: not loaded.';
   banner.innerHTML = '<strong>Data as of ' + asOf + '.</strong> ' + coverageNote +
     ' Snapshot coverage: 112/399 accounts with metrics (28%).' +
@@ -830,8 +869,10 @@ function getOpportunities(acct) {
       opps.push({text:'MaxAge='+cfg.max_age+'d. Benchmark: 300. 5-min fix.', type:'config'});
     }
     if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      var bunchGMV = bun && bun.sells_bunches ? fmt$(bun.total_bunch_gmv)+' bunch GMV offline' : '';
-      opps.push({text:'Bunches OFF.'+(bunchGMV ? ' '+bunchGMV+'.' : '')+' 5-min fix.', type:'config'});
+      // FIX F: Add $ from bun.total_bunch_gmv + 95% TAM framing
+      var bunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
+      var bunchGmvStr = bunchGmvAmt ? ' '+fmt$(bunchGmvAmt)+' offline bunch GMV. 95% TAM blocked.' : ' 95% TAM blocked.';
+      opps.push({text:'Bunches OFF \u2192'+bunchGmvStr+' 5-min fix.', type:'config', gmv_impact: bunchGmvAmt});
     }
     if(!cfg.future && acct.ct_id === 'WH_CORE') {
       opps.push({text:'Future Sales OFF. eShop shows today only.', type:'config'});
@@ -868,7 +909,10 @@ function getOpportunities(acct) {
       opps.push({text:'No long-term inventory listed (0% at 30d+).', type:'list'});
     }
     if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      opps.push({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers.', type:'list'});
+      // FIX G: Add $ offline bunch GMV to the list opp
+      var listBunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
+      var listBunchDollar = listBunchGmvAmt ? ' \u2014 '+fmt$(listBunchGmvAmt)+' in offline bunch GMV not visible online.' : '.';
+      opps.push({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers'+listBunchDollar, type:'list'});
     }
     var bdCheck = findBuyDetail(acct.name);
     if(bdCheck && bdCheck.open_market_gmv === 0) {
@@ -1395,7 +1439,7 @@ function renderAccounts() {
     }
     html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0">';
     html += '<tr style="background:#f1f5f9"><th colspan="3" style="padding:4px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text-muted)">SELL SIDE</th></tr>';
-    html += '<tr><td style="padding:3px 8px">Est. Sell (ORA)</td><td style="text-align:right">'+(a.annual_sales_est?fmt$(a.annual_sales_est):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px"></td></tr>';
+    html += '<tr><td style="padding:3px 8px">Est. Sell (ORA)</td><td style="text-align:right">'+(a.annual_sales_est?fmt$(a.annual_sales_est):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px">Christine ORA</td></tr>';
     // FIX 2: Hide Est Sell (calc) row when same as ORA
     var calcSameAsOra = estData && (estData.est_sell_source === 'Christine ORA' || (a.annual_sales_est && estData.est_sell_gmv === a.annual_sales_est));
     if(calcSameAsOra) {
@@ -1441,8 +1485,17 @@ function renderAccounts() {
     html += '<tr><td style="padding:3px 8px">Koronet Buy</td><td style="text-align:right;font-weight:600">'+(potBuyTotal!=null?fmt$(potBuyTotal):(met?fmt$(met.proc_total):'\u2014'))+(potBuyTotalDelta?' '+potBuyTotalDelta.html:'')+'</td><td style="padding-left:6px"><span style="color:'+buyPenColor+';font-weight:600">'+(buyPenPct!==null?fmtPct(buyPenPct)+' penetration':'')+'</span>'+potBuyV2Label+'</td></tr>';
     html += '<tr><td style="padding:3px 8px">Online Buy</td><td style="text-align:right">'+(potBuyOnline!=null?fmt$(potBuyOnline):(met?fmt$(met.proc_online):'\u2014'))+(potBuyOnlineDelta?' '+potBuyOnlineDelta.html:'')+'</td><td style="padding-left:6px">'+(buyOnlinePct>0?fmtPct(buyOnlinePct):'')+'</td></tr>';
     html += '</table>';
-    // FIX 3: Fee breakdown by channel with take rate
-    var directPotential = met ? met.fees_total : 0;
+    // FIX A (Audit Run 2 P1): Wire V2 fees — prefer temporal fees_total over static metrics.json
+    var v2FeesData = getV2Fees(a.name);
+    var v2FeesDelta = null;
+    var directPotential;
+    if(v2FeesData && v2FeesData.fees_total) {
+      var v2FeesVal = getV2Val(v2FeesData.fees_total, tf);
+      directPotential = v2FeesVal != null ? v2FeesVal : (met ? met.fees_total : 0);
+      v2FeesDelta = getV2Delta(v2FeesData.fees_total, tf);
+    } else {
+      directPotential = met ? met.fees_total : 0;
+    }
     var indirectPotential = indirectFees;
     // Build channel GMV lookup from sell_by_channel data
     var channelGmvMap = {};
@@ -1462,8 +1515,10 @@ function renderAccounts() {
     });
     var offlineGmv = channelGmvMap['Offline'] || (met ? met.sell_offline : 0);
     if(offlineGmv > 0) html += '<tr style="color:var(--text-muted)"><td style="padding:2px 6px">Offline</td><td style="padding:2px 6px;text-align:right">'+fmt$(offlineGmv)+'</td><td style="padding:2px 6px;text-align:right">$0</td><td style="padding:2px 6px;text-align:right">\u2014</td><td style="padding:2px 6px;font-size:10px;color:var(--red)">$0 take</td></tr>';
-    html += '<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">Indirect</td><td style="padding:3px 6px;text-align:right;font-size:10px;color:var(--text-muted)">1.5%\u00d7'+fmt$(met?met.proc_online:0)+'</td><td style="padding:3px 6px;text-align:right;font-weight:600">'+fmt$(indirectPotential)+'</td><td colspan="2"></td></tr>';
-    html += '<tr style="background:#f1f5f9"><td style="padding:3px 6px;font-weight:700">TOTAL</td><td></td><td style="padding:3px 6px;text-align:right;font-weight:700;color:var(--green)">'+fmt$(directPotential+indirectPotential)+'</td><td colspan="2"></td></tr>';
+    html += '<tr style="border-top:1px solid var(--border)"><td style="padding:3px 6px">Indirect <span style="font-size:10px;color:var(--text-muted);font-weight:400">(1.5% \u00d7 Buy Online) [est.]</span></td><td style="padding:3px 6px;text-align:right;font-size:10px;color:var(--text-muted)">1.5%\u00d7'+fmt$(met?met.proc_online:0)+'</td><td style="padding:3px 6px;text-align:right;font-weight:600">'+fmt$(indirectPotential)+'</td><td colspan="2"></td></tr>';
+    // FIX A: show fee delta inline on TOTAL row
+    var feesDeltaHtml = v2FeesDelta ? ' ' + v2FeesDelta.html : '';
+    html += '<tr style="background:#f1f5f9"><td style="padding:3px 6px;font-weight:700">TOTAL</td><td></td><td style="padding:3px 6px;text-align:right;font-weight:700;color:var(--green)">'+fmt$(directPotential+indirectPotential)+feesDeltaHtml+'</td><td colspan="2"></td></tr>';
     html += '</table>';
     html += '</div>';
 
@@ -1736,19 +1791,45 @@ function renderAccounts() {
       }
 
       // --- PROCUREMENT FUNNEL ---
+      // FIX B (Audit Run 4 P1): Use vendors_active_l30d from metrics_v2_vendors.json
+      // k2k_active in metrics.json = lifetime (ever bought), NOT L30D. Use V2 for L30D active.
       html += '<div style="margin-top:8px;margin-bottom:2px"><strong style="font-size:11px;color:var(--text-muted)">PROCUREMENT FUNNEL</strong></div>';
+      var v2VendorsData = getV2Vendors(a.name);
       if(met && met.k2k_total > 0) {
         var k2kPct = (met.k2k_active / met.k2k_total * 100);
         var dormant = vd ? (vd.dormant_vendors||0) : 0;
         var churned = vd ? (vd.churned_vendors||0) : 0;
+        // V2 active L30D (preferred) vs lifetime k2k_active
+        var activeL30D = v2VendorsData ? v2VendorsData.vendors_active_l30d : null;
+        var dormantV2 = v2VendorsData ? v2VendorsData.vendors_dormant_30_90d : null;
+        var churnedV2 = v2VendorsData ? v2VendorsData.vendors_churned_90plus : null;
+        var totalV2 = v2VendorsData ? v2VendorsData.vendors_total : null;
         html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
-        html += '<tr><td style="padding:2px 6px;color:var(--text-muted)">K2K Connected</td><td style="text-align:right;font-weight:600">'+met.k2k_total+'</td><td style="padding-left:8px;font-size:10px;color:var(--text-muted)">\u2190 infrastructure</td></tr>';
-        html += '<tr><td style="padding:2px 6px">\u2192 Activated (ever bought)</td><td style="text-align:right;font-weight:600;color:'+(k2kPct>=70?'var(--green)':k2kPct>=40?'var(--amber)':'var(--red)')+'">'+met.k2k_active+' ('+fmtPct(k2kPct)+')</td><td style="padding-left:8px;font-size:10px;color:var(--text-muted)">\u2190 conversion</td></tr>';
-        if(dormant > 0) html += '<tr><td style="padding:2px 6px;color:var(--amber)">\u2192 Dormant (connected, never bought)</td><td style="text-align:right;color:var(--amber)">'+dormant+'</td><td style="padding-left:8px;font-size:10px;color:var(--amber)">\u2190 activate these</td></tr>';
-        if(churned > 0) html += '<tr><td style="padding:2px 6px;color:var(--red)">\u2192 Churned (bought before, stopped)</td><td style="text-align:right;color:var(--red)">'+churned+'</td><td style="padding-left:8px;font-size:10px;color:var(--red)">\u2190 reactivate</td></tr>';
-        var unconverted = met.k2k_total - met.k2k_active - dormant;
-        if(unconverted > 0) html += '<tr><td style="padding:2px 6px;color:var(--text-muted)">\u2192 Not yet activated</td><td style="text-align:right;color:var(--text-muted)">'+unconverted+'</td><td></td></tr>';
+        html += '<tr><td style="padding:2px 6px;color:var(--text-muted)">K2K Connected (lifetime)</td><td style="text-align:right;font-weight:600">'+(totalV2 != null ? totalV2 : met.k2k_total)+'</td><td style="padding-left:8px;font-size:10px;color:var(--text-muted)">\u2190 infrastructure</td></tr>';
+        html += '<tr><td style="padding:2px 6px">\u2192 Activated (ever bought)</td><td style="text-align:right;font-weight:600;color:'+(k2kPct>=70?'var(--green)':k2kPct>=40?'var(--amber)':'var(--red)')+'">'+met.k2k_active+' ('+fmtPct(k2kPct)+')</td><td style="padding-left:8px;font-size:10px;color:var(--text-muted)">\u2190 lifetime</td></tr>';
+        // FIX B: show L30D active from V2 if available (more operationally useful than lifetime)
+        if(activeL30D != null) {
+          var l30dPct = totalV2 && totalV2 > 0 ? (activeL30D / totalV2 * 100) : 0;
+          html += '<tr style="background:rgba(37,99,235,0.05)"><td style="padding:2px 6px;font-weight:600">\u2192 Active L30D</td><td style="text-align:right;font-weight:600;color:'+(l30dPct>=50?'var(--green)':l30dPct>=25?'var(--amber)':'var(--red)')+'">'+activeL30D+' ('+fmtPct(l30dPct)+')</td><td style="padding-left:8px;font-size:10px;color:var(--blue)"><strong>\u2190 L30D (use this)</strong></td></tr>';
+        }
+        if(dormantV2 != null) {
+          html += '<tr><td style="padding:2px 6px;color:var(--amber)">\u2192 Dormant (30-90d no buy)</td><td style="text-align:right;color:var(--amber)">'+dormantV2+'</td><td style="padding-left:8px;font-size:10px;color:var(--amber)">\u2190 re-engage</td></tr>';
+        } else if(dormant > 0) {
+          html += '<tr><td style="padding:2px 6px;color:var(--amber)">\u2192 Dormant (connected, never bought)</td><td style="text-align:right;color:var(--amber)">'+dormant+'</td><td style="padding-left:8px;font-size:10px;color:var(--amber)">\u2190 activate these</td></tr>';
+        }
+        if(churnedV2 != null) {
+          html += '<tr><td style="padding:2px 6px;color:var(--red)">\u2192 Churned (90d+ no buy)</td><td style="text-align:right;color:var(--red)">'+churnedV2+'</td><td style="padding-left:8px;font-size:10px;color:var(--red)">\u2190 reactivate</td></tr>';
+        } else if(churned > 0) {
+          html += '<tr><td style="padding:2px 6px;color:var(--red)">\u2192 Churned (bought before, stopped)</td><td style="text-align:right;color:var(--red)">'+churned+'</td><td style="padding-left:8px;font-size:10px;color:var(--red)">\u2190 reactivate</td></tr>';
+        }
+        if(!v2VendorsData) {
+          var unconverted = met.k2k_total - met.k2k_active - dormant;
+          if(unconverted > 0) html += '<tr><td style="padding:2px 6px;color:var(--text-muted)">\u2192 Not yet activated</td><td style="text-align:right;color:var(--text-muted)">'+unconverted+'</td><td></td></tr>';
+        }
         html += '</table>';
+        if(v2VendorsData) {
+          html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;margin-top:2px">V2 vendor data as of '+v2VendorsData.as_of+' \u2014 L30D = active in last 30 days (PROCUREMENTS_SV).</div>';
+        }
       } else if(met) {
         html += '<div class="detail-row"><span class="detail-label">K2K</span><span>'+met.k2k_active+' / '+met.k2k_total+'</span></div>';
       } else {
@@ -1830,11 +1911,18 @@ function renderAccounts() {
     var listBunchFlag = cfg ? cfg.bunches_flag : null;
     var listBunchFlagStr = listBunchFlag != null ? (listBunchFlag ? 'ON' : 'OFF') : '\u2014';
     var listBunchGmv = bun ? fmt$(bun.total_bunch_gmv) : '\u2014';
-    var listBunchTam = (listBunchFlag === false && bun && bun.sells_bunches) ? '95% TAM' : '';
+    // FIX G: Add actual $ to 95% TAM blocked message
+    var listBunchTam = '';
+    if(listBunchFlag === false && bun && bun.sells_bunches) {
+      listBunchTam = '95% TAM blocked';
+      if(bun.total_bunch_gmv > 0) {
+        listBunchTam += ' \u2014 ' + fmt$(bun.total_bunch_gmv) + ' offline bunch GMV not visible online';
+      }
+    }
     html += '<tr><td style="padding:3px 6px;font-weight:600">Format</td>';
     html += '<td style="padding:3px 6px">Bunches <span style="color:'+(listBunchFlag ? 'var(--green)' : 'var(--red)')+'">'+listBunchFlagStr+'</span></td>';
     html += '<td style="padding:3px 6px">'+listBunchGmv+' GMV</td>';
-    html += '<td style="padding:3px 6px;color:var(--red)">'+listBunchTam+'</td></tr>';
+    html += '<td style="padding:3px 6px;color:var(--red);font-size:10px">'+listBunchTam+'</td></tr>';
     html += '</tbody></table>';
 
     // TIME DEPTH BREAKDOWN (from loop2_list_time_depth_v2)
