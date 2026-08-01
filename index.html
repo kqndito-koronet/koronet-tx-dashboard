@@ -488,6 +488,11 @@ window.METRICS_V2_FEES = null;    // FIX A: fees with temporal structure
 window.METRICS_V2_VENDORS = null; // FIX B: vendors_active_l30d
 window.METRICS_V2_PACING = null;  // Fix 10: network pacing totals
 
+// New data files (2026-07-31)
+window.BENCHMARKS = null;          // benchmarks.json — network/segment percentiles
+window.CONCENTRATION_V2 = null;    // buyer_concentration_v2.json — Top 5 buyers per account
+window.TIME_DEPTH_OFFLINE = null;  // time_depth_offline.json — offline time depth + best-in-class
+
 // Active timeframe — default YTD
 var ACTIVE_TIMEFRAME = 'ytd';
 
@@ -552,6 +557,22 @@ async function loadData() {
     fetch(base+'metrics_v2_pacing.json').then(function(r){return r.json();}).then(function(d){
       window.METRICS_V2_PACING = d;
     }).catch(function(){ window.METRICS_V2_PACING = null; }),
+  ]);
+
+  // New data files (2026-07-31) — non-blocking, same pattern
+  await Promise.all([
+    fetch(base+'benchmarks.json').then(function(r){return r.json();}).then(function(d){
+      window.BENCHMARKS = d;
+    }).catch(function(){ window.BENCHMARKS = null; }),
+    fetch(base+'buyer_concentration_v2.json').then(function(r){return r.json();}).then(function(d){
+      window.CONCENTRATION_V2 = d;
+    }).catch(function(){ window.CONCENTRATION_V2 = null; }),
+    fetch(base+'time_depth_offline.json').then(function(r){return r.json();}).then(function(d){
+      window.TIME_DEPTH_OFFLINE = d;
+    }).catch(function(){ window.TIME_DEPTH_OFFLINE = null; }),
+    fetch(base+'metrics_v2_buyers_full.json').then(function(r){return r.json();}).then(function(d){
+      window.BUYERS_FULL = d;
+    }).catch(function(){ window.BUYERS_FULL = null; }),
   ]);
 
   updateFreshnessBanner();
@@ -753,6 +774,14 @@ function findBuyerData(companyId) {
   if(!companyId || !BUYERS.length) return null;
   return BUYERS.find(function(b){ return b.company_id === companyId; });
 }
+function findBuyersFull(name) {
+  if(!name || !window.BUYERS_FULL || !window.BUYERS_FULL.companies) return null;
+  var n = normName(name);
+  for(var key in window.BUYERS_FULL.companies) {
+    if(normName(key) === n) return window.BUYERS_FULL.companies[key];
+  }
+  return null;
+}
 function findConcentrationByName(name) {
   if(!name || !BUYER_CONCENTRATION.accounts) return null;
   var n = normName(name);
@@ -869,6 +898,37 @@ function findSellFormat(name) {
   if(!name || !window.SELL_FORMAT) return null;
   var n = normName(name);
   return window.SELL_FORMAT.find(function(r){ return normName(r.company_name) === n; });
+}
+
+// === NEW DATA LOOKUP HELPERS (2026-07-31) ===
+
+// Find Top 5 concentration from CONCENTRATION_V2 by company name (normName match)
+function findConcentrationV2(name) {
+  if(!name || !window.CONCENTRATION_V2 || !window.CONCENTRATION_V2.accounts) return null;
+  var n = normName(name);
+  return window.CONCENTRATION_V2.accounts.find(function(a){
+    return normName(a.company_name) === n;
+  });
+}
+
+// Find offline time depth for a company by name (normName match)
+function findOfflineTimeDepth(name) {
+  if(!name || !window.TIME_DEPTH_OFFLINE || !window.TIME_DEPTH_OFFLINE.offline) return null;
+  var n = normName(name);
+  return window.TIME_DEPTH_OFFLINE.offline.find(function(r){
+    return normName(r.company_name) === n;
+  });
+}
+
+// Get benchmark for a given metric key and segment
+// metricKey: e.g. '4_repeat_rate_pct', '5_top2_pct_concentration', '8_distinct_varieties'
+// segment: e.g. 'WH_CORE', null for network
+function getBenchmark(metricKey, segment) {
+  if(!window.BENCHMARKS || !window.BENCHMARKS.benchmarks) return null;
+  var bm = window.BENCHMARKS.benchmarks[metricKey];
+  if(!bm) return null;
+  if(segment && bm.by_segment && bm.by_segment[segment]) return bm.by_segment[segment];
+  return bm.network || null;
 }
 
 // === OPPORTUNITY GENERATOR ===
@@ -1370,14 +1430,16 @@ function renderAccounts() {
     html += '<td style="text-align:center">' + trendHtml + '</td>';
     // FIX 5: Wire eShop CVR from GA4 data
     var ga4Portfolio = findGA4(a.name);
+    var bmCvr = getBenchmark('6_cvr_ga4_own_hostname', null);
+    var cvrBmNote = bmCvr ? 'Network median CVR (active eShops): '+fmtPct(bmCvr.active_eshops_only ? bmCvr.active_eshops_only.median * 100 : bmCvr.median * 100)+'. p75: '+fmtPct(bmCvr.active_eshops_only ? bmCvr.active_eshops_only.p75 * 100 : bmCvr.p75 * 100)+'. Best: Kennicott 22.8%.' : 'Best-in-class: Kennicott ~22.8% CVR.';
     var cvrHtml;
     if(ga4Portfolio && ga4Portfolio.sessions > 0 && ga4Portfolio.transactions > 0) {
       var cvrPct = ga4Portfolio.transactions / ga4Portfolio.sessions * 100;
       var cvrColor = cvrPct > 20 ? 'var(--green)' : cvrPct > 10 ? 'var(--amber)' : 'var(--red)';
-      var cvrTooltip = ga4Portfolio.sessions.toLocaleString()+' sessions \u2192 '+ga4Portfolio.transactions.toLocaleString()+' transactions';
+      var cvrTooltip = ga4Portfolio.sessions.toLocaleString()+' sessions \u2192 '+ga4Portfolio.transactions.toLocaleString()+' transactions. '+cvrBmNote;
       cvrHtml = '<span style="color:'+cvrColor+';font-weight:600;font-size:11px" title="'+cvrTooltip+'">'+cvrPct.toFixed(1)+'%</span>';
     } else {
-      cvrHtml = '<span style="color:var(--text-muted)" title="eShop uses shared platform domain (app.kometsales.com). Per-company CVR requires GA4 data by company_id from Snowflake.">\u2014</span>';
+      cvrHtml = '<span style="color:var(--text-muted)" title="eShop uses shared platform domain (app.kometsales.com). Per-company CVR requires GA4 data by company_id from Snowflake. '+cvrBmNote+'">\u2014</span>';
     }
     html += '<td style="text-align:center">'+cvrHtml+'</td>';
     html += '<td style="text-align:center">'+oppBadge+'</td>';
@@ -1935,7 +1997,10 @@ function renderAccounts() {
     }
     var listUsage = findListUsage(a.company_id);
     if(listUsage) {
-      html += '<tr><td style="padding:3px 6px;font-weight:600">Varieties</td><td style="padding:3px 6px">'+listUsage.distinct_varieties+'</td><td style="padding:3px 6px">\u2014</td><td style="padding:3px 6px"></td></tr>';
+      var bmVar = getBenchmark('8_distinct_varieties', a.ct_id);
+      var varBmStr = '';
+      if(bmVar) varBmStr = ' <span style="font-size:10px;color:var(--text-muted)" title="Network benchmark for distinct varieties">(net. p75: '+fmtN(bmVar.p75)+')</span>';
+      html += '<tr><td style="padding:3px 6px;font-weight:600">Varieties</td><td style="padding:3px 6px">'+listUsage.distinct_varieties+varBmStr+'</td><td style="padding:3px 6px">\u2014</td><td style="padding:3px 6px"></td></tr>';
       html += '<tr><td style="padding:3px 6px;font-weight:600">SKUs</td><td style="padding:3px 6px">'+listUsage.distinct_skus+'</td><td style="padding:3px 6px">\u2014</td><td style="padding:3px 6px"></td></tr>';
     }
     // Row: Time depth
@@ -1964,26 +2029,66 @@ function renderAccounts() {
     html += '<td style="padding:3px 6px;color:var(--red);font-size:10px">'+listBunchTam+'</td></tr>';
     html += '</tbody></table>';
 
-    // TIME DEPTH BREAKDOWN (from loop2_list_time_depth_v2)
+    // TIME DEPTH BREAKDOWN (from loop2_list_time_depth_v2) — ONLINE + OFFLINE + BEST-IN-CLASS
     var tdV2 = findListTimeDepthV2(a.company_id);
-    if(tdV2) {
+    var tdOffline = findOfflineTimeDepth(a.name);
+    var tdBest = window.TIME_DEPTH_OFFLINE ? window.TIME_DEPTH_OFFLINE.best_in_class : null;
+    if(tdV2 || tdOffline) {
       html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Time Depth (% of varieties at each horizon)</div>';
-      html += '<div style="display:flex;gap:0;height:22px;border-radius:4px;overflow:hidden;margin-bottom:4px">';
-      var pcts = [
-        {pct: tdV2.pct_0_3_days||0, label:'0-3d', color:'var(--red)'},
-        {pct: tdV2.pct_4_7_days||0, label:'4-7d', color:'var(--amber)'},
-        {pct: tdV2.pct_8_14_days||0, label:'8-14d', color:'#2563eb'},
-        {pct: tdV2.pct_15_30_days||0, label:'15-30d', color:'#7c3aed'},
-        {pct: tdV2.pct_31_90_days||0, label:'31-90d', color:'var(--green)'},
-        {pct: tdV2.pct_over_90_days||0, label:'90d+', color:'#059669'}
+      var tdBuckets = [
+        {key:'pct_0_3_days',  label:'0-3d',    color:'var(--red)'},
+        {key:'pct_4_7_days',  label:'4-7d',    color:'var(--amber)'},
+        {key:'pct_8_14_days', label:'8-14d',   color:'#2563eb'},
+        {key:'pct_15_30_days',label:'15-30d',  color:'#7c3aed'},
+        {key:'pct_31_90_days',label:'31-90d',  color:'var(--green)'},
+        {key:'pct_over_90_days',label:'90d+',  color:'#059669'}
       ];
-      pcts.forEach(function(p) {
-        if(p.pct > 0.5) html += '<div style="width:'+p.pct+'%;background:'+p.color+';color:#fff;font-size:9px;text-align:center;line-height:22px" title="'+p.label+': '+p.pct.toFixed(1)+'%">'+Math.round(p.pct)+'%</div>';
-      });
+
+      function renderTdBar(tdRow, labelStr, varietyCount) {
+        if(!tdRow) return '';
+        var h = '<div style="margin-bottom:2px"><span style="font-size:10px;font-weight:600;color:var(--text-muted);display:inline-block;width:90px">'+labelStr+'</span>';
+        h += '<div style="display:inline-flex;width:calc(100% - 100px);height:18px;border-radius:3px;overflow:hidden;vertical-align:middle">';
+        tdBuckets.forEach(function(b) {
+          var p = tdRow[b.key] || 0;
+          if(p > 0.5) h += '<div style="width:'+p+'%;background:'+b.color+';color:#fff;font-size:9px;text-align:center;line-height:18px;min-width:2px" title="'+b.label+': '+p.toFixed(1)+'%">'+Math.round(p)+'%</div>';
+        });
+        h += '</div>';
+        h += ' <span style="font-size:10px;color:var(--text-muted);margin-left:4px">'+fmtN(varietyCount)+' var</span></div>';
+        return h;
+      }
+
+      if(tdV2) html += renderTdBar(tdV2, 'ONLINE', tdV2.total_varieties);
+      if(tdOffline) html += renderTdBar(tdOffline, 'OFFLINE', tdOffline.total_varieties);
+      if(tdBest) html += renderTdBar(tdBest, 'BEST (Kennicott)', tdBest.total_varieties);
+
+      // Legend
+      html += '<div style="font-size:10px;color:var(--text-muted);margin-top:3px">';
+      tdBuckets.forEach(function(b) { html += '<span style="color:'+b.color+'">\u25a0</span> '+b.label+' '; });
       html += '</div>';
-      html += '<div style="font-size:10px;color:var(--text-muted)">';
-      pcts.forEach(function(p) { html += '<span style="color:'+p.color+'">\u25a0</span> '+p.label+' '; });
-      html += ' \u00b7 '+tdV2.total_varieties+' varieties total</div>';
+
+      // SO WHAT: offline vs online gap
+      if(tdV2 && tdOffline) {
+        var offlineOver30 = (tdOffline.pct_31_90_days||0) + (tdOffline.pct_over_90_days||0);
+        var onlineOver30 = (tdV2.pct_31_90_days||0) + (tdV2.pct_over_90_days||0);
+        var offlineTotal = tdOffline.total_varieties || 0;
+        var onlineTotal = tdV2.total_varieties || 0;
+        var hiddenVarieties = offlineTotal > onlineTotal ? (offlineTotal - onlineTotal) : null;
+        var soWhatParts = [];
+        if(hiddenVarieties && hiddenVarieties > 0) soWhatParts.push('<strong>'+fmtN(hiddenVarieties)+'</strong> varieties offline not shown online');
+        if(offlineOver30 > 0) soWhatParts.push('<strong>'+offlineOver30.toFixed(0)+'%</strong> of offline at 30d+' + (onlineOver30 > 0 ? ' vs <strong>'+onlineOver30.toFixed(0)+'%</strong> online' : ''));
+        if(tdBest) {
+          var bestOver30 = (tdBest.pct_31_90_days||0) + (tdBest.pct_over_90_days||0);
+          soWhatParts.push('best-in-class: <strong>'+bestOver30.toFixed(0)+'%</strong> at 30d+');
+        }
+        if(soWhatParts.length > 0) {
+          html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(217,119,6,0.06);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:11px">';
+          html += '<strong>SO WHAT:</strong> ' + soWhatParts.join(' \u00b7 ');
+          html += '</div>';
+        }
+      } else if(tdV2) {
+        // Only online data — single-bar display
+        html += '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">'+tdV2.total_varieties+' varieties total (online only \u2014 offline data not available)</div>';
+      }
     }
 
     // CATEGORIES DETAIL (from listing_detail)
@@ -2070,29 +2175,76 @@ function renderAccounts() {
       else { concColor = 'var(--green)'; concLabel = ' \u2014 healthy'; }
     }
     var bv2 = findBuyersV2(a.company_id);
+    var bf = findBuyersFull(a.name);
     html += '<div style="margin:6px 0"><table class="def-table"><thead><tr>'
       + '<th>Metric</th><th>Online</th><th>Offline</th><th>Total</th>'
       + '</tr></thead><tbody>';
-    html += '<tr><td>Buyers</td><td>' + (buyerData ? buyerData.online_buyers : '\u2014') + '</td><td>' + (buyerData ? buyerData.offline_buyers : '\u2014') + '</td><td>' + (buyerData ? buyerData.total_buyers : '\u2014') + '</td></tr>';
-    html += '<tr><td>Active L30D</td><td>' + (bv2 && (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) ? (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) : (sellL30D ? sellL30D.buyers_online_l30d : '\u2014')) + '</td><td>\u2014</td><td>\u2014</td></tr>';
+    // Buyers row — prefer BUYERS_FULL, fall back to buyerData (buyers.json)
+    var bfOnline = bf ? bf.online_buyers : (buyerData ? buyerData.online_buyers : null);
+    var bfOffline = bf ? bf.offline_buyers : (buyerData ? buyerData.offline_buyers : null);
+    var bfTotal = bf ? bf.total_buyers : (buyerData ? buyerData.total_buyers : null);
+    html += '<tr><td>Buyers</td><td>' + (bfOnline != null ? bfOnline : '\u2014') + '</td><td>' + (bfOffline != null ? bfOffline : '\u2014') + '</td><td>' + (bfTotal != null ? bfTotal : '\u2014') + '</td></tr>';
+    // Active L30D — prefer BUYERS_FULL, fall back to bv2, then sellL30D
+    var bfL30DOnline = bf ? bf.online_buyers_l30d : null;
+    var bfL30DOffline = bf ? bf.offline_buyers_l30d : null;
+    var bfL30DOnlineStr = bfL30DOnline != null ? bfL30DOnline : (bv2 && (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) ? (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) : (sellL30D ? sellL30D.buyers_online_l30d : '\u2014'));
+    var bfL30DOfflineStr = bfL30DOffline != null ? bfL30DOffline : '\u2014';
+    html += '<tr><td>Active L30D</td><td>' + bfL30DOnlineStr + '</td><td>' + bfL30DOfflineStr + '</td><td>\u2014</td></tr>';
     html += '<tr><td>New Q2</td><td>' + (bv2 ? (bv2.NEW_BUYERS_Q2 || bv2.new_buyers_q2 || '\u2014') : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    html += '<tr><td>Churned Q2</td><td>' + (bv2 ? (bv2.CHURNED_BUYERS_Q2 || bv2.churned_buyers_q2 || '\u2014') : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    html += '<tr><td>AOV</td><td>' + (aovData ? fmt$(aovData.aov_online) : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    html += '<tr><td>Repeat Rate</td><td style="color:'+repeatColor+'">' + (repeatData ? fmtPct(repeatData.repeat_rate_pct) + repeatLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    html += '<tr><td>Concentration Top 2</td><td style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
-    if(concData) {
-      if(concData.top1_name) {
-        var top1Gmv = concData.top1_gmv != null ? ' (' + fmt$(concData.top1_gmv) + ')' : '';
-        html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#1 Buyer</td><td colspan="3"><strong>' + concData.top1_name + '</strong>' + top1Gmv + '</td></tr>';
+    // New This Month — from BUYERS_FULL
+    var bfNewMonth = bf ? bf.new_buyers_current_month : null;
+    html += '<tr><td>New This Month</td><td>\u2014</td><td>\u2014</td><td>' + (bfNewMonth != null ? bfNewMonth : '\u2014') + '</td></tr>';
+    // Churned — from BUYERS_FULL (replaces Q2-only bv2 churn)
+    var bfChurned = bf ? bf.churned_buyers : null;
+    html += '<tr><td>Churned</td><td>\u2014</td><td>\u2014</td><td>' + (bfChurned != null ? bfChurned : (bv2 ? (bv2.CHURNED_BUYERS_Q2 || bv2.churned_buyers_q2 || '\u2014') : '\u2014')) + '</td></tr>';
+    // AOV — prefer BUYERS_FULL for both online+offline, fall back to aovData for online only
+    var bfAovOnline = bf ? bf.aov_online : (aovData ? aovData.aov_online : null);
+    var bfAovOffline = bf ? bf.aov_offline : null;
+    html += '<tr><td>AOV</td><td>' + (bfAovOnline != null ? fmt$(bfAovOnline) : '\u2014') + '</td><td>' + (bfAovOffline != null ? fmt$(bfAovOffline) : '\u2014') + '</td><td>\u2014</td></tr>';
+    var bmRepeat = getBenchmark('4_repeat_rate_pct', a.ct_id);
+    var repeatBmStr = '';
+    if(bmRepeat) repeatBmStr = ' <span style="font-size:10px;color:var(--text-muted)">(net. median: '+fmtPct(bmRepeat.median)+', p75: '+fmtPct(bmRepeat.p75)+')</span>';
+    html += '<tr><td>Repeat Rate</td><td style="color:'+repeatColor+'">' + (repeatData ? fmtPct(repeatData.repeat_rate_pct) + repeatLabel : '\u2014') + repeatBmStr + '</td><td>\u2014</td><td>\u2014</td></tr>';
+    // Try V2 Top 5 first, fall back to old Top 2
+    var concV2 = findConcentrationV2(a.name);
+    if(concV2) {
+      // V2 path: show Top 5
+      var concV2Color = concV2.top5_pct > 50 ? 'var(--red)' : concV2.top5_pct >= 25 ? 'var(--amber)' : 'var(--green)';
+      var concV2Label = concV2.top5_pct > 50 ? ' \u2014 risk' : concV2.top5_pct >= 25 ? ' \u2014 moderate' : ' \u2014 healthy';
+      html += '<tr><td>Concentration Top 5</td><td style="color:'+concV2Color+'">' + fmtPct(concV2.top5_pct) + concV2Label + '</td><td>\u2014</td><td>\u2014</td></tr>';
+      // Show individual top 5 buyers
+      var top5Names = concV2.top5_names || [];
+      var top5Gmvs = concV2.top5_gmvs || [];
+      for(var ti = 0; ti < Math.min(5, top5Names.length); ti++) {
+        var tGmv = top5Gmvs[ti] != null ? ' ' + fmt$(top5Gmvs[ti]) : '';
+        var tPct = concV2.total_online_gmv > 0 && top5Gmvs[ti] != null ? ' (' + fmtPct(top5Gmvs[ti] / concV2.total_online_gmv * 100) + ')' : '';
+        html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#' + (ti+1) + '</td><td colspan="3"><strong>' + top5Names[ti] + '</strong>' + tGmv + tPct + '</td></tr>';
       }
-      if(concData.top2_name) {
-        var top2Gmv = concData.top2_gmv != null ? ' (' + fmt$(concData.top2_gmv) + ')' : '';
-        html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#2 Buyer</td><td colspan="3"><strong>' + concData.top2_name + '</strong>' + top2Gmv + '</td></tr>';
+    } else {
+      // Fallback: old Top 2
+      html += '<tr><td>Concentration Top 2</td><td style="color:'+concColor+'">' + (concData ? fmtPct(concData.top2_pct) + concLabel : '\u2014') + '</td><td>\u2014</td><td>\u2014</td></tr>';
+      if(concData) {
+        if(concData.top1_name) {
+          var top1Gmv = concData.top1_gmv != null ? ' (' + fmt$(concData.top1_gmv) + ')' : '';
+          html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#1 Buyer</td><td colspan="3"><strong>' + concData.top1_name + '</strong>' + top1Gmv + '</td></tr>';
+        }
+        if(concData.top2_name) {
+          var top2Gmv = concData.top2_gmv != null ? ' (' + fmt$(concData.top2_gmv) + ')' : '';
+          html += '<tr><td style="padding-left:16px;color:var(--text-muted)">#2 Buyer</td><td colspan="3"><strong>' + concData.top2_name + '</strong>' + top2Gmv + '</td></tr>';
+        }
       }
     }
     html += '</tbody></table>';
-    // FIX 7: Style concentration disclaimer as a visible warning, not hidden/muted text
-    html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(217,119,6,0.08);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:10px;color:#92400e">\u26a0 <strong>Data gap:</strong> Top 5 concentration needs query. Showing Top 2 from available data only \u2014 interpret with caution.</div>';
+    html += '<div style="margin-top:4px;font-size:10px;color:var(--text-muted);font-style:italic">Note: some buyers purchase both online and offline \u2014 total \u2260 online + offline</div>';
+    // Benchmark reference for concentration (network median — lower is better)
+    var bmConcNet2 = getBenchmark('5_top2_pct_concentration', null);
+    if(bmConcNet2) {
+      html += '<div style="margin-top:3px;font-size:10px;color:var(--text-muted)">Network median top-2 concentration: ' + fmtPct(bmConcNet2.median) + ' \u00b7 best quartile: &le;' + fmtPct(bmConcNet2.p25_best_quartile || 14.47) + ' (lower = more diversified)</div>';
+    }
+    // Only show data gap warning if no V2 data at all
+    if(!concV2 && !concData) {
+      html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(217,119,6,0.08);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;font-size:10px;color:#92400e">\u26a0 <strong>Data gap:</strong> No concentration data available for this account.</div>';
+    }
     html += '</div>';
 
     // CHANNEL MIX (compact one-liner)
@@ -2113,10 +2265,15 @@ function renderAccounts() {
     var ga4Data = findGA4(a.name);
     if(ga4Data && ga4Data.sessions > 0) {
       var convPct = (ga4Data.transactions / ga4Data.sessions * 100);
+      var bmCvrCard = getBenchmark('6_cvr_ga4_own_hostname', null);
       html += '<div style="margin-top:6px;padding:6px 8px;background:#f1f5f9;border-radius:4px;font-size:11px">';
       html += '<strong>GA4 eShop:</strong> '+ga4Data.sessions+' sessions \u2192 '+ga4Data.transactions+' transactions = <strong style="color:'+(convPct>20?'var(--green)':convPct>10?'var(--amber)':'var(--red)')+'">'+fmtPct(convPct)+' conversion</strong>';
       html += ' \u00b7 '+fmt$(ga4Data.revenue)+' revenue';
-      html += '<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Best-in-class: Kennicott ~22.8% CVR</div>';
+      if(bmCvrCard && bmCvrCard.active_eshops_only) {
+        html += '<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Network (active eShops): median '+fmtPct(bmCvrCard.active_eshops_only.median * 100)+' \u00b7 p75 '+fmtPct(bmCvrCard.active_eshops_only.p75 * 100)+' \u00b7 best: Kennicott 22.8%</div>';
+      } else {
+        html += '<div style="margin-top:4px;font-size:10px;color:var(--text-muted)">Best-in-class: Kennicott ~22.8% CVR</div>';
+      }
       html += '</div>';
     }
 
