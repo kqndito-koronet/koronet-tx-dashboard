@@ -2516,11 +2516,13 @@ function renderOpps() {
     metricCard('If +10% Online', '+'+fmt$(uplift10)+' fees', 'at 0.5% take-rate on new online') +
     metricCard('If +25% Online', '+'+fmt$(uplift25)+' fees', 'at 0.5% take-rate on new online'));
 
-  // Fix 2: Populate listLeadList and sellLeadList from getOpportunities()
-  var listLeads = [], sellLeads = [];
+  // Run 10: Wire ALL 4 lead list tabs from getOpportunities()
+  var configLeads = [], buyLeads = [], listLeads = [], sellLeads = [];
   ACCOUNTS.forEach(function(a) {
     var opps = getOpportunities(a);
     opps.forEach(function(o) {
+      if(o.type === 'config') configLeads.push({name: a.name, text: o.text});
+      if(o.type === 'buy') buyLeads.push({name: a.name, text: o.text});
       if(o.type === 'list') listLeads.push({name: a.name, text: o.text});
       if(o.type === 'sell') sellLeads.push({name: a.name, text: o.text});
     });
@@ -2533,8 +2535,10 @@ function renderOpps() {
         '<span style="color:var(--text-muted)">'+l.text+'</span></div>';
     }).join('') + '</div>';
   }
-  setInner('listLeadList', '<strong style="font-size:12px">'+listLeads.length+' leads detected from opportunity data</strong><div style="margin-top:8px">'+renderLeadCards(listLeads, 'No LIST leads detected')+'</div>');
-  setInner('sellLeadList', '<strong style="font-size:12px">'+sellLeads.length+' leads detected from opportunity data</strong><div style="margin-top:8px">'+renderLeadCards(sellLeads, 'No SELL leads detected')+'</div>');
+  setInner('configLeadList', '<strong style="font-size:12px">'+configLeads.length+' config leads detected</strong><div style="margin-top:8px">'+renderLeadCards(configLeads, 'No CONFIG leads detected')+'</div>');
+  setInner('buyLeadList', '<strong style="font-size:12px">'+buyLeads.length+' BUY leads detected</strong><div style="margin-top:8px">'+renderLeadCards(buyLeads, 'No BUY leads detected')+'</div>');
+  setInner('listLeadList', '<strong style="font-size:12px">'+listLeads.length+' LIST leads detected</strong><div style="margin-top:8px">'+renderLeadCards(listLeads, 'No LIST leads detected')+'</div>');
+  setInner('sellLeadList', '<strong style="font-size:12px">'+sellLeads.length+' SELL leads detected</strong><div style="margin-top:8px">'+renderLeadCards(sellLeads, 'No SELL leads detected')+'</div>');
 }
 
 // === DEFINITIONS (Tab 4) ===
@@ -2602,6 +2606,62 @@ function renderDefinitions() {
   }
 
   el.innerHTML = html;
+
+  // Run 10: Wire enablement sections in each lead tab
+  function setInnerDef(id, content) { var e = document.getElementById(id); if(e) e.innerHTML = content; }
+
+  // CONFIG enablement — config objectives table
+  if(D.config_objectives) {
+    var cfgHtml = '<strong style="font-size:12px">CONFIG Enablement — Settings that gate TX</strong><table class="def-table" style="margin-top:8px"><thead><tr><th>Setting</th><th>Question</th><th>TX Impact</th><th>Fix</th><th>Applies To</th></tr></thead><tbody>';
+    Object.entries(D.config_objectives).forEach(function(entry) {
+      var k = entry[0], v = entry[1];
+      cfgHtml += '<tr><td style="font-weight:600">'+v.setting+'</td><td>'+v.question+'</td><td style="color:'+(v.tx_impact==='MUST HAVE'?'var(--red)':'var(--amber)')+'">'+v.tx_impact+'</td><td style="color:var(--green)">'+v.fix+'</td><td style="font-size:11px">'+(v.applies_to||[]).join(', ')+'</td></tr>';
+    });
+    cfgHtml += '</tbody></table>';
+    setInnerDef('configEnablement', cfgHtml);
+  }
+
+  // BUY enablement — discovery questions + challenger messages
+  if(D.buy_discovery || D.buy_challenger) {
+    var buyEnHtml = '';
+    if(D.buy_discovery) {
+      buyEnHtml += '<strong style="font-size:12px">BUY Discovery Questions</strong><ol style="margin-top:8px;font-size:12px;padding-left:20px">';
+      D.buy_discovery.forEach(function(q) { buyEnHtml += '<li style="margin-bottom:4px">'+q+'</li>'; });
+      buyEnHtml += '</ol>';
+    }
+    if(D.buy_challenger) {
+      buyEnHtml += '<strong style="font-size:12px;display:block;margin-top:12px">BUY Challenger Messages</strong><ol style="margin-top:8px;font-size:12px;padding-left:20px">';
+      D.buy_challenger.forEach(function(msg) { buyEnHtml += '<li style="margin-bottom:4px">'+msg+'</li>'; });
+      buyEnHtml += '</ol>';
+    }
+    setInnerDef('buyEnablement', buyEnHtml);
+  }
+
+  // LIST enablement — 9 challenger messages
+  if(D.list_challenger) {
+    var listEnHtml = '<strong style="font-size:12px">9 LIST Challenger Messages</strong><ol style="margin-top:8px;font-size:12px;padding-left:20px">';
+    D.list_challenger.forEach(function(msg) { listEnHtml += '<li style="margin-bottom:6px">'+msg+'</li>'; });
+    listEnHtml += '</ol>';
+    setInnerDef('listEnablement', listEnHtml);
+  }
+
+  // SELL enablement — buyer onboarding steps + benchmarks
+  if(D.sell_buyer_onboarding || D.sell_benchmarks) {
+    var sellEnHtml = '';
+    if(D.sell_buyer_onboarding) {
+      sellEnHtml += '<strong style="font-size:12px">Buyer Onboarding Playbook</strong><ol style="margin-top:8px;font-size:12px;padding-left:20px">';
+      D.sell_buyer_onboarding.forEach(function(step) { sellEnHtml += '<li style="margin-bottom:4px">'+step+'</li>'; });
+      sellEnHtml += '</ol>';
+    }
+    if(D.sell_benchmarks) {
+      sellEnHtml += '<strong style="font-size:12px;display:block;margin-top:12px">Best-in-Class Benchmarks</strong><table class="def-table" style="margin-top:8px"><thead><tr><th>Account</th><th>MaxAge</th><th>Repeat Rate</th><th>Online Sell%</th><th>Buyers</th></tr></thead><tbody>';
+      Object.values(D.sell_benchmarks).forEach(function(b) {
+        sellEnHtml += '<tr><td style="font-weight:600">'+b.name+'</td><td>'+(b.max_age||'—')+'d</td><td style="color:var(--green)">'+(b.repeat_rate_pct ? b.repeat_rate_pct+'%' : '—')+'</td><td>'+(b.online_sell_pct ? b.online_sell_pct+'%' : '—')+'</td><td>'+(b.buyers||'—')+'</td></tr>';
+      });
+      sellEnHtml += '</tbody></table>';
+    }
+    setInnerDef('sellEnablement', sellEnHtml);
+  }
 }
 
 // === TAB SWITCHING ===
