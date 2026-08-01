@@ -677,23 +677,30 @@ function updateFreshnessBanner() {
   var banner = document.getElementById('freshnessBanner');
   if(!banner) return;
   var asOf = '\u2014';
-  var sellCount = 0, buyCount = 0;
+  // Run 11: compute portfolio-specific coverage (how many of 399 accounts have data),
+  // not metadata totals (which count all companies ever queried, not just our portfolio).
+  var sellCov = 0, buyCov = 0, feesCov = 0, vendorsCov = 0;
   if(window.METRICS_V2_SELL && window.METRICS_V2_SELL._metadata) {
     asOf = window.METRICS_V2_SELL._metadata.as_of || asOf;
-    sellCount = window.METRICS_V2_SELL._metadata.total_companies || 0;
+    var sellCos = window.METRICS_V2_SELL.companies || {};
+    sellCov = ACCOUNTS.filter(function(a) { return !!sellCos[a.name]; }).length;
   }
-  if(window.METRICS_V2_BUY && window.METRICS_V2_BUY._metadata) {
-    buyCount = window.METRICS_V2_BUY._metadata.total_companies || 0;
+  if(window.METRICS_V2_BUY && window.METRICS_V2_BUY.companies) {
+    var buyCos = window.METRICS_V2_BUY.companies;
+    buyCov = ACCOUNTS.filter(function(a) { return !!buyCos[a.name]; }).length;
   }
-  var feesCount = 0, vendorsCount = 0;
-  if(window.METRICS_V2_FEES && window.METRICS_V2_FEES._metadata) {
-    feesCount = Object.keys(window.METRICS_V2_FEES.companies || {}).length;
+  if(window.METRICS_V2_FEES && window.METRICS_V2_FEES.companies) {
+    var feesCos = window.METRICS_V2_FEES.companies;
+    feesCov = ACCOUNTS.filter(function(a) { return !!feesCos[a.name]; }).length;
   }
-  if(window.METRICS_V2_VENDORS && window.METRICS_V2_VENDORS._metadata) {
-    vendorsCount = window.METRICS_V2_VENDORS._metadata.total_companies || 0;
+  if(window.METRICS_V2_VENDORS && window.METRICS_V2_VENDORS.companies) {
+    var vendorsCos = window.METRICS_V2_VENDORS.companies;
+    vendorsCov = ACCOUNTS.filter(function(a) { return !!vendorsCos[a.name]; }).length;
   }
-  var coverageNote = (sellCount > 0 || buyCount > 0)
-    ? 'Temporal coverage: ' + sellCount + ' sell / ' + buyCount + ' buy / ' + feesCount + ' fees / ' + vendorsCount + ' vendors companies.'
+  var total = ACCOUNTS.length || 399;
+  var metricsCount = Object.keys(METRICS).length;
+  var coverageNote = (sellCov > 0 || buyCov > 0)
+    ? 'Portfolio V2 coverage: ' + sellCov + '/' + total + ' sell \u00b7 ' + buyCov + '/' + total + ' buy \u00b7 ' + feesCov + '/' + total + ' fees \u00b7 ' + vendorsCov + '/' + total + ' vendors.'
     : 'Temporal data: not loaded.';
   // Fix 10: network totals from pacing JSON or hardcoded fallback
   var networkTotals = '';
@@ -705,7 +712,7 @@ function updateFreshnessBanner() {
   }
   banner.innerHTML = '<strong>Data as of ' + asOf + '.</strong> ' + coverageNote +
     networkTotals +
-    ' \u00b7 Snapshot coverage: 112/399 accounts with metrics (28%).' +
+    ' \u00b7 Static metrics: ' + metricsCount + '/' + total + ' accounts (' + Math.round(100*metricsCount/total) + '%).' +
     ' <span style="color:#64748b;margin-left:8px">Fields marked <em>MISSING</em> = data not yet available, not zero.</span>';
 }
 
