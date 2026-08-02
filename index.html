@@ -591,6 +591,12 @@ async function loadData() {
     fetch(base+'metrics_v2_buyers_full.json').then(function(r){return r.json();}).then(function(d){
       window.BUYERS_FULL = d;
     }).catch(function(){ window.BUYERS_FULL = null; }),
+    fetch(base+'skus_online_offline.json').then(function(r){return r.json();}).then(function(d){
+      window.SKUS_ONLINE_OFFLINE = d;
+    }).catch(function(){ window.SKUS_ONLINE_OFFLINE = null; }),
+    fetch(base+'product_division_gmv.json').then(function(r){return r.json();}).then(function(d){
+      window.PRODUCT_DIVISION = d;
+    }).catch(function(){ window.PRODUCT_DIVISION = null; }),
   ]);
 
   updateFreshnessBanner();
@@ -632,6 +638,17 @@ function getV2Fees(name) {
   var companies = window.METRICS_V2_FEES.companies;
   for(var key in companies) {
     if(normName(key) === n) return companies[key];
+  }
+  return null;
+}
+
+// Product division GMV lookup (hardgoods / plants / fresh cut) by company name
+function findProductDivision(name) {
+  if(!name || !window.PRODUCT_DIVISION || !window.PRODUCT_DIVISION.companies) return null;
+  var n = normName(name);
+  for(var i = 0; i < window.PRODUCT_DIVISION.companies.length; i++) {
+    var co = window.PRODUCT_DIVISION.companies[i];
+    if(normName(co.company_name) === n) return co;
   }
   return null;
 }
@@ -936,6 +953,16 @@ function findConcentrationV2(name) {
   });
 }
 
+// Find SKU online/offline counts for a company by name (normName match)
+function findSkuData(name) {
+  if(!name || !window.SKUS_ONLINE_OFFLINE || !window.SKUS_ONLINE_OFFLINE.companies) return null;
+  var n = normName(name);
+  for(var key in window.SKUS_ONLINE_OFFLINE.companies) {
+    if(normName(key) === n) return window.SKUS_ONLINE_OFFLINE.companies[key];
+  }
+  return null;
+}
+
 // Find offline time depth for a company by name (normName match)
 function findOfflineTimeDepth(name) {
   if(!name || !window.TIME_DEPTH_OFFLINE || !window.TIME_DEPTH_OFFLINE.offline) return null;
@@ -1065,6 +1092,12 @@ function getOpportunities(acct) {
     // FIX 2026-07-31: labeled as "scenario estimate" (not "potential") — AOV source has documented fan-out; figure is directional.
     var scenarioStr = scenarioGmv ? ' Scenario estimate: ~'+fmt$(scenarioGmv)+' in online GMV if converted (directional \u2014 AOV source may overstate).' : '';
     addLead({text:offlineBuyers+' buyers only purchase offline.'+scenarioStr, type:'sell', gmv_impact: scenarioGmv, priority:2, action:'Identify top offline buyers by volume. Start with buyers who already have eShop access.'});
+  }
+
+  // S6: Hard Goods offline — no eShop catalog for non-flower products
+  var pdOpp = findProductDivision(acct.name);
+  if(pdOpp && (pdOpp.hardgoods_gmv_offline || 0) > 10000 && (pdOpp.hardgoods_gmv_online || 0) < 100) {
+    addLead({text:'Hard Goods: ' + fmt$(pdOpp.hardgoods_gmv_offline) + ' sold offline, not online. Structural gap \u2014 no eShop catalog for non-flower products.', type:'list', gmv_impact: pdOpp.hardgoods_gmv_offline, priority:3, action:'Verify whether Hard Goods are listed in eShop. If not, explore catalog activation for non-flower SKUs.', source:'product_division_gmv.json', outcome_metric:'hardgoods_gmv_online > 0'});
   }
 
   // === BUY OPPORTUNITIES ===
@@ -2245,6 +2278,16 @@ function renderAccounts() {
       html += '<td style="text-align:right;padding:4px 8px;color:var(--amber)">'+(buyOfflineVarieties != null ? fmtN(buyOfflineVarieties) : '<span style="color:var(--amber);font-size:10px">needs data</span>')+'</td>';
       html += '<td style="padding:4px 8px;color:var(--red)">'+(buyVarietyGap != null && buyVarietyGap > 0 ? fmtN(buyVarietyGap)+' not online' : (buyOnlineVarieties != null && buyOfflineVarieties != null ? '\u2014' : ''))+'</td></tr>';
 
+      // Row: SKUs (online vs offline) — from skus_online_offline.json
+      var buySkuData = findSkuData(a.name);
+      var buyOnlineSkus = buySkuData ? buySkuData.online_skus : null;
+      var buyOfflineSkus = buySkuData ? buySkuData.offline_skus : null;
+      var buySkuGap = (buyOnlineSkus != null && buyOfflineSkus != null && buyOfflineSkus > buyOnlineSkus) ? (buyOfflineSkus - buyOnlineSkus) : null;
+      html += '<tr><td style="padding:4px 8px">SKUs</td>';
+      html += '<td style="text-align:right;padding:4px 8px;color:var(--green)">'+(buyOnlineSkus != null ? fmtN(buyOnlineSkus) : '\u2014')+'</td>';
+      html += '<td style="text-align:right;padding:4px 8px;color:var(--amber)">'+(buyOfflineSkus != null ? fmtN(buyOfflineSkus) : '\u2014')+'</td>';
+      html += '<td style="padding:4px 8px;color:var(--red)">'+(buySkuGap != null && buySkuGap > 0 ? fmtN(buySkuGap)+' not online' : (buyOnlineSkus != null && buyOfflineSkus != null ? '\u2014' : ''))+'</td></tr>';
+
       // Row: Procurement $
       var procOnlineDisplay = buyOnline > 0 ? fmt$(buyOnline) : '\u2014';
       var procOfflineDisplay = buyOffline > 0 ? fmt$(buyOffline) : '\u2014';
@@ -2397,10 +2440,14 @@ function renderAccounts() {
       html += '<td style="padding:3px 6px">'+(listOnlineVarieties != null ? fmtN(listOnlineVarieties)+varBmStr : '\u2014')+'</td>';
       html += '<td style="padding:3px 6px">'+(listOfflineVarieties != null ? fmtN(listOfflineVarieties) : '<span style="color:var(--amber);font-size:10px">needs data</span>')+'</td>';
       html += '<td style="padding:3px 6px;color:var(--red)">'+(listVarietyGap != null && listVarietyGap > 0 ? fmtN(listVarietyGap)+' not listed online' : (listOnlineVarieties != null && listOfflineVarieties != null ? '\u2014' : ''))+'</td></tr>';
+      var listSkuData = findSkuData(a.name);
+      var listOfflineSkus = listSkuData ? listSkuData.offline_skus : null;
+      var listOnlineSkus = listUsage ? listUsage.distinct_skus : (listSkuData ? listSkuData.online_skus : null);
+      var listSkuGap = (listOnlineSkus != null && listOfflineSkus != null && listOfflineSkus > listOnlineSkus) ? (listOfflineSkus - listOnlineSkus) : null;
       html += '<tr><td style="padding:3px 6px;font-weight:600">SKUs</td>';
-      html += '<td style="padding:3px 6px">'+(listUsage ? fmtN(listUsage.distinct_skus) : '\u2014')+'</td>';
-      html += '<td style="padding:3px 6px"><span style="color:var(--amber);font-size:10px">needs data</span></td>';
-      html += '<td style="padding:3px 6px"></td></tr>';
+      html += '<td style="padding:3px 6px">'+(listOnlineSkus != null ? fmtN(listOnlineSkus) : '\u2014')+'</td>';
+      html += '<td style="padding:3px 6px">'+(listOfflineSkus != null ? fmtN(listOfflineSkus) : '\u2014')+'</td>';
+      html += '<td style="padding:3px 6px;color:var(--red)">'+(listSkuGap != null && listSkuGap > 0 ? fmtN(listSkuGap)+' not listed online' : (listOnlineSkus != null && listOfflineSkus != null ? '\u2014' : ''))+'</td></tr>';
     }
     // Row: Time depth — FIX 6: show both online and offline indicators, reference the 3-bar chart below
     var listMaxAge = cfg && cfg.max_age != null ? cfg.max_age : null;
@@ -2470,7 +2517,29 @@ function renderAccounts() {
         });
       }
 
-      // 3. Category TAM — from supply_matrix sell_coverage + gap_categories
+      // 3. SKU TAM — from skus_online_offline.json
+      var tamSkuData = findSkuData(a.name);
+      var tamSkuOnline = tamSkuData ? tamSkuData.online_skus : null;
+      var tamSkuOffline = tamSkuData ? tamSkuData.offline_skus : null;
+      if(tamSkuOnline != null && tamSkuOffline != null && tamSkuOffline > tamSkuOnline) {
+        var tamSkuGap = tamSkuOffline - tamSkuOnline;
+        var tamSkuV2Sell = v2Sell || getV2Sell(a.name);
+        var tamSkuSellOffline = tamSkuV2Sell && tamSkuV2Sell.sell_offline ? getV2Val(tamSkuV2Sell.sell_offline, tf) : null;
+        if(tamSkuSellOffline == null && met) tamSkuSellOffline = met.sell_offline;
+        var tamSkuEst = null;
+        if(tamSkuSellOffline != null && tamSkuOffline > 0) {
+          tamSkuEst = (tamSkuGap / tamSkuOffline) * tamSkuSellOffline;
+        }
+        tamRows.push({
+          dimension: 'SKUs',
+          gap: fmtN(tamSkuGap) + ' SKUs sold offline but not online (' + fmtN(tamSkuOnline) + ' online vs ' + fmtN(tamSkuOffline) + ' offline)',
+          estimate: tamSkuEst != null ? '~' + fmt$(tamSkuEst) : null,
+          label: 'directional estimate of GMV not visible online',
+          severity: tamSkuGap > 2000 ? 'high' : 'medium'
+        });
+      }
+
+      // 4. Category TAM — from supply_matrix sell_coverage + gap_categories
       var tamSupSell = findSupplySell(a.name);
       var tamGapCat = findGapCategories(a.name);
       if(tamSupSell && tamGapCat && tamGapCat.gap_categories > 0) {
@@ -2507,7 +2576,7 @@ function renderAccounts() {
           html += '</tr>';
         });
         html += '</tbody></table>';
-        html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;padding:2px 0 4px">Source: time_depth_offline.json (offline varieties), loop2_list_usage_v2.json (online varieties), supply_matrix_full.json (categories), metrics_v2_sell.json (offline GMV).</div>';
+        html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;padding:2px 0 4px">Source: time_depth_offline.json (offline varieties), loop2_list_usage_v2.json (online varieties), skus_online_offline.json (SKUs), supply_matrix_full.json (categories), metrics_v2_sell.json (offline GMV).</div>';
       }
     })();
 
@@ -2767,6 +2836,34 @@ function renderAccounts() {
       });
       html += '<div style="margin-top:4px;font-size:11px;color:var(--text-muted)"><strong>Channels:</strong> ' + chParts.join(' \u00b7 ') + '</div>';
     }
+    // PRODUCT MIX (hardgoods / plants / fresh cut — from product_division_gmv.json)
+    var pd = findProductDivision(a.name);
+    if(pd) {
+      var pdParts = [];
+      // Fresh Cut
+      if((pd.freshcut_gmv_total || 0) > 0) {
+        var fcPct = pd.freshcut_gmv_total > 0 ? (pd.freshcut_gmv_online / pd.freshcut_gmv_total * 100) : 0;
+        pdParts.push('Fresh Cut: ' + fmt$(pd.freshcut_gmv_online) + ' online / ' + fmt$(pd.freshcut_gmv_offline) + ' offline \u2014 ' + fcPct.toFixed(0) + '% online');
+      }
+      // Hard Goods
+      if((pd.hardgoods_gmv_total || 0) > 0) {
+        if(pd.hardgoods_gmv_total > 1000 && (pd.hardgoods_gmv_online || 0) === 0) {
+          pdParts.push('<span style="color:var(--amber);font-weight:600">Hard Goods: ' + fmt$(pd.hardgoods_gmv_total) + ' offline, not sold online</span>');
+        } else {
+          var hgPct = pd.hardgoods_gmv_total > 0 ? (pd.hardgoods_gmv_online / pd.hardgoods_gmv_total * 100) : 0;
+          pdParts.push('Hard Goods: ' + fmt$(pd.hardgoods_gmv_online) + ' online / ' + fmt$(pd.hardgoods_gmv_offline) + ' offline \u2014 ' + hgPct.toFixed(0) + '% online');
+        }
+      }
+      // Plants
+      if((pd.plants_gmv_total || 0) > 0) {
+        var plPct = pd.plants_gmv_total > 0 ? (pd.plants_gmv_online / pd.plants_gmv_total * 100) : 0;
+        pdParts.push('Plants: ' + fmt$(pd.plants_gmv_online) + ' online / ' + fmt$(pd.plants_gmv_offline) + ' offline \u2014 ' + plPct.toFixed(0) + '% online');
+      }
+      if(pdParts.length > 0) {
+        html += '<div style="margin-top:5px;font-size:11px"><span style="color:var(--text-muted);font-weight:600">Product Mix:</span> <div style="margin-top:2px;padding-left:8px;line-height:1.7">' + pdParts.join('<br>') + '</div></div>';
+      }
+    }
+
     var sf = findSellFormat(a.name);
     if(sf) {
       html += '<div style="font-size:11px;margin-top:4px"><span style="color:var(--text-muted)">Format:</span> Boxes '+(sf.online_pct_boxes||0).toFixed(0)+'% \u00b7 Bunches '+(sf.online_pct_bunches||0).toFixed(0)+'% <span style="color:var(--text-muted)">\u00b7 Short '+(sf.online_pct_short||0).toFixed(0)+'% / Forward '+(sf.online_pct_forward||0).toFixed(0)+'%</span></div>';
