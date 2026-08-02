@@ -1288,6 +1288,9 @@ function renderAccounts() {
     return true;
   });
 
+  // Expose filtered account set so lead lists (and other consumers) respond to portfolio filters
+  window.FILTERED_ACCOUNTS = filtered;
+
   // Enrich for sorting
   filtered = filtered.map(function(a) {
     var id = a.company_id;
@@ -2903,6 +2906,9 @@ function renderAccounts() {
       }
     });
   });
+
+  // Refresh lead lists to match the current portfolio filter
+  renderLeadLists();
 }
 
 // === HEALTH SUMMARY (Tab 2) — elements may not exist in current HTML; guards prevent JS errors ===
@@ -3090,9 +3096,18 @@ function renderOpps() {
     metricCard('If +10% Online', '+'+fmt$(uplift10)+' fees', 'at 0.5% take-rate on new online') +
     metricCard('If +25% Online', '+'+fmt$(uplift25)+' fees', 'at 0.5% take-rate on new online'));
 
-  // Run 10: Wire ALL 4 lead list tabs from getOpportunities()
+  // Lead lists are filter-aware — delegate to renderLeadLists() which reads FILTERED_ACCOUNTS
+  renderLeadLists();
+}
+
+// === LEAD LISTS (filter-aware) ===
+// Iterates window.FILTERED_ACCOUNTS (set by renderAccounts) so lead tabs always match
+// the active portfolio filter. Falls back to all ACCOUNTS when called before any filter runs.
+function renderLeadLists() {
+  function setInner(id, html) { var el = document.getElementById(id); if(el) el.innerHTML = html; }
+  var source = window.FILTERED_ACCOUNTS || ACCOUNTS;
   var configLeads = [], buyLeads = [], listLeads = [], sellLeads = [];
-  ACCOUNTS.forEach(function(a) {
+  source.forEach(function(a) {
     var opps = getOpportunities(a);
     opps.forEach(function(o) {
       if(o.type === 'config') configLeads.push({name: a.name, lead: o});
@@ -3111,10 +3126,13 @@ function renderOpps() {
         '<span style="display:block;font-size:9px;margin-top:2px">'+o.status+' \u00b7 prerequisite: '+o.prerequisite+' \u00b7 source: '+o.source+'</span></span></div>';
     }).join('') + '</div>';
   }
-  setInner('configLeadList', '<strong style="font-size:12px">'+configLeads.length+' config leads detected</strong><div style="margin-top:8px">'+renderLeadCards(configLeads, 'No CONFIG leads detected')+'</div>');
-  setInner('buyLeadList', '<strong style="font-size:12px">'+buyLeads.length+' BUY leads detected</strong><div style="margin-top:8px">'+renderLeadCards(buyLeads, 'No BUY leads detected')+'</div>');
-  setInner('listLeadList', '<strong style="font-size:12px">'+listLeads.length+' LIST leads detected</strong><div style="margin-top:8px">'+renderLeadCards(listLeads, 'No LIST leads detected')+'</div>');
-  setInner('sellLeadList', '<strong style="font-size:12px">'+sellLeads.length+' SELL leads detected</strong><div style="margin-top:8px">'+renderLeadCards(sellLeads, 'No SELL leads detected')+'</div>');
+  var filterNote = (window.FILTERED_ACCOUNTS && window.FILTERED_ACCOUNTS.length < ACCOUNTS.length)
+    ? ' <span style="font-size:10px;color:var(--text-muted);font-weight:400">(filtered: '+window.FILTERED_ACCOUNTS.length+' of '+ACCOUNTS.length+' accounts)</span>'
+    : '';
+  setInner('configLeadList', '<strong style="font-size:12px">'+configLeads.length+' config leads detected'+filterNote+'</strong><div style="margin-top:8px">'+renderLeadCards(configLeads, 'No CONFIG leads detected')+'</div>');
+  setInner('buyLeadList', '<strong style="font-size:12px">'+buyLeads.length+' BUY leads detected'+filterNote+'</strong><div style="margin-top:8px">'+renderLeadCards(buyLeads, 'No BUY leads detected')+'</div>');
+  setInner('listLeadList', '<strong style="font-size:12px">'+listLeads.length+' LIST leads detected'+filterNote+'</strong><div style="margin-top:8px">'+renderLeadCards(listLeads, 'No LIST leads detected')+'</div>');
+  setInner('sellLeadList', '<strong style="font-size:12px">'+sellLeads.length+' SELL leads detected'+filterNote+'</strong><div style="margin-top:8px">'+renderLeadCards(sellLeads, 'No SELL leads detected')+'</div>');
 }
 
 // === DEFINITIONS (Tab 4) ===
