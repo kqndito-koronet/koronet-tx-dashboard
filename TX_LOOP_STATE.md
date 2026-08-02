@@ -65,6 +65,25 @@
 **Finding 2:** Duplicate account name in accounts.json ("LD Trading" 2x)
 **State:** NEEDS_DECISION (Facu: keep both or deduplicate?)
 
+### Cycle 7: LIST TAM quantification (semantic layer)
+**Problem:** TAM lost only showed bunches. Varieties and categories gap not quantified in $.
+**Change:** "TAM Not Visible Online" section: variety gap × sell_offline = directional estimate; category gap × avg GMV/cat
+**Fixtures:** Kennicott variety gap 3,717 → ~$24.9M (PASS). Category gap 2 → ~$1.8M (PASS).
+**Evaluator:** 9/10
+**State:** VERIFIED
+**Commit:** `7b7d836`
+
+### Cycle 8: Lead tabs respond to filters (frontend/routing)
+**Problem:** Lead lists showed all 399 accounts regardless of active portfolio filters
+**Change:** FILTERED_ACCOUNTS stored by renderAccounts(); renderLeadLists() iterates filtered set
+**Fixtures:** P1 filter → fewer leads; All → all leads. Filter indicator shows "(filtered: N of 399)"
+**Evaluator:** 9/10
+**State:** VERIFIED
+**Commit:** `9dbcdb4`
+
+### Cycle 9: Enablement content verification (in progress)
+**State:** IN_PROGRESS
+
 ## Card rotation order
 POTENTIAL → OPPORTUNITIES → BUY → LIST → SELL → PORTFOLIO → META REVIEW → repeat
 
