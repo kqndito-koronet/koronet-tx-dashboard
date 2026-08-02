@@ -38,6 +38,33 @@
 **Commit:** `fc89958`
 **Next systemic problem:** Assess remaining coverage gaps and pick highest impact
 
+### Cycle 4: Cross-card consistency (semantic layer)
+**Problem:** Portfolio take rate (0.078%) ≠ POTENTIAL (0.199%) — portfolio excluded indirect fees
+**Change:** Portfolio take rate formula now includes indirect est. (1.5% × buy_online)
+**Fixtures:** Kennicott — both surfaces now show ~0.199%. DKAY (WH_PROC, buy-only) — take rate = 0 (correct, no sell GMV).
+**State:** VERIFIED
+**Commit:** `afe5301`
+
+### Cycle 5: Outcome spine schema (data pipeline contract)
+**Problem:** No canonical definition for daily per-account snapshot
+**Change:** outcome_spine_schema.json with field definitions, sources, delta rules
+**Fixtures:** Kennicott all fields present; DKAY buy-only (expected)
+**State:** VERIFIED (schema). First snapshot = Cycle 6.
+**Commit:** `925ed6e`
+
+### Cycle 6: First outcome spine snapshot (data pipeline)
+**Problem:** No snapshot exists yet — can't compute real day-over-day deltas
+**Change:** Rose generating outcome_spine_2026-08-02.json from Snowflake
+**State:** IN_PROGRESS
+
+### Cycle 6b: Codex audit findings
+**Problem:** Coverage banner shows lower numbers than expected (V2 files have companies not in portfolio)
+**Finding:** Fees 188/399 (47%), Vendors 262/399 (66%) — honest but lower than raw file totals (244, 322)
+**Root cause:** Rose queried ALL Snowflake companies; ~20-25% not in 399-account portfolio
+**State:** DOCUMENTED (not a bug — banner is honest). Consider expanding portfolio in future.
+**Finding 2:** Duplicate account name in accounts.json ("LD Trading" 2x)
+**State:** NEEDS_DECISION (Facu: keep both or deduplicate?)
+
 ## Card rotation order
 POTENTIAL → OPPORTUNITIES → BUY → LIST → SELL → PORTFOLIO → META REVIEW → repeat
 
