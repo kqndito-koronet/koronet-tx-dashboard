@@ -2429,6 +2429,85 @@ function renderAccounts() {
     html += '<td style="padding:3px 6px;color:var(--red);font-size:10px">'+listBunchTam+'</td></tr>';
     html += '</tbody></table>';
 
+    // TAM NOT VISIBLE ONLINE — variety + category gaps with directional $ estimates
+    (function() {
+      var tamRows = [];
+
+      // 1. Bunches TAM (already shown inline in table above, but also include here as anchor)
+      if(listBunchFlag === false && bun && bun.sells_bunches && bun.total_bunch_gmv > 0) {
+        tamRows.push({
+          dimension: 'Bunches',
+          gap: 'OFF — retail segment blocked',
+          estimate: fmt$(bun.total_bunch_gmv),
+          label: 'offline bunch GMV not visible online',
+          severity: 'high'
+        });
+      }
+
+      // 2. Variety TAM — from offline time_depth_offline vs list_usage (online varieties)
+      var tamListUsage = findListUsage(a.company_id);
+      var tamTdOffline = findOfflineTimeDepth(a.name);
+      var tamOnlineVar = tamListUsage ? tamListUsage.distinct_varieties : null;
+      var tamOfflineVar = tamTdOffline ? tamTdOffline.total_varieties : null;
+      if(tamOnlineVar != null && tamOfflineVar != null && tamOfflineVar > tamOnlineVar) {
+        var tamVarGap = tamOfflineVar - tamOnlineVar;
+        var tamV2Sell = v2Sell || getV2Sell(a.name);
+        var tamSellOffline = tamV2Sell && tamV2Sell.sell_offline ? getV2Val(tamV2Sell.sell_offline, tf) : null;
+        if(tamSellOffline == null && met) tamSellOffline = met.sell_offline;
+        var tamVarEst = null;
+        if(tamSellOffline != null && tamOfflineVar > 0) {
+          tamVarEst = (tamVarGap / tamOfflineVar) * tamSellOffline;
+        }
+        tamRows.push({
+          dimension: 'Varieties',
+          gap: fmtN(tamVarGap) + ' sold offline but not online (' + fmtN(tamOnlineVar) + ' online vs ' + fmtN(tamOfflineVar) + ' offline)',
+          estimate: tamVarEst != null ? '~' + fmt$(tamVarEst) : null,
+          label: 'directional estimate of GMV not visible online',
+          severity: tamVarGap > 1000 ? 'high' : 'medium'
+        });
+      }
+
+      // 3. Category TAM — from supply_matrix sell_coverage + gap_categories
+      var tamSupSell = findSupplySell(a.name);
+      var tamGapCat = findGapCategories(a.name);
+      if(tamSupSell && tamGapCat && tamGapCat.gap_categories > 0) {
+        var tamTotalCats = tamSupSell.total_categories_sold;
+        var tamGapCatN = tamGapCat.gap_categories;
+        var tamAvgGmvPerCat = tamSupSell.total_sell_gmv && tamTotalCats > 0 ? tamSupSell.total_sell_gmv / tamTotalCats : null;
+        var tamCatEst = tamAvgGmvPerCat != null ? tamGapCatN * tamAvgGmvPerCat : null;
+        tamRows.push({
+          dimension: 'Categories',
+          gap: tamGapCatN + ' categor' + (tamGapCatN === 1 ? 'y' : 'ies') + ' sold offline but not online (' + tamTotalCats + ' total)',
+          estimate: tamCatEst != null ? '~' + fmt$(tamCatEst) : null,
+          label: 'directional estimate (' + fmt$(Math.round(tamAvgGmvPerCat || 0)) + ' avg GMV/category)',
+          severity: tamGapCatN >= 5 ? 'high' : 'medium'
+        });
+      }
+
+      if(tamRows.length > 0) {
+        html += '<div style="margin:10px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:#7c3aed;letter-spacing:0.5px">TAM Not Visible Online</div>';
+        html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:5px">Each dimension not online = volume invisible to buyers. Estimates are directional — not potential, not forecast.</div>';
+        html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:6px">';
+        html += '<thead><tr style="border-bottom:1px solid var(--border);text-align:left">';
+        html += '<th style="padding:3px 8px;color:var(--text-muted)">Dimension</th>';
+        html += '<th style="padding:3px 8px;color:var(--text-muted)">Gap</th>';
+        html += '<th style="padding:3px 8px;color:var(--text-muted)">Est. GMV Hidden</th>';
+        html += '</tr></thead><tbody>';
+        tamRows.forEach(function(r) {
+          var estHtml = r.estimate
+            ? '<span style="color:var(--red);font-weight:600">'+r.estimate+'</span> <span style="font-size:10px;color:var(--text-muted)">'+r.label+'</span>'
+            : '<span style="color:var(--text-muted);font-size:10px">—</span>';
+          html += '<tr style="border-bottom:1px solid #f1f5f9">';
+          html += '<td style="padding:3px 8px;font-weight:600">'+r.dimension+'</td>';
+          html += '<td style="padding:3px 8px;color:var(--amber)">'+r.gap+'</td>';
+          html += '<td style="padding:3px 8px">'+estHtml+'</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table>';
+        html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic;padding:2px 0 4px">Source: time_depth_offline.json (offline varieties), loop2_list_usage_v2.json (online varieties), supply_matrix_full.json (categories), metrics_v2_sell.json (offline GMV).</div>';
+      }
+    })();
+
     // TIME DEPTH BREAKDOWN (from loop2_list_time_depth_v2) — ONLINE + OFFLINE + BEST-IN-CLASS
     var tdV2 = findListTimeDepthV2(a.company_id);
     var tdOffline = findOfflineTimeDepth(a.name);
