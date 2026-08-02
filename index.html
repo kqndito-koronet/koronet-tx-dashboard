@@ -1373,9 +1373,12 @@ function renderAccounts() {
     var buyPen = (estBuyVal > 0 && koronetBuyAnnualized) ? (koronetBuyAnnualized / estBuyVal * 100) : null;
     var onlineBuyPct = (koronetBuy > 0) ? (onlineBuy / koronetBuy * 100) : null;
 
-    // Take Rate = fees / (sell_total + proc_total)
+    // Take Rate = (direct fees + indirect est.) / (sell + buy GMV)
+    // Must match POTENTIAL card formula for cross-card consistency
+    var indirectEst = (onlineBuy || 0) * 0.015;
+    var feesWithIndirect = (fees || 0) + indirectEst;
     var totalGmv = (koronetSell || 0) + (koronetBuy || 0);
-    var takeRate = (totalGmv > 0 && fees) ? (fees / totalGmv * 100) : null;
+    var takeRate = (totalGmv > 0 && feesWithIndirect > 0) ? (feesWithIndirect / totalGmv * 100) : null;
 
     // Trend: use V2 YoY delta for sell_total (primary metric)
     // Always use YoY regardless of selected timeframe (trend = YoY signal)
