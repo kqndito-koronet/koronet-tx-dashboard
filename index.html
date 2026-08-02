@@ -498,7 +498,9 @@ var ACTIVE_TIMEFRAME = 'ytd';
 
 async function loadData() {
   var base = 'data/';
-  var results = await Promise.all([
+  var results;
+  try {
+    results = await Promise.all([
     fetch(base+'accounts.json').then(function(r){return r.json();}),
     fetch(base+'metrics.json').then(function(r){return r.json();}),
     fetch(base+'config.json').then(function(r){return r.json();}),
@@ -522,6 +524,11 @@ async function loadData() {
     fetch(base+'loop2_phase1v2_buyers.json').then(function(r){return r.json();}).catch(function(){return [];}),
     fetch(base+'loop2_sell_format_time_v2.json').then(function(r){return r.json();}).catch(function(){return {sell_format_time:[]};}),
   ]);
+  } catch(err) {
+    var banner = document.getElementById('freshnessBanner');
+    if(banner) banner.innerHTML = '<strong style="color:var(--red)">&#9888; Error loading data — check that JSON files are accessible. ' + (err.message || err) + '</strong>';
+    return;
+  }
   ACCOUNTS=results[0]; METRICS=results[1]; CONFIG=results[2]; BUNCHES=results[3]; SFDC=results[4]; CHRISTINE=results[5]; DEFINITIONS=results[6];
   BUYERS=results[7]; SELL_BY_CHANNEL=results[8]; BUYER_CONCENTRATION=results[9]; REPEAT_RATE=results[10]; SUPPLY_MATRIX=results[11];
   var BUY_DETAIL=results[12]; var SELL_DETAIL=results[13]; var EST_GMV=results[14]; var VENDOR_DETAIL=results[15];
@@ -3065,7 +3072,11 @@ document.getElementById('timeframeSelect').addEventListener('change', function()
   renderAccounts();
 });
 document.getElementById('repFilter').addEventListener('change', renderAccounts);
-document.getElementById('searchInput').addEventListener('input', renderAccounts);
+var _searchTimer = null;
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(renderAccounts, 250);
+});
 document.getElementById('priorityFilter').addEventListener('change', renderAccounts);
 document.getElementById('configFilter').addEventListener('change', renderAccounts);
 document.getElementById('implFilter').addEventListener('change', renderAccounts);
