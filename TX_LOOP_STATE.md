@@ -2,44 +2,96 @@
 
 **Started:** 2026-08-01 ~16:00 PT
 **Ends:** 2026-08-03 ~04:00 PT (36 hours)
-**Mode:** Non-stop card cycles + meta reviews + loop self-improvement
+**Mode:** ACTIVE — v2 loop running. Systemic fixes, not card rotation.
 
 ## Current state
 
 | Field | Value |
 |---|---|
-| Current pass | 1 |
-| Current card | POTENTIAL (running) |
-| Cards completed this pass | 0 |
-| Total pushes | 0 this pass |
-| Loop version | v1 |
+| Current pass | 1 (v2 active) |
+| Current cycle | Lead engine fix VERIFIED, fees data pipeline in progress |
+| Pushes this session | 4 (`cf2f44b`, `e8f9bc8`, `3657127`, fees pending) |
+| Loop version | v2 applied |
+
+## v2 cycle log
+
+### Cycle 1: Lead engine (semantic/lead layer)
+**Problem:** 16 opp types, 4 unsupported/blocked, 3 needs-qualification, duplicate L3/C3
+**Change:** 6 fixes — duplicate removed, segment filters, honest claims, actual take rate
+**Verification:** Kennicott (WH_CORE) ✓, Rosaprima (IMP_K2K excluded) ✓, WH_PROC (excluded) ✓
+**State:** VERIFIED
+**Commit:** `3657127`
+
+### Cycle 2: Fees data pipeline (data layer)
+**Problem:** fees coverage 11/399 = 2%. 388 accounts can't show temporal fees.
+**Change:** Rose querying ALL companies from TRANSACTION_FEES + EXPECTED
+**Verification:** pending Rose completion
+**State:** IN_PROGRESS
+**Next:** Wire metrics_v2_fees_full.json, verify on Tier 1, push
 
 ## Card rotation order
 POTENTIAL → OPPORTUNITIES → BUY → LIST → SELL → PORTFOLIO → META REVIEW → repeat
 
 ## Pass history
 
-### Pass 1 (in progress)
+### Pass 1 (paused after checkpoint)
 | Card | Status | Fixes | Data queries | Learnings |
 |---|---|---|---|---|
-| POTENTIAL | running | — | — | — |
-| OPPORTUNITIES | queued | — | — | — |
-| BUY | queued | — | — | — |
-| LIST | queued | — | — | — |
-| SELL | queued | — | — | — |
-| PORTFOLIO | queued | — | — | — |
-| META | queued | — | — | — |
+| POTENTIAL | completed | Take-rate, penetration, buy-gap and source/qualifier corrections | No new query; existing temporal data wired | A value is not useful without an honest denominator, source and operator guidance |
+| OPPORTUNITIES | completed checkpoint | Opportunity structure, $ impact where viable, benchmarks, links and enablement notes | No new query; uses existing benchmark/data files | A lead requires a source/causal/action contract; a visual opportunity is not automatically an approved rep instruction |
+| BUY | paused | — | — | Must begin with the feedback-to-verification contract, not a free-running card audit |
+| LIST | paused | — | — | Same |
+| SELL | paused | — | — | Same |
+| PORTFOLIO | paused | — | — | Same |
+| META | paused | — | — | Same |
 
 ## Loop improvements (how the loop itself gets better each pass)
 
-### v1 (current)
+### v1 (used for the two completed card checkpoints)
 - Read full scope + card feedback + audit
 - Think field by field
 - Build + push
 - Document enablement notes
 
-### What to improve in v2 (after pass 1)
-TBD — will learn from pass 1 what was slow, what was missed, what was wasteful
+### v2 (required before resuming BUY)
+
+For each feedback item, classify the root layer: **data pipeline**, **semantic
+definition/calculation**, **frontend/routing**, **enablement**, or
+**cross-card consistency**. Then record:
+
+1. exact Facu requirement and observable acceptance criterion;
+2. smallest change and source/data contract affected;
+3. 2–3 account checks plus post-build verification evidence;
+4. final state: `VERIFIED`, `BLOCKED`, or `NEEDS_DECISION` — never merely
+   “applied”; and
+5. cross-card checks for denominator, timeframe, proxy/trust label,
+   prerequisite and lead status.
+
+**Hard gate:** a card cannot advance because it was reviewed or because code
+was committed. It advances only when its chosen feedback items have evidence
+of verification in the MVP validation cohort. Data/semantic failures are
+fixed at their source, not concealed by UI changes.
+
+### Resume sequence (set Aug 1 after current-code audit)
+
+1. **Reconcile the current code, feedback and no-loss inventory:** the
+   inventory is a historical baseline and predates the POTENTIAL/
+   OPPORTUNITIES checkpoints. Update only its affected card entries before
+   treating it as a verification source.
+2. **Lead contract audit before another card build:** classify every current
+   generated opportunity as evidence-backed DRAFT, unsupported/blocked, or
+   ready for a defined verification test. Remove causal wording that the data
+   does not establish; preserve the underlying signal as a hypothesis where
+   useful.
+3. **Validate the account-opening flow on the Tier 1 cohort:** Portfolio
+   selection → POTENTIAL diagnosis → OPPORTUNITIES hypothesis → relevant
+   BUY/LIST/SELL evidence → Deep Dive when needed. Do not redesign cards in
+   isolation.
+4. **Only then resume the next card:** start with the smallest verified gap,
+   not automatically with BUY merely because it is next in the rotation.
+5. **Build daily/weekly measurement after the above baseline is trustworthy:**
+   daily outcome spine + account-specific lever; weekly cycle report separates
+   action, lever movement, outcome movement and learning.
 
 ## Facu feedback queue (check each cycle)
 - Slack DM: U0B9P1F5ALA

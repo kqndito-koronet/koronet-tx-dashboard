@@ -564,7 +564,7 @@ async function loadData() {
       window.METRICS_V2_BUY = d;
     }).catch(function(){ window.METRICS_V2_BUY = null; }),
     // FIX A: load fees V2 (temporal structure with deltas)
-    fetch(base+'metrics_v2_fees.json').then(function(r){return r.json();}).then(function(d){
+    fetch(base+'metrics_v2_fees_full.json').then(function(r){return r.json();}).then(function(d){
       window.METRICS_V2_FEES = d;
     }).catch(function(){ window.METRICS_V2_FEES = null; }),
     // FIX B: load vendors V2 (vendors_active_l30d — L30D active, not lifetime)
