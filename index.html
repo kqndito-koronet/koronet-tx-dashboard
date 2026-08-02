@@ -1285,7 +1285,14 @@ function renderAccounts() {
     else if(tf === 'current_quarter' || tf === 'prior_quarter') tfMultiplier = 4;
     var koronetSellAnnualized = koronetSell != null ? koronetSell * tfMultiplier : null;
     var penetration = (estSell && estSell > 0 && koronetSellAnnualized != null) ? (koronetSellAnnualized / estSell * 100) : null;
-    var fees = m ? m.fees_total : null;
+    // FIX 1 (2026-07-31): use V2 temporal fees for take rate computation — same source as feesDisplay.
+    // Prior bug: fees was always m.fees_total (static YTD) even when timeframe changed.
+    var fees = null;
+    var _v2fEnrich = getV2Fees(a.name);
+    if(_v2fEnrich && _v2fEnrich.fees_total) {
+      fees = getV2Val(_v2fEnrich.fees_total, tf);
+    }
+    if(fees == null) fees = m ? m.fees_total : null;
 
     // BUY columns — V2 preferred, fall back to metrics + est_gmv cascade
     var estData = id ? (window.EST_GMV || {})[id] : null;
@@ -2462,14 +2469,17 @@ function renderAccounts() {
     // --- Card 5: SELL — "¿Vende online?" ---
     html += '<div class="expand-section"><h4>SELL \u2014 \u00bfVende online?</h4>';
 
-    // FIX 7: SELL RESUMEN — show offline metrics prominently from BUYERS_FULL
-    var sellOnlineVal = met ? met.sell_online : 0;
-    var sellOfflineVal = met ? met.sell_offline : 0;
-    var sellOnlinePctVal = met ? met.online_pct : 0;
+    // FIX 7 + FIX-CONSISTENCY (2026-07-31): SELL RESUMEN — use V2 temporal values to match POTENTIAL card.
+    // Prior bug: sellOnlineVal/sellOfflineVal/sellOnlinePctVal were always static met values,
+    // so SELL RESUMEN never updated when timeframe changed, diverging from POTENTIAL.
+    var sellOnlineVal = potSellOnline != null ? potSellOnline : (met ? met.sell_online : 0);
+    var sellOfflineVal = (v2Sell && v2Sell.sell_offline) ? (getV2Val(v2Sell.sell_offline, tf) != null ? getV2Val(v2Sell.sell_offline, tf) : (met ? met.sell_offline : 0)) : (met ? met.sell_offline : 0);
+    var sellOnlinePctVal = potOnlinePct != null ? potOnlinePct : (met ? met.online_pct : 0);
+    var sellTfLabel = (tf !== 'ytd') ? ' <span style="font-size:10px;color:var(--text-muted);font-style:italic">[V2 '+tf.replace('_',' ')+']</span>' : '';
     var sellBf = findBuyersFull(a.name);
     html += '<div style="margin-bottom:6px">';
     html += '<div class="detail-row"><span class="detail-label" style="font-weight:600">RESUMEN</span><span>'
-      + 'Online: ' + fmt$(sellOnlineVal) + ' (' + fmtPct(sellOnlinePctVal) + ')'
+      + 'Online: ' + fmt$(sellOnlineVal) + ' (' + fmtPct(sellOnlinePctVal) + ')' + sellTfLabel
       + ' | Offline: ' + fmt$(sellOfflineVal)
       + '</span></div>';
     // Offline buyer summary from BUYERS_FULL
@@ -2672,9 +2682,12 @@ function renderAccounts() {
   });
   var totalTakeRate = (totals.koronet_sell + totalKoronetBuy) > 0 ? (totalFeesFoot / (totals.koronet_sell + totalKoronetBuy) * 100) : 0;
 
+  // FIX 4 (2026-07-31): Footer totals accumulate static met values (YTD) regardless of timeframe selector.
+  // The individual rows may show V2 temporal values. Add explicit label so reader knows totals are always YTD.
+  var footTfNote = ACTIVE_TIMEFRAME !== 'ytd' ? ' <span style="font-size:10px;font-weight:400;color:var(--amber)" title="Totals row always uses YTD static data. Individual rows may reflect selected timeframe via V2 data.">\u26a0 YTD only</span>' : '';
   tfoot.innerHTML = '<tr class="total-row">' +
     '<td></td>' +
-    '<td>TOTAL ('+totals.count+' shown)</td>' +
+    '<td>TOTAL ('+totals.count+' shown)'+footTfNote+'</td>' +
     '<td></td><td></td><td></td>' +
     '<td style="text-align:right">'+fmt$(totals.est_sell)+'</td>' +
     '<td style="text-align:right">'+fmt$(totals.koronet_sell)+'</td>' +

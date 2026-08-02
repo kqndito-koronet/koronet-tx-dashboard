@@ -23,11 +23,19 @@
 **Commit:** `3657127`
 
 ### Cycle 2: Fees data pipeline (data layer)
-**Problem:** fees coverage 11/399 = 2%. 388 accounts can't show temporal fees.
-**Change:** Rose querying ALL companies from TRANSACTION_FEES + EXPECTED
-**Verification:** pending Rose completion
-**State:** IN_PROGRESS
-**Next:** Wire metrics_v2_fees_full.json, verify on Tier 1, push
+**Problem:** fees coverage 11/399 = 2%.
+**Change:** Rose queried ALL companies → metrics_v2_fees_full.json (244 cos)
+**Verification:** Kennicott $83.8K, Sole $138.5K, Bill Doran $43K, Mayesh $12.5K — all match
+**State:** VERIFIED
+**Commit:** `935c828`
+
+### Cycle 3: Vendor lifecycle data pipeline (data layer)
+**Problem:** vendor lifecycle coverage 7/399 = 1%.
+**Change:** Rose queried ALL companies → metrics_v2_vendors_full.json (322 cos)
+**Verification:** Kennicott 183 active L30D, DKAY 24, AquaRose 0 (renders correctly). as_of bug fixed.
+**State:** VERIFIED
+**Commit:** `fc89958`
+**Next systemic problem:** Assess remaining coverage gaps and pick highest impact
 
 ## Card rotation order
 POTENTIAL → OPPORTUNITIES → BUY → LIST → SELL → PORTFOLIO → META REVIEW → repeat
