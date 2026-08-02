@@ -972,6 +972,49 @@ function getOpportunities(acct) {
   var vd = (window.VENDOR_DETAIL||{})[id];
   var opps = [];
 
+  // One reusable DRAFT contract for every detected opportunity. Individual
+  // rules may refine these fields, but rendered copy must not be the only
+  // place where source, dependency and success condition live.
+  function addLead(lead) {
+    var defaults = {
+      config: {
+        source: 'config.json', prerequisite: 'CONFIG',
+        outcome_metric: 'setting verified + intended supply visible'
+      },
+      buy: {
+        source: 'metrics.json / vendor_detail.json', prerequisite: 'CONFIG',
+        outcome_metric: 'online procurement GMV and online BUY %'
+      },
+      list: {
+        source: 'sales/listing proxies + config.json', prerequisite: 'BUY',
+        outcome_metric: 'supply visibility signal and online SELL GMV'
+      },
+      sell: {
+        source: 'sell/buyer metrics', prerequisite: 'LIST',
+        outcome_metric: 'online SELL GMV, buyer conversion or repeat'
+      }
+    };
+    lead.type = lead.type || 'unknown';
+    lead.action = lead.action || 'Investigate the observed signal before proposing a customer action.';
+    var contract = defaults[lead.type] || {};
+    lead.lead_id = lead.lead_id || ('DRAFT_' + lead.type.toUpperCase() + '_' + (opps.length + 1));
+    lead.status = lead.status || 'DRAFT';
+    lead.trust_level = lead.trust_level || 'INTERPRETATION';
+    lead.source = lead.source || contract.source || 'source not yet mapped';
+    lead.prerequisite = lead.prerequisite || contract.prerequisite || 'needs review';
+    lead.outcome_metric = lead.outcome_metric || contract.outcome_metric || 'needs definition';
+    lead.impact_method = lead.gmv_impact != null ? 'observed gap or labeled scenario; inspect lead text' : 'not quantified';
+    opps.push(lead);
+  }
+
+  function leadMeta(lead) {
+    return '<div style="font-size:9px;color:var(--text-muted);margin-top:2px;padding-left:16px">'
+      + (lead.status || 'DRAFT') + ' \u00b7 prerequisite: ' + (lead.prerequisite || 'needs review')
+      + ' \u00b7 source: ' + (lead.source || 'not mapped')
+      + ' \u00b7 measure: ' + (lead.outcome_metric || 'needs definition')
+      + '</div>';
+  }
+
   // === SELL OPPORTUNITIES (revenue first — highest impact) ===
 
   // S1: Large offline GMV at $0 direct fees
@@ -984,14 +1027,14 @@ function getOpportunities(acct) {
     var tenPctOffline = Math.round(met.sell_offline * 0.10);
     var tenPctFeeEst = Math.round(tenPctOffline * actualRate);
     var rateLabel = (met.fees_total > 0 && met.sell_online > 0) ? fmtPct(actualRate*100)+'% actual take rate' : '0.5% assumed take rate';
-    opps.push({text:fmt$(met.sell_offline)+' selling offline at $0 direct fees. Scenario: if 10% moves online = '+fmt$(tenPctFeeEst)+'/yr in fees ('+rateLabel+').', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Review offline buyer list. Identify top 5 offline buyers for eShop activation.'});
+    addLead({text:fmt$(met.sell_offline)+' selling offline at $0 direct fees. Scenario: if 10% moves online = '+fmt$(tenPctFeeEst)+'/yr in fees ('+rateLabel+').', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Review offline buyer list. Identify top 5 offline buyers for eShop activation.'});
   } else if(met && (ct_id === 'WH_CORE' || ct_id === 'WH_ESUITE') && met.online_pct < 5 && met.sell_total > 100000) {
-    opps.push({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Why is the eShop not being used? Check inventory, pricing, buyer awareness.'});
+    addLead({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Why is the eShop not being used? Check inventory, pricing, buyer awareness.'});
   }
 
   // S2: No eShop — cannot sell online at all
   if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-    opps.push({text:'No eShop. Cannot sell online.', type:'sell', gmv_impact: null, priority:1, action:'Enable eShop. This is a prerequisite for online sales.'});
+    addLead({text:'No eShop detected in account data. Verify setup; without eShop, direct eCommerce selling is not available.', type:'sell', gmv_impact: null, priority:1, action:'Verify eShop setup, then enable it if the account/product profile supports direct online selling.'});
   }
 
   // S3: Low repeat rate (below network median)
@@ -999,13 +1042,13 @@ function getOpportunities(acct) {
   var repeatBm = getBenchmark('4_repeat_rate_pct', acct.ct_id);
   if(repeatData && repeatData.repeat_rate_pct < 40) {
     var rrBmStr = repeatBm ? ' Network median: '+fmtPct(repeatBm.median)+'%.' : '';
-    opps.push({text:'Low repeat rate: '+fmtPct(repeatData.repeat_rate_pct)+'%.'+rrBmStr+' Buyers are not coming back.', type:'sell', gmv_impact: null, priority:2, action:'Check inventory freshness, pricing competitiveness, fulfillment quality.'});
+    addLead({text:'Low repeat-rate signal: '+fmtPct(repeatData.repeat_rate_pct)+'%.'+rrBmStr+' Diagnose why before attributing a cause.', type:'sell', gmv_impact: null, priority:2, action:'Check inventory freshness, pricing competitiveness and fulfillment quality with account evidence.'});
   }
 
   // S4: High buyer concentration (top 5 > 50%)
   var concV2 = findConcentrationV2(acct.name);
   if(concV2 && concV2.top5_pct > 50) {
-    opps.push({text:'Top 5 buyers = '+fmtPct(concV2.top5_pct)+' of online GMV. Concentration risk.', type:'sell', gmv_impact: null, priority:3, action:'Diversify buyer base. Increase new buyer acquisition via eShop visibility.'});
+    addLead({text:'Top 5 buyers = '+fmtPct(concV2.top5_pct)+' of online GMV. Concentration risk.', type:'sell', gmv_impact: null, priority:3, action:'Diversify buyer base. Increase new buyer acquisition via eShop visibility.'});
   }
 
   // S5: Many offline buyers not buying online
@@ -1021,27 +1064,29 @@ function getOpportunities(acct) {
     var scenarioGmv = aovOnline ? Math.round(offlineBuyers * aovOnline * 6) : null; // 6-month scenario estimate
     // FIX 2026-07-31: labeled as "scenario estimate" (not "potential") — AOV source has documented fan-out; figure is directional.
     var scenarioStr = scenarioGmv ? ' Scenario estimate: ~'+fmt$(scenarioGmv)+' in online GMV if converted (directional \u2014 AOV source may overstate).' : '';
-    opps.push({text:offlineBuyers+' buyers only purchase offline.'+scenarioStr, type:'sell', gmv_impact: scenarioGmv, priority:2, action:'Identify top offline buyers by volume. Start with buyers who already have eShop access.'});
+    addLead({text:offlineBuyers+' buyers only purchase offline.'+scenarioStr, type:'sell', gmv_impact: scenarioGmv, priority:2, action:'Identify top offline buyers by volume. Start with buyers who already have eShop access.'});
   }
 
   // === BUY OPPORTUNITIES ===
 
   // B1: Buy stage early — no connections or no purchases
-  if(met) {
+  // Fix 2026-07-31: WH_K2K accounts don't buy inventory (proc_online=0 is expected, not a problem).
+  // buy_stage is derived from proc_online which is always 0 for WH_K2K — skip this check for them.
+  if(met && ct_id !== 'WH_K2K') {
     if(met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY') {
-      opps.push({text:'BUY stage: '+met.buy_stage.replace(/_/g,' ')+'. Needs activation.', type:'buy', gmv_impact: null, priority:2, action:'Activate K2K connections. Each connection requires agreement + selling effort.'});
+      addLead({text:'BUY stage: '+met.buy_stage.replace(/_/g,' ')+'. Needs activation.', type:'buy', gmv_impact: null, priority:2, action:'Activate K2K connections. Each connection requires agreement + selling effort.'});
     }
   }
 
   // B2: K2K inactive connections — investment lost
   if(met && met.k2k_total > 0 && met.k2k_active / met.k2k_total < 0.7) {
     var inactive = met.k2k_total - met.k2k_active;
-    opps.push({text:inactive+'/'+met.k2k_total+' K2K inactive. Each connection required sales effort to establish.', type:'buy', gmv_impact: null, priority:2, action:'Reactivate dormant connections. Identify why they stopped buying.'});
+    addLead({text:inactive+'/'+met.k2k_total+' K2K inactive. Each connection required sales effort to establish.', type:'buy', gmv_impact: null, priority:2, action:'Reactivate dormant connections. Identify why they stopped buying.'});
   }
 
   // B3: Leakage — vendors WITH K2K buying offline
   if(vd && vd.leakage_vendors > 0 && vd.leakage_cost > 0) {
-    opps.push({text:vd.leakage_vendors+' vendors with K2K still buying offline. '+fmt$(vd.leakage_cost)+' recoverable today.', type:'buy', gmv_impact: vd.leakage_cost, priority:1, action:'These vendors already have K2K. Move their procurement online for indirect fee revenue.'});
+    addLead({text:vd.leakage_vendors+' vendors with K2K still buying offline. '+fmt$(vd.leakage_cost)+' recoverable today.', type:'buy', gmv_impact: vd.leakage_cost, priority:1, action:'These vendors already have K2K. Move their procurement online for indirect fee revenue.'});
   }
 
   // B4: Large offline procurement at $0 indirect fees
@@ -1049,7 +1094,7 @@ function getOpportunities(acct) {
     var procOffline = met.proc_total - (met.proc_online || 0);
     if(procOffline > 50000) {
       var potentialIndirect = Math.round(procOffline * 0.015); // 1.5% indirect
-      opps.push({text:fmt$(procOffline)+' in offline procurement at $0 indirect fees. '+fmt$(potentialIndirect)+' potential if moved online.', type:'buy', gmv_impact: procOffline, priority:2, action:'Map offline vendors. Identify K2K connection candidates.'});
+      addLead({text:fmt$(procOffline)+' in offline procurement at $0 indirect fees. '+fmt$(potentialIndirect)+' potential if moved online.', type:'buy', gmv_impact: procOffline, priority:2, action:'Map offline vendors. Identify K2K connection candidates.'});
     }
   }
 
@@ -1061,29 +1106,29 @@ function getOpportunities(acct) {
     var varBm = getBenchmark('8_distinct_varieties', acct.ct_id);
     if(listU && listU.distinct_varieties < 50) {
       var varBmStr = varBm ? ' Segment median: '+Math.round(varBm.median)+' varieties.' : '';
-      opps.push({text:'Low variety coverage: only '+listU.distinct_varieties+' varieties online.'+varBmStr, type:'list', gmv_impact: null, priority:2, action:'Increase variety count. More varieties = more relevant search results for buyers.'});
+      addLead({text:'Low variety coverage: only '+listU.distinct_varieties+' varieties online.'+varBmStr, type:'list', gmv_impact: null, priority:2, action:'Increase variety count. More varieties = more relevant search results for buyers.'});
     } else if(listU && varBm && listU.distinct_varieties < varBm.median * 0.5) {
-      opps.push({text:'Below-median variety count: '+listU.distinct_varieties+' vs segment median '+Math.round(varBm.median)+'.', type:'list', gmv_impact: null, priority:3, action:'Compare variety list to best-in-class. What categories are missing?'});
+      addLead({text:'Below-median variety count: '+listU.distinct_varieties+' vs segment median '+Math.round(varBm.median)+'.', type:'list', gmv_impact: null, priority:3, action:'Compare variety list to best-in-class. What categories are missing?'});
     }
 
     // L2: No long-term inventory
     // Segment filter added 2026-07-31: standing orders / long-term inventory relevance is WH_CORE only per audit.
     var tdV2check = findListTimeDepthV2(id);
     if(ct_id === 'WH_CORE' && tdV2check && (tdV2check.pct_31_90_days === 0 || !tdV2check.pct_31_90_days) && (tdV2check.pct_over_90_days === 0 || !tdV2check.pct_over_90_days)) {
-      opps.push({text:'No long-term inventory listed (0% at 30d+). Buyers planning ahead cannot find this account.', type:'list', gmv_impact: null, priority:2, action:'Enable future inventory visibility. Check MaxAge, Future Sales, and time depth settings.'});
+      addLead({text:'Sales-recency proxy: no online varieties sold in the 30d+ bucket. This does not prove listing depth; verify future availability before diagnosing buyer demand.', type:'list', gmv_impact: null, priority:2, action:'Verify future inventory visibility. Check MaxAge, Future Sales and actual available supply.'});
     }
 
     // L3: Bunches not listed — 95% TAM invisible
     if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
       var listBunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
       var listBunchDollar = listBunchGmvAmt ? ' '+fmt$(listBunchGmvAmt)+' in offline bunch GMV not visible online.' : '.';
-      opps.push({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers'+listBunchDollar, type:'list', gmv_impact: listBunchGmvAmt, priority:1, action:'Enable bunches flag. 5-min fix. Opens the retail buyer segment.'});
+      addLead({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers'+listBunchDollar, type:'list', gmv_impact: listBunchGmvAmt, priority:1, action:'Enable bunches flag. 5-min fix. Opens the retail buyer segment.'});
     }
 
     // L4: No Open Market GMV
     var bdCheck = findBuyDetail(acct.name);
     if(bdCheck && bdCheck.open_market_gmv === 0) {
-      opps.push({text:'No Open Market GMV \u2014 no future inventory uploaded (proxy).', type:'list', gmv_impact: null, priority:3, action:'Check if wholesaler uploads future inventory. Open Market = forward visibility for buyers.'});
+      addLead({text:'No Open Market GMV \u2014 no future inventory uploaded (proxy).', type:'list', gmv_impact: null, priority:3, action:'Check if wholesaler uploads future inventory. Open Market = forward visibility for buyers.'});
     }
 
     // L5: Category gap — offline categories not sold online
@@ -1091,7 +1136,7 @@ function getOpportunities(acct) {
     if(supSell && supSell.total_categories_sold > 0) {
       var offlineCats = supSell.total_categories_sold - (supSell.online_categories_sold || 0);
       if(offlineCats > 3) {
-        opps.push({text:offlineCats+' categories sold offline but not online. Invisible to online buyers.', type:'list', gmv_impact: null, priority:3, action:'Review category gaps. Each missing category = buyers who cannot find what they need online.'});
+        addLead({text:offlineCats+' categories sold offline but not online. Invisible to online buyers.', type:'list', gmv_impact: null, priority:3, action:'Review category gaps. Each missing category = buyers who cannot find what they need online.'});
       }
     }
   }
@@ -1100,19 +1145,19 @@ function getOpportunities(acct) {
 
   if(cfg) {
     if(cfg.max_age === 0 || cfg.max_age === null) {
-      opps.push({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config', gmv_impact: null, priority:1, action:'Set MaxAge to at least 10. Without it, inventory is invisible.'});
+      addLead({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config', gmv_impact: null, priority:1, action:'Set MaxAge to at least 10. Without it, inventory is invisible.'});
     } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
       // FIX 2026-07-31: removed "Benchmark: 300" (single-account, not a network benchmark) and "47% Kennicott" (not generalizable).
-      opps.push({text:'MaxAge='+cfg.max_age+'d. Top accounts use MaxAge 30\u2013300d. Current: '+cfg.max_age+'d \u2014 limits forward inventory visibility. 5-min fix.', type:'config', gmv_impact: null, priority:2, action:'Increase MaxAge. MaxAge=10 means eShop only shows inventory arriving in next 10 days.'});
+      addLead({text:'MaxAge='+cfg.max_age+'d. Top accounts use MaxAge 30\u2013300d. Current: '+cfg.max_age+'d \u2014 limits forward inventory visibility. 5-min fix.', type:'config', gmv_impact: null, priority:2, action:'Increase MaxAge. MaxAge=10 means eShop only shows inventory arriving in next 10 days.'});
     }
     // C3 removed: duplicate of L3 (same trigger, same data). Bunches opp lives in LIST. Audit 2026-07-31.
     if(!cfg.future && acct.ct_id === 'WH_CORE') {
-      opps.push({text:'Future Sales OFF. eShop shows today only \u2014 blocks forward-planned buyers.', type:'config', gmv_impact: null, priority:2, action:'Enable Future Sales to show inventory beyond current on-hand.'});
+      addLead({text:'Future Sales OFF. eShop shows today only \u2014 blocks forward-planned buyers.', type:'config', gmv_impact: null, priority:2, action:'Enable Future Sales to show inventory beyond current on-hand.'});
     }
     // C5: on_hand flag is OFF. Note: on_hand (inventory display) != hideCheckoutWithoutPayment (checkout blocking).
     // This fires as a soft verification prompt, NOT as a confirmed checkout issue. Audit 2026-07-31.
     if(!cfg.on_hand && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      opps.push({text:'On-hand inventory display OFF \u2014 verify if this blocks checkout (hideCheckoutWithoutPayment is a separate setting; confirm on account).', type:'config', gmv_impact: null, priority:3, action:'Check if buyers can checkout. Confirm hideCheckoutWithoutPayment setting directly \u2014 on_hand flag is NOT the same field.'});
+      addLead({text:'On-hand inventory display OFF \u2014 verify if this blocks checkout (hideCheckoutWithoutPayment is a separate setting; confirm on account).', type:'config', gmv_impact: null, priority:3, action:'Check if buyers can checkout. Confirm hideCheckoutWithoutPayment setting directly \u2014 on_hand flag is NOT the same field.'});
     }
   }
 
@@ -1129,10 +1174,11 @@ function getOpportunities(acct) {
 
 // === BOTTLENECK ===
 function computeBottleneck(acct, cfg, met) {
-  if(cfg && (cfg.max_age === 0 || cfg.max_age === null)) return 'GATE: MaxAge=0';
+  if(cfg && (cfg.max_age === 0 || cfg.max_age === null) && acct.ct_id !== 'IMP_CORE') return 'GATE: MaxAge=0';
   if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'GATE: No eShop';
   if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'FORMAT: Bunches OFF';
-  if(met && (met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY')) return 'BUY: No active connections';
+  // Fix 2026-07-31: WH_K2K accounts don't buy inventory — proc_online=0 is expected, not a bottleneck.
+  if(acct.ct_id !== 'WH_K2K' && met && (met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY')) return 'BUY: No active connections';
   if(met && met.buy_stage === 'ACTIVATING') return 'BUY: Activating';
   var buyerData = findBuyerData(acct.company_id);
   if(buyerData && buyerData.online_buyers < 10) return 'SELL: Few online buyers';
@@ -1921,6 +1967,7 @@ function renderAccounts() {
             html += '<div style="font-size:11px;padding:3px 0;padding-left:8px;border-bottom:1px solid rgba(0,0,0,0.04)">';
             html += priorityBadge + grp.icon+' '+o.text+impactBadge;
             if(o.action) html += '<div style="font-size:10px;color:var(--blue);margin-top:1px;padding-left:16px">\u2192 '+o.action+'</div>';
+            html += leadMeta(o);
             html += '</div>';
           });
         });
@@ -1936,6 +1983,7 @@ function renderAccounts() {
           html += '<div style="font-size:11px;padding:3px 0;padding-left:8px;border-bottom:1px solid rgba(0,0,0,0.04)">';
           html += '\ud83d\udd27 '+o.text+impactBadge;
           if(o.action) html += '<div style="font-size:10px;color:var(--blue);margin-top:1px;padding-left:16px">\u2192 '+o.action+'</div>';
+          html += leadMeta(o);
           html += '</div>';
         });
         html += '</div>';
@@ -2965,18 +3013,20 @@ function renderOpps() {
   ACCOUNTS.forEach(function(a) {
     var opps = getOpportunities(a);
     opps.forEach(function(o) {
-      if(o.type === 'config') configLeads.push({name: a.name, text: o.text});
-      if(o.type === 'buy') buyLeads.push({name: a.name, text: o.text});
-      if(o.type === 'list') listLeads.push({name: a.name, text: o.text});
-      if(o.type === 'sell') sellLeads.push({name: a.name, text: o.text});
+      if(o.type === 'config') configLeads.push({name: a.name, lead: o});
+      if(o.type === 'buy') buyLeads.push({name: a.name, lead: o});
+      if(o.type === 'list') listLeads.push({name: a.name, lead: o});
+      if(o.type === 'sell') sellLeads.push({name: a.name, lead: o});
     });
   });
   function renderLeadCards(leads, emptyMsg) {
     if(!leads.length) return '<div style="color:var(--text-muted);font-style:italic">'+emptyMsg+'</div>';
     return '<div style="display:flex;flex-direction:column;gap:6px">' + leads.map(function(l) {
+      var o = l.lead;
       return '<div style="display:flex;gap:10px;padding:6px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;font-size:12px">' +
         '<span style="font-weight:600;min-width:160px;flex-shrink:0">'+l.name+'</span>' +
-        '<span style="color:var(--text-muted)">'+l.text+'</span></div>';
+        '<span style="color:var(--text-muted)">'+o.text+
+        '<span style="display:block;font-size:9px;margin-top:2px">'+o.status+' \u00b7 prerequisite: '+o.prerequisite+' \u00b7 source: '+o.source+'</span></span></div>';
     }).join('') + '</div>';
   }
   setInner('configLeadList', '<strong style="font-size:12px">'+configLeads.length+' config leads detected</strong><div style="margin-top:8px">'+renderLeadCards(configLeads, 'No CONFIG leads detected')+'</div>');

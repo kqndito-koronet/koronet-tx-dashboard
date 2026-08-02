@@ -224,3 +224,267 @@ Feedback directo de Facu durante browser review. Organizado por CARD para tracki
 | Hardgoods visibility | No product_type segmentation in any data source | Rose: new query splitting perishable vs hardgoods |
 | Temporal benchmarks | All benchmarks are point-in-time | Rose: compute benchmarks per period for trending |
 | APPROVED vs DRAFT workflow | All opps shown, no approval gate | Facu decision: define approval workflow |
+
+---
+
+## PRODUCT DEFINITION — Facu working session (Aug 1)
+
+**Status:** AUTHORITATIVE PRODUCT DIRECTION. This preserves Facu's operating
+intent. It is not evidence that any individual account, metric, lead, or
+benchmark is true; those require the normal source and verification gates.
+
+### 1. Two distinct users, one evidence base
+
+| User | Job when opening the dashboard | Required outcome |
+|---|---|---|
+| **Facu / leadership** | Filter the portfolio in different ways to discover accounts doing better or worse, decide which one merits investigation, and open that account. | A clear hypothesis about where to investigate next; routing to the Account Deep Dive when the dashboard cannot answer it. |
+| **CS / Implementation rep or manager** | Receive the approved, account-specific execution lead after the account diagnosis. | Understand why the lead matters, what to say, common client objections, what to do, and an example/case study. |
+
+The dashboard is therefore an **MVP investigation and diagnosis surface first**.
+It becomes an operating surface only when its diagnosis routes a rep to an
+approved, evidence-backed action. It must not pretend that a DRAFT lead is a
+rep instruction.
+
+**Current MVP gap (Facu correction):** the dashboard is **not yet good enough
+to detect and explain leads**. The existing opportunity generator and its
+examples are working hypotheses, not proof that the MVP has this capability.
+MVP acceptance requires that a reviewer can trace each surfaced lead from
+account evidence → explicit logic → honest causal interpretation → why it
+matters → next investigation/action. Until then, it remains DRAFT/under
+validation.
+
+### 2. Facu investigation path (what an account must answer)
+
+1. **Portfolio:** filter by different signals to find accounts performing
+   better/worse and decide which account to investigate.
+2. **Card 1 — POTENTIAL:** understand where Koronet could help the account
+   grow: estimated business, current capture, online/offline capture,
+   monetization and the material opportunity.
+3. **Card 2 — OPPORTUNITIES:** see the prioritized account diagnosis and the
+   list of possible interventions or client-convincing tasks. This is not just
+   config; it connects the revenue opportunity, prerequisites and the action.
+4. **BUY:** compare online and offline procurement; assess what the account
+   should be able to buy online, what prevents it, whether vendor/category/
+   variety coverage exists at short and long horizons, and whether the best
+   growers/importers and exclusive supply are available. Surface connected
+   vendors that were never activated, became dormant, or moved back offline.
+5. **LIST:** if the account buys (especially through Core + Procurement),
+   determine whether it can show that supply in its shop; identify configuration
+   gates, what the available inventory lacks, and why buyers cannot find what
+   they want. Compare against offline sales where valid; otherwise use a
+   labeled best-in-class or competitor reference.
+6. **SELL:** understand who the account's clients are; whether the shop
+   converts existing traffic before more traffic is acquired; and whether
+   offline clients are the first viable activation cohort.
+7. **Account Deep Dive:** open it when the dashboard has identified a
+   consequential hypothesis or data gap that needs account-specific research.
+
+### 2A. Portfolio-to-card reading model (Facu clarification)
+
+**The portfolio must let Facu discover accounts by this reading order — not
+force a single opaque score:**
+
+1. **Company potential:** its estimated total GMV, because that determines the
+   possible scale of both selling and buying.
+2. **Koronet capture:** how much of what it buys and sells already passes
+   through Koronet. Higher existing capture can make an intervention easier;
+   low capture can indicate a larger but less proven opportunity.
+3. **Online share:** the percentage of buying and selling that is online.
+4. **Change:** whether each of the above metrics is improving, flat or
+   declining over a compatible timeframe.
+
+Facu's interpretation is deliberately two-sided: an account can have more or
+less potential **to buy** and independently more or less potential **to
+sell**. The UI must not collapse that distinction into one priority score.
+
+**Required account-opening sequence:**
+
+```text
+Portfolio filters / comparisons
+  → select an account because of potential, capture, online share and/or trend
+  → POTENTIAL: quantify the size and capture gap
+  → OPPORTUNITIES: summarize candidate interventions and their prerequisites
+  → BUY: test supply/procurement feasibility and blockers
+  → LIST: test whether the supply can be made visible and useful in the shop
+  → SELL: test buyer conversion, repeat and the next viable buyer cohort
+  → Account Deep Dive only for the consequential unanswered question
+```
+
+The cards should therefore open as a **progressive investigation**, not as a
+long dashboard dump. Each card needs a one-line conclusion plus a clear
+"continue to [next card] because…" handoff when its answer creates the next
+question.
+
+### 2B. Time dimension: daily client change and weekly operating cycles
+
+The MVP is not only a point-in-time portfolio. There is a defined client list
+that needs to be measured **daily**, so the system can report what changed
+rather than repeatedly show the same snapshot.
+
+```text
+Daily: client-list metric changes, new/removed blockers, new evidence and
+       data freshness/coverage changes
+  → Weekly: report the cycle for each selected client/account: what was
+           investigated, what changed, what was attempted, what remains
+           blocked, and what should be learned or tested next
+```
+
+Daily measurement is a prerequisite for credible weekly reporting. The weekly
+report must distinguish observed metric movement from actions/hypotheses; it
+must not infer causality merely because two things happened in the same week.
+
+### 3. Causal chain that every lead must explain
+
+```text
+BUY: relevant supply can be procured online
+  → LIST: that supply is visible, discoverable and purchasable in the shop
+    → SELL: the right buyers find it, convert and repeat
+```
+
+No BUY/LIST/SELL lead is complete merely because it detects a low metric. It
+must explain the causal break, the affected buyer/client value, and the next
+test or intervention. A downstream SELL recommendation is blocked until its
+BUY/LIST prerequisites are checked.
+
+### 4. Lead families stated by Facu (examples, not asserted facts)
+
+All examples below are **DRAFT lead hypotheses** until their detection logic,
+source, thresholds, target accounts, causal claim and outcome metric are
+defined and approved.
+
+| Lead family | Account question / hypothesis | Execution value to explain |
+|---|---|---|
+| **Config unlocks purchased supply** | A configuration feature may let the account expose what it already bought, reduce waste and make supply visible earlier. | Which setting/change; what inventory becomes visible; expected buyer value; owner and verification. |
+| **Offline assortment gap** | The account's offline sales or market demand may include categories/varieties absent online. | Why the missing assortment makes the shop less viable; what buyer demand is lost; labeled comparison to offline, market or benchmark. |
+| **Short-horizon-only supply** | Inventory may exist mostly for immediate need, while higher-value/planned buyers need medium/long-horizon availability. | Which buyer segment is not being served; what time horizon/supply is missing; why planning depth matters. |
+| **Connected-but-inactive vendor** | A vendor connection may exist but be unactivated, dormant, churned or bypassed offline. | Recoverable procurement/fee opportunity, root cause to validate, and vendor/account owner action. |
+| **Bunches/cooler-to-eShop visibility** | Material offline bunch sales may not be visible online, especially after shop close when buyers plan elsewhere. | The buyer-use moment, configuration/catalog requirement, and a testable activation/cohort path. |
+| **Traffic versus shop readiness** | Before adding traffic, determine whether the shop converts the traffic it already receives. | Whether the first intervention is inventory/pricing/UX/supply readiness or acquisition; use CVR only where attribution is valid. |
+| **Offline-client activation** | Offline buyers may be an immediate, known cohort for digital activation. | Who is eligible, why they are not online, and a measurable conversion/retention outcome. |
+
+### 5. Contract for every lead and its enablement tab
+
+Before a lead is visible as **APPROVED** to CS/Impl, it needs:
+
+1. A plain-language definition of the account situation.
+2. Source, timeframe, coverage and whether it is FACT / INTERPRETATION /
+   ASSUMPTION / OPEN QUESTION.
+3. Detection logic and the specific causal claim (not a correlation dressed up
+   as a recommendation).
+4. BUY → LIST → SELL prerequisite status.
+5. Value at stake: observed value separated from estimated/projection value.
+6. The recommended owner, next action and a measurable outcome.
+7. Enablement: why it matters, talk track, discovery questions, common
+   objections, required evidence, and a real case study when one exists.
+8. A link back to the account evidence and forward to the relevant deep dive
+   or execution surface.
+
+### 6. Cross-card consistency tests implied by this direction
+
+- Portfolio filters must help find an investigation candidate, not just filter
+  rows cosmetically.
+- A POTENTIAL claim must use compatible estimates and timeframes with BUY and
+  SELL; uncertainty is visible rather than silently reconciled in the UI.
+- BUY evidence must be the basis for LIST feasibility; LIST evidence must be
+  the basis for SELL/traffic recommendations.
+- A proxy, benchmark or competitor comparison is never presented as observed
+  account truth.
+- The same lead may surface on a card and an enablement tab, but it has one
+  definition, one status and one source contract.
+
+### 7. MVP validation cohort selected by Facu
+
+**Rule:** A dashboard/card/lead change is not `VERIFIED` until it is tested
+against the relevant members of this cohort. The cohort is a test set, not a
+statement that every account has the same diagnosis or priority.
+
+#### Tier 1 — required before broad MVP use
+
+1. Kennicott
+2. Maple Grove Floral
+3. Zeidler Floral
+4. Ashland Addison
+5. Price's Floral Wholesale
+6. Main Wholesale Florist LLC (including the relevant location context)
+7. Dreisbach Wholesale
+8. Baisch & Skinner
+9. H&T Wholesale Flowers
+10. Arizona Family Florist
+
+#### Tier 2 — expand after Tier 1 passes the relevant checks
+
+1. Avon Valley Floral
+2. WE GOT FLOWERS
+3. Cleveland Plant & Flower Co.
+4. Penn Valley Flora
+5. Arizona Floral Exchange (AFX)
+6. Shamrock
+
+**Per-change test selection:** test the smallest subset of the cohort that
+can falsify the change (for example, a multi-location account for location
+logic, a Core+Procurement account for BUY→LIST feasibility, an implementation
+account for config routing, and an offline-heavy/online-active account for
+channel comparison). Do not claim cohort-wide verification from one account.
+
+#### Third population — daily operating coverage
+
+In addition to the Tier 1 and Tier 2 validation cohorts, the daily change
+system must cover the active account populations labeled **Implementation**,
+**CS P1**, **CS P2**, and **Top Accounts (TA)**. This is the broad operating
+population; it is not interchangeable with the smaller validation cohort.
+
+### 8. Outcome chain for the operating dashboard (Facu definition)
+
+**North-star outcome:** clients buy and sell more **within Koronet**, with
+more of that behavior online, thereby generating transactional fees.
+
+The dashboard/operating loop must learn how to make that outcome happen:
+
+1. Identify and speak with the **right accounts**.
+2. Speak about the **right opportunity** for that account.
+3. Bring the **right solution** (product, configuration, supply, process or
+   commercial intervention).
+4. Influence the client to make the required change — or learn why they do
+   not, how to influence them better, or how to make the change easier.
+5. After the change, measure whether it has the intended effect and help make
+   the desired behavior happen more easily and more often.
+6. If it does not work, learn from the failure and improve prioritization,
+   opportunity selection, solution and influence approach.
+
+These are not six reporting fields. They are the causal learning chain that
+connects a daily account signal and a weekly operating cycle to the actual
+business outcome. Every weekly cycle should make clear where it progressed or
+failed: account selection, diagnosis, solution, client influence, adoption,
+behavioral effect or learning.
+
+### 9. Measurement design: universal outcome spine + account-specific lever
+
+Daily measurement must adapt to the account's active strategy; it must not
+apply the same flat KPI set to every account.
+
+**Universal outcome spine (where data is fresh/available):**
+
+- Koronet SELL GMV;
+- Koronet BUY GMV;
+- SELL online versus offline;
+- BUY online versus offline; and
+- their change over a compatible period.
+
+**Account-specific lever:** each active account strategy also declares the
+one or few mechanism measures that should move if the intervention works.
+For a LIST strategy, that may be the relevant configuration state and whether
+more of the intended supply is visible/available; for a BUY strategy, vendor
+or category/variety/horizon availability and online procurement behavior; for
+a SELL strategy, the relevant shop/buyer activation mechanism. The exact
+measure must be sourced and stated per account — never assumed from a generic
+lead label.
+
+```text
+Daily account view = outcome spine + strategy/lever signal + data freshness
+Weekly cycle      = what was tried + whether the lever changed + whether the
+                    outcome moved + what was learned
+```
+
+The system must distinguish: “the setting changed,” “more supply became
+visible,” and “buy/sell/online behavior improved.” They are different stages
+of evidence, not interchangeable proof of impact.

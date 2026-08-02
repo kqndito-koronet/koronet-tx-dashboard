@@ -1,11 +1,19 @@
 # TX Dashboard Tab 1 -- P0.0 No-Loss Field Inventory
 
-**Status:** CODEX VERIFIED (2026-07-31, Run 29) — PARTIALLY_CERTIFIED, ready for P0.1 with corrections applied below
+**Status:** HISTORICAL BASELINE (2026-07-31, Run 29) — PARTIALLY_CERTIFIED at
+the time of tracing; not a current verification of the Aug 1 POTENTIAL or
+OPPORTUNITIES implementation.
 **Codex confidence:** 85% — field tracing, formulas, gaps all verified. 3 corrections applied post-verification.
 **Date:** 2026-07-31
 **Source:** 7 microagent traces covering Portfolio columns + 5 cards (POTENTIAL, CONFIG/OPPORTUNITIES, BUY, LIST, SELL) + JSON data coverage audit
 **Artifact traced:** `/Users/facu/Koronet_OS/docs/transactions/index.html`
 **Scope v2 spec:** `/Users/facu/Koronet_OS/docs/transactions/TX_DASHBOARD_SCOPE_V2.md`
+
+> **Current-use warning (Aug 1):** This inventory predates commits `cf2f44b`
+> (POTENTIAL) and `e8f9bc8` (OPPORTUNITIES). It still contains superseded
+> descriptions such as 9 opportunity types / no LIST generation. Use it for
+> lineage and field coverage only until those two card sections are reconciled
+> against the current code. It must not be used to certify current MVP behavior.
 
 ---
 

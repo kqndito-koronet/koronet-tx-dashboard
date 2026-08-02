@@ -18,6 +18,7 @@
 ### Cycle 1: Lead engine (semantic/lead layer)
 **Problem:** 16 opp types, 4 unsupported/blocked, 3 needs-qualification, duplicate L3/C3
 **Change:** 6 fixes — duplicate removed, segment filters, honest claims, actual take rate
+**Fixtures:** Kennicott (Tier 1 WH_CORE positive case); Rosaprima (IMP_K2K product-type boundary); WH_PROC (buy-only boundary)
 **Verification:** Kennicott (WH_CORE) ✓, Rosaprima (IMP_K2K excluded) ✓, WH_PROC (excluded) ✓
 **State:** VERIFIED
 **Commit:** `3657127`
@@ -100,6 +101,30 @@ fixed at their source, not concealed by UI changes.
 5. **Build daily/weekly measurement after the above baseline is trustworthy:**
    daily outcome spine + account-specific lever; weekly cycle report separates
    action, lever movement, outcome movement and learning.
+
+## Next work order (after current data-pipeline cycle)
+
+Do not resume card rotation by default. Work in this order, and stop at the
+first missing source rather than fabricating a trend:
+
+1. **Daily outcome spine — data contract first.** The dashboard currently has
+   period deltas, but no append-only daily account snapshot. Define and source
+   `as_of, company_id, estimated_gmv, koronet_sell_gmv, sell_online_gmv,
+   koronet_buy_gmv, buy_online_gmv` plus their denominators. Deliver one
+   repeatable snapshot writer and freshness/coverage output; do not present it
+   as a daily trend until two compatible snapshots exist.
+2. **Portfolio selection proof.** With that spine, verify that the filters and
+   sorting can answer: which selected account has the biggest potential/capture
+   gap, which is improving/worsening, and which is appropriate to investigate.
+   Test on Kennicott plus two contrasting cohort accounts; no account-specific
+   thresholds unless the definition says so.
+3. **Lead-to-enable-ment handoff.** Add a separate, DRAFT-aware payload for
+   CS/Implementation: why it fired, evidence/source, prerequisite, proposed
+   pitch, likely objection, action owner and outcome metric. It must consume
+   the same lead object, not fork its own lead logic.
+
+**Acceptance gate for any item:** reusable source/semantic/UI capability,
+explicit fixture set, deterministic check, and evaluator report with no P0/P1.
 
 ## Facu feedback queue (check each cycle)
 - Slack DM: U0B9P1F5ALA

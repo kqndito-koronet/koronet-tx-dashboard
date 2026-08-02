@@ -97,6 +97,76 @@ status, owner, due date, expected outcome, feedback reference and a link to
 the previous comparable run. A missing source or freshness field makes the
 claim DRAFT, not fact.
 
+### Claude builder-loop contract (added after first v2 cycles)
+
+Claude's unit of work is **one reusable system capability**, not the next card
+in a rotation and not an account-specific patch. A representative account is
+a fixture for falsifying the capability; it is never sufficient reason to
+hardcode the capability for that account.
+
+Before selecting work, the builder classifies the root layer:
+
+`data pipeline` · `semantic metric/denominator` · `lead contract` ·
+`cross-card consistency` · `frontend/routing` · `enablement`.
+
+The next cycle picks the smallest high-impact gap in that layer. It must not
+move to another card merely because the current code renders.
+
+#### Lead contract — mandatory before executable/approved use
+
+Every reusable lead object must eventually carry these fields separately from
+its rendered prose:
+
+```text
+lead_id, type, detection_logic, source, period/as_of, trust_level,
+status (DRAFT/APPROVED), prerequisite, observed_signal,
+causal_hypothesis, action, outcome_metric, impact_value + impact_method
+```
+
+Until a field exists, the lead remains `DRAFT`; it may surface an investigation
+signal but cannot be presented as a proven recommendation. Do not replace
+missing fields with stronger copy in the UI.
+
+#### Semantic rules
+
+- A proxy must be named where it is interpreted; sales recency is not listing
+  depth, and a low metric is not a proven cause.
+- Use `scenario estimate` or `hypothesis` for modeled impact/cause; distinguish
+  it from observed GMV, fees or behavior.
+- An absolute product/config claim requires the specific source/configuration
+  check that proves it for the account/product type.
+- A BUY, LIST or SELL recommendation must name its prerequisite status rather
+  than imply downstream action is ready.
+
+#### Fixture verification and state vocabulary
+
+For each reusable change, name the **smallest contrasting fixture set** that
+can falsify it: normally at least three cases, including a relevant Tier 1
+account where possible plus a counterexample/product-type boundary. State why
+each fixture was selected, the source/timeframe used, and the pass/fail result.
+
+Use these states precisely:
+
+| State | Meaning |
+|---|---|
+| `BUILT` | Code/data was changed locally or committed; no independent conclusion. |
+| `AUTOMATED_CHECKED` | Deterministic checks passed; still not an evidence certification. |
+| `VERIFIED` | An evaluator other than the builder checked the relevant evidence and fixtures, with no unresolved P0/P1 finding. |
+| `BLOCKED` | Required source/capability is absent; record owner and next evidence needed. |
+| `NEEDS_DECISION` | The remaining gap is a Facu product/priority/approval decision. |
+
+Before using `VERIFIED`, run:
+
+```text
+python3 scripts/tx_claude_loop_evaluator.py
+```
+
+Read `ops/reports/tx_claude_loop_evaluation_latest.html`. The automated
+evaluator is read-only and does not itself certify the builder's work; it
+provides the independent check queue for Codex/Facu. A P0/P1 finding blocks
+promotion. P2 findings must be explicitly carried into the next cycle or
+marked as an intentional, source-backed limitation.
+
 ## 5. How the system improves rather than accumulates reports
 
 For every approved action, capture one outcome metric and one learning state:
