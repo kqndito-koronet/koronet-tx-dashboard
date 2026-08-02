@@ -57,9 +57,20 @@ tr.eco-row:hover { opacity:1; }
 .expand-row { display:none; }
 .expand-row.open { display:table-row; }
 .expand-cell { padding:12px 16px 12px 36px; background:#fafbfc; border-bottom:1px solid var(--border); }
-.expand-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:12px; }
+.expand-grid { display:grid; grid-template-columns:1fr; gap:12px; max-width:1180px; }
 .expand-section { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
 .expand-section h4 { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:6px; }
+.investigation-start { background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px 14px; }
+.investigation-start strong { font-size:12px; color:#1e3a8a; }
+.investigation-start p { font-size:11px; color:#334155; margin:4px 0 8px; }
+.investigation-nav { display:flex; gap:6px; flex-wrap:wrap; }
+.investigation-nav button { border:1px solid #93c5fd; background:#fff; color:#1d4ed8; border-radius:4px; font-size:11px; font-weight:600; padding:4px 7px; cursor:pointer; }
+.investigation-nav button:hover { background:#dbeafe; }
+.account-card > h4 { cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.account-card > h4:focus { outline:2px solid #93c5fd; outline-offset:3px; border-radius:3px; }
+.account-card-toggle { font-size:10px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--blue); }
+.account-card.collapsed > :not(h4) { display:none; }
+.account-card.collapsed { border-color:#cbd5e1; background:#fafcff; }
 .expand-section .detail-row { display:flex; justify-content:space-between; font-size:12px; padding:2px 0; }
 .expand-section .detail-label { color:var(--text-muted); }
 
@@ -964,11 +975,17 @@ function getOpportunities(acct) {
   // === SELL OPPORTUNITIES (revenue first — highest impact) ===
 
   // S1: Large offline GMV at $0 direct fees
-  if(met && met.sell_offline > 10000) {
+  // Segment filter added 2026-07-31: eShop activation is only a lever for WH_CORE/WH_ESUITE.
+  // Importers' offline GMV is via K2K — different mechanism, different play.
+  var ct_id = acct.ct_id;
+  if(met && (ct_id === 'WH_CORE' || ct_id === 'WH_ESUITE') && met.sell_offline > 10000) {
+    // FIX 2026-07-31: use actual take rate when both fees_total and sell_online are available; fall back to 0.5%.
+    var actualRate = (met.fees_total > 0 && met.sell_online > 0) ? (met.fees_total / met.sell_online) : 0.005;
     var tenPctOffline = Math.round(met.sell_offline * 0.10);
-    var tenPctFeeEst = Math.round(tenPctOffline * 0.005); // conservative 0.5% take rate
-    opps.push({text:fmt$(met.sell_offline)+' selling offline at $0 direct fees. If 10% moves online = '+fmt$(tenPctFeeEst)+'/yr in fees.', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Review offline buyer list. Identify top 5 offline buyers for eShop activation.'});
-  } else if(met && met.online_pct < 5 && met.sell_total > 100000) {
+    var tenPctFeeEst = Math.round(tenPctOffline * actualRate);
+    var rateLabel = (met.fees_total > 0 && met.sell_online > 0) ? fmtPct(actualRate*100)+'% actual take rate' : '0.5% assumed take rate';
+    opps.push({text:fmt$(met.sell_offline)+' selling offline at $0 direct fees. Scenario: if 10% moves online = '+fmt$(tenPctFeeEst)+'/yr in fees ('+rateLabel+').', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Review offline buyer list. Identify top 5 offline buyers for eShop activation.'});
+  } else if(met && (ct_id === 'WH_CORE' || ct_id === 'WH_ESUITE') && met.online_pct < 5 && met.sell_total > 100000) {
     opps.push({text:fmtPct(met.online_pct)+' online of '+fmt$(met.sell_total)+'. '+fmt$(met.sell_offline)+' at $0 fees.', type:'sell', gmv_impact: met.sell_offline, priority:1, action:'Why is the eShop not being used? Check inventory, pricing, buyer awareness.'});
   }
 
@@ -992,17 +1009,19 @@ function getOpportunities(acct) {
   }
 
   // S5: Many offline buyers not buying online
+  // Segment filter added 2026-07-31: offline buyers for importers/growers are NOT eShop conversion candidates.
   var buyerData = findBuyerData(id);
   var bf = findBuyersFull(acct.name);
   var offlineBuyers = bf ? (bf.offline_buyers || 0) : (buyerData ? (buyerData.total_buyers - buyerData.online_buyers) : 0);
   var onlineBuyers = bf ? (bf.online_buyers || 0) : (buyerData ? buyerData.online_buyers : 0);
-  if(offlineBuyers > 5 && onlineBuyers > 0) {
+  if((ct_id === 'WH_CORE' || ct_id === 'WH_ESUITE') && offlineBuyers > 5 && onlineBuyers > 0) {
     var aovOnline = null;
     var aovData = findAOV ? findAOV(acct.name) : null;
     if(aovData && aovData.aov_online > 0) aovOnline = aovData.aov_online;
-    var potentialGmv = aovOnline ? Math.round(offlineBuyers * aovOnline * 6) : null; // 6 months estimate
-    var potentialStr = potentialGmv ? ' If converted: ~'+fmt$(potentialGmv)+' in online GMV.' : '';
-    opps.push({text:offlineBuyers+' buyers only purchase offline.'+potentialStr, type:'sell', gmv_impact: potentialGmv, priority:2, action:'Identify top offline buyers by volume. Start with buyers who already have eShop access.'});
+    var scenarioGmv = aovOnline ? Math.round(offlineBuyers * aovOnline * 6) : null; // 6-month scenario estimate
+    // FIX 2026-07-31: labeled as "scenario estimate" (not "potential") — AOV source has documented fan-out; figure is directional.
+    var scenarioStr = scenarioGmv ? ' Scenario estimate: ~'+fmt$(scenarioGmv)+' in online GMV if converted (directional \u2014 AOV source may overstate).' : '';
+    opps.push({text:offlineBuyers+' buyers only purchase offline.'+scenarioStr, type:'sell', gmv_impact: scenarioGmv, priority:2, action:'Identify top offline buyers by volume. Start with buyers who already have eShop access.'});
   }
 
   // === BUY OPPORTUNITIES ===
@@ -1048,8 +1067,9 @@ function getOpportunities(acct) {
     }
 
     // L2: No long-term inventory
+    // Segment filter added 2026-07-31: standing orders / long-term inventory relevance is WH_CORE only per audit.
     var tdV2check = findListTimeDepthV2(id);
-    if(tdV2check && (tdV2check.pct_31_90_days === 0 || !tdV2check.pct_31_90_days) && (tdV2check.pct_over_90_days === 0 || !tdV2check.pct_over_90_days)) {
+    if(ct_id === 'WH_CORE' && tdV2check && (tdV2check.pct_31_90_days === 0 || !tdV2check.pct_31_90_days) && (tdV2check.pct_over_90_days === 0 || !tdV2check.pct_over_90_days)) {
       opps.push({text:'No long-term inventory listed (0% at 30d+). Buyers planning ahead cannot find this account.', type:'list', gmv_impact: null, priority:2, action:'Enable future inventory visibility. Check MaxAge, Future Sales, and time depth settings.'});
     }
 
@@ -1082,18 +1102,17 @@ function getOpportunities(acct) {
     if(cfg.max_age === 0 || cfg.max_age === null) {
       opps.push({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config', gmv_impact: null, priority:1, action:'Set MaxAge to at least 10. Without it, inventory is invisible.'});
     } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      opps.push({text:'MaxAge='+cfg.max_age+'d. Benchmark: 300. Blocks 47% of volume (Kennicott reference). 5-min fix.', type:'config', gmv_impact: null, priority:2, action:'Increase MaxAge. MaxAge=10 means eShop only shows inventory arriving in next 10 days.'});
+      // FIX 2026-07-31: removed "Benchmark: 300" (single-account, not a network benchmark) and "47% Kennicott" (not generalizable).
+      opps.push({text:'MaxAge='+cfg.max_age+'d. Top accounts use MaxAge 30\u2013300d. Current: '+cfg.max_age+'d \u2014 limits forward inventory visibility. 5-min fix.', type:'config', gmv_impact: null, priority:2, action:'Increase MaxAge. MaxAge=10 means eShop only shows inventory arriving in next 10 days.'});
     }
-    if(!cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      var bunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
-      var bunchGmvStr = bunchGmvAmt ? ' '+fmt$(bunchGmvAmt)+' offline bunch GMV. 95% TAM blocked.' : ' 95% TAM blocked.';
-      opps.push({text:'Bunches OFF \u2192'+bunchGmvStr+' 5-min fix.', type:'config', gmv_impact: bunchGmvAmt, priority:1, action:'Enable bunches flag in config. Opens eShop bunches tab for retail buyers.'});
-    }
+    // C3 removed: duplicate of L3 (same trigger, same data). Bunches opp lives in LIST. Audit 2026-07-31.
     if(!cfg.future && acct.ct_id === 'WH_CORE') {
       opps.push({text:'Future Sales OFF. eShop shows today only \u2014 blocks forward-planned buyers.', type:'config', gmv_impact: null, priority:2, action:'Enable Future Sales to show inventory beyond current on-hand.'});
     }
+    // C5: on_hand flag is OFF. Note: on_hand (inventory display) != hideCheckoutWithoutPayment (checkout blocking).
+    // This fires as a soft verification prompt, NOT as a confirmed checkout issue. Audit 2026-07-31.
     if(!cfg.on_hand && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
-      opps.push({text:'Checkout may require payment method. Verify hideCheckoutWithoutPayment.', type:'config', gmv_impact: null, priority:3, action:'Check if buyers can checkout. Hidden payment requirement kills conversion silently.'});
+      opps.push({text:'On-hand inventory display OFF \u2014 verify if this blocks checkout (hideCheckoutWithoutPayment is a separate setting; confirm on account).', type:'config', gmv_impact: null, priority:3, action:'Check if buyers can checkout. Confirm hideCheckoutWithoutPayment setting directly \u2014 on_hand flag is NOT the same field.'});
     }
   }
 
@@ -1620,6 +1639,16 @@ function renderAccounts() {
     var buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var sellGap = sellEstDenom && potCardSellTotalAnnualized != null ? (sellEstDenom - potCardSellTotalAnnualized) : null;
     var oraCalcDiverge = a.annual_sales_est && estData && estData.est_sell_gmv > 0 ? Math.abs(a.annual_sales_est - estData.est_sell_gmv) / Math.max(a.annual_sales_est, estData.est_sell_gmv) * 100 : 0;
+    html += '<div class="investigation-start">';
+    html += '<strong>ACCOUNT INVESTIGATION — start with the business gap, then test the evidence</strong>';
+    html += '<p>Potential tells you the size and capture gap. Opportunities proposes what to investigate. BUY → LIST → SELL tests whether supply, shop readiness and buyer behavior support that hypothesis.</p>';
+    html += '<div class="investigation-nav">';
+    html += '<button type="button" class="account-card-link" data-expand="'+i+'" data-card="0">1. POTENTIAL</button>';
+    html += '<button type="button" class="account-card-link" data-expand="'+i+'" data-card="1">2. OPPORTUNITIES</button>';
+    html += '<button type="button" class="account-card-link" data-expand="'+i+'" data-card="2">3. BUY evidence</button>';
+    html += '<button type="button" class="account-card-link" data-expand="'+i+'" data-card="3">4. LIST evidence</button>';
+    html += '<button type="button" class="account-card-link" data-expand="'+i+'" data-card="4">5. SELL evidence</button>';
+    html += '</div></div>';
     html += '<div class="expand-section"><h4>POTENTIAL \u2014 \u00bfCu\u00e1n grande es?</h4>';
     // FIX 4: Pre go-live SO WHAT + FIX 5: Show impl stage
     if(sellGap && sellGap > 0) {
@@ -2670,9 +2699,43 @@ function renderAccounts() {
     });
   });
 
+  function setCardOpen(section, open) {
+    if(!section) return;
+    section.classList.toggle('collapsed', !open);
+    var heading = section.querySelector('h4');
+    if(!heading) return;
+    heading.setAttribute('aria-expanded', open ? 'true' : 'false');
+    var hint = heading.querySelector('.account-card-toggle');
+    if(hint) hint.textContent = open ? 'Hide detail' : 'Open evidence';
+  }
+
+  // Keep the initial account reading focused: POTENTIAL and OPPORTUNITIES
+  // are open; BUY/LIST/SELL evidence expands only when it is needed.
+  document.querySelectorAll('tr.expand-row').forEach(function(row) {
+    var sections = row.querySelectorAll('.expand-section');
+    sections.forEach(function(section, idx) {
+      section.classList.add('account-card');
+      var heading = section.querySelector('h4');
+      if(!heading) return;
+      heading.setAttribute('role', 'button');
+      heading.setAttribute('tabindex', '0');
+      heading.setAttribute('aria-expanded', idx < 2 ? 'true' : 'false');
+      var hint = document.createElement('span');
+      hint.className = 'account-card-toggle';
+      hint.textContent = idx < 2 ? 'Hide detail' : 'Open evidence';
+      heading.appendChild(hint);
+      if(idx >= 2) section.classList.add('collapsed');
+      function toggleCard() { setCardOpen(section, section.classList.contains('collapsed')); }
+      heading.addEventListener('click', toggleCard);
+      heading.addEventListener('keydown', function(e) {
+        if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCard(); }
+      });
+    });
+  });
+
   // Bind "see BUY/LIST/SELL card" links in OPPORTUNITIES card
   // These scroll to the corresponding expand-section (card) within the same row
-  document.querySelectorAll('.opp-card-link').forEach(function(link) {
+  document.querySelectorAll('.opp-card-link, .account-card-link').forEach(function(link) {
     link.addEventListener('click', function(e) {
       e.stopPropagation();
       var expandIdx = this.dataset.expand;
@@ -2687,6 +2750,7 @@ function renderAccounts() {
       // Find the nth expand-section within this row (0-indexed: 0=POTENTIAL, 1=OPPORTUNITIES, 2=BUY, 3=LIST, 4=SELL)
       var sections = row.querySelectorAll('.expand-section');
       if(sections[cardIdx]) {
+        setCardOpen(sections[cardIdx], true);
         sections[cardIdx].scrollIntoView({behavior:'smooth', block:'start'});
         // Brief highlight to show where they landed
         sections[cardIdx].style.transition = 'box-shadow 0.3s';
