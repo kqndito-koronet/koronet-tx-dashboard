@@ -285,7 +285,7 @@ tr.eco-row:hover { opacity:1; }
           <th data-sort="fees" style="text-align:right">Fees <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="take_rate" style="text-align:right">Take Rate <span class="sort-arrow">&#9650;</span></th>
           <th style="text-align:center" title="Requires temporal data (P0.2)">Trend</th>
-          <th style="text-align:center" title="eShop CVR: orders/visits. Only ~7 accounts with own domain (not app.kometsales.com). 93% show — because GA4 data is by hostname, not company_id. Fix: Rose GA4 query by company_id.">eShop CVR <span style="font-size:9px;color:var(--amber)" title="Only works for ~7 accounts with own domain">⚠</span></th>
+          <th style="text-align:center" title="Session CVR uses GA4 only when hostname is mapped. Login CVR is a separate upper-bound metric keyed by company_id.">Conversion</th>
           <th data-sort="opp_count" style="text-align:center">Opps <span class="sort-arrow">&#9650;</span></th>
           <th>SFDC Opp</th>
         </tr>
@@ -602,6 +602,9 @@ async function loadData() {
     fetch(base+'account_spine_2026-07-30_staged.json').then(function(r){return r.json();}).then(function(d){
       window.ACCOUNT_TRUTH_SPINE = d;
     }).catch(function(){ window.ACCOUNT_TRUTH_SPINE = null; }),
+    fetch(base+'eshop_cvr_by_company.json').then(function(r){return r.json();}).then(function(d){
+      window.ESHOP_LOGIN_CVR = d.companies || {};
+    }).catch(function(){ window.ESHOP_LOGIN_CVR = {}; }),
     fetch(base+'precard_coverage_2026-08-03.json').then(function(r){return r.json();}).then(function(d){
       window.PRECARD_COVERAGE_BY_ID = Object.fromEntries((d.records || []).map(function(r){ return [String(r.company_id), r]; }));
     }).catch(function(){ window.PRECARD_COVERAGE_BY_ID = {}; }),
@@ -1367,7 +1370,8 @@ function renderAccounts() {
     }
     var cfg = id ? CONFIG[id] : null;
     var opps = getOpportunities(a);
-    var estSell = a.annual_sales_est;
+    var legacyEstimate = id ? (window.EST_GMV || {})[id] : null;
+    var estSell = a.annual_sales_est || (legacyEstimate && legacyEstimate.est_sell_gmv) || null;
     var tf = ACTIVE_TIMEFRAME;
 
     // V2 temporal data — supplement metrics.json where available
@@ -1400,6 +1404,7 @@ function renderAccounts() {
     // FIX 4: Annualize for penetration when using monthly or quarterly timeframes
     // Sell penetration denominator is always an annual estimate — must annualize numerator for apples-to-apples
     var tfMultiplier = 1;
+    if(tf === 'ytd') tfMultiplier = 365 / 211; // Jan 1–Jul 30, 2026
     if(tf === 'current_month' || tf === 'prior_month') tfMultiplier = 12;
     else if(tf === 'current_quarter' || tf === 'prior_quarter') tfMultiplier = 4;
     var koronetSellAnnualized = koronetSell != null ? koronetSell * tfMultiplier : null;
@@ -1697,6 +1702,7 @@ function renderAccounts() {
     html += '<td style="text-align:center">' + trendHtml + '</td>';
     // FIX 5: Wire eShop CVR from GA4 data
     var ga4Portfolio = findGA4(a.name);
+    var loginCvr = (window.ESHOP_LOGIN_CVR || {})[String(id)];
     var bmCvr = getBenchmark('6_cvr_ga4_own_hostname', null);
     var cvrBmNote = bmCvr ? 'Network median CVR (active eShops): '+fmtPct(bmCvr.active_eshops_only ? bmCvr.active_eshops_only.median * 100 : bmCvr.median * 100)+'. p75: '+fmtPct(bmCvr.active_eshops_only ? bmCvr.active_eshops_only.p75 * 100 : bmCvr.p75 * 100)+'. Best: Kennicott 22.8%.' : 'Best-in-class: Kennicott ~22.8% CVR.';
     var cvrHtml;
@@ -1705,6 +1711,8 @@ function renderAccounts() {
       var cvrColor = cvrPct > 20 ? 'var(--green)' : cvrPct > 10 ? 'var(--amber)' : 'var(--red)';
       var cvrTooltip = ga4Portfolio.sessions.toLocaleString()+' sessions \u2192 '+ga4Portfolio.transactions.toLocaleString()+' transactions. '+cvrBmNote;
       cvrHtml = '<span style="color:'+cvrColor+';font-weight:600;font-size:11px" title="'+cvrTooltip+'">'+cvrPct.toFixed(1)+'%</span>';
+    } else if(loginCvr && loginCvr.cvr_pct != null) {
+      cvrHtml = '<span style="color:var(--blue);font-weight:600;font-size:11px" title="Login CVR upper bound: '+loginCvr.purchase_logins+' purchase logins / '+loginCvr.total_logins+' total logins. This is not GA4 session conversion.">L '+Number(loginCvr.cvr_pct).toFixed(1)+'%</span>';
     } else {
       cvrHtml = '<span style="color:var(--text-muted)" title="eShop uses shared platform domain (app.kometsales.com). Per-company CVR requires GA4 data by company_id from Snowflake. '+cvrBmNote+'">\u2014</span>';
     }
