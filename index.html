@@ -273,6 +273,7 @@ tr.eco-row:hover { opacity:1; }
           <th data-sort="rep">Owner <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="priority_order">Priority <span class="sort-arrow">&#9650;</span></th>
           <th>Products</th>
+          <th title="Current extracts vs dated historical snapshots. Potential is tracked separately as research/validation work.">Data</th>
           <th data-sort="est_sell" style="text-align:right">Est. Sell GMV <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="koronet_sell" style="text-align:right" id="thKoronetSell">Koronet Sell <span class="sort-arrow">&#9650;</span><br><span class="tf-label" id="tfLabelSell">YTD</span></th>
           <th data-sort="penetration" style="text-align:right">Penetr. % <span class="sort-arrow">&#9650;</span></th>
@@ -503,6 +504,7 @@ window.METRICS_V2_PACING = null;  // Fix 10: network pacing totals
 window.BENCHMARKS = null;          // benchmarks.json — network/segment percentiles
 window.CONCENTRATION_V2 = null;    // buyer_concentration_v2.json — Top 5 buyers per account
 window.TIME_DEPTH_OFFLINE = null;  // time_depth_offline.json — offline time depth + best-in-class
+window.ACCOUNT_TRUTH_SPINE = null; // truth override for Price's + the complete P1 cohort
 
 // Active timeframe — default YTD
 var ACTIVE_TIMEFRAME = 'ytd';
@@ -597,6 +599,12 @@ async function loadData() {
     fetch(base+'product_division_gmv.json').then(function(r){return r.json();}).then(function(d){
       window.PRODUCT_DIVISION = d;
     }).catch(function(){ window.PRODUCT_DIVISION = null; }),
+    fetch(base+'account_spine_2026-07-30_staged.json').then(function(r){return r.json();}).then(function(d){
+      window.ACCOUNT_TRUTH_SPINE = d;
+    }).catch(function(){ window.ACCOUNT_TRUTH_SPINE = null; }),
+    fetch(base+'precard_coverage_2026-08-03.json').then(function(r){return r.json();}).then(function(d){
+      window.PRECARD_COVERAGE_BY_ID = Object.fromEntries((d.records || []).map(function(r){ return [String(r.company_id), r]; }));
+    }).catch(function(){ window.PRECARD_COVERAGE_BY_ID = {}; }),
   ]);
 
   updateFreshnessBanner();
@@ -608,6 +616,13 @@ async function loadData() {
 }
 
 // === V2 LOOKUP HELPERS ===
+
+var TRUTH_ACCOUNT_IDS = {'816515':true,'641341':true,'743648':true,'507479':true,'498865':true};
+function truthMetric(companyId, key) {
+  var accounts = window.ACCOUNT_TRUTH_SPINE && window.ACCOUNT_TRUTH_SPINE.accounts;
+  var metric = accounts && accounts[String(companyId)] && accounts[String(companyId)].metrics ? accounts[String(companyId)].metrics[key] : null;
+  return metric && metric.evidence_state !== 'blocked' && metric.value != null ? metric : null;
+}
 
 // Get V2 sell data for a company by name (normName match)
 function getV2Sell(name) {
@@ -1338,6 +1353,18 @@ function renderAccounts() {
   filtered = filtered.map(function(a) {
     var id = a.company_id;
     var m = id ? METRICS[id] : null;
+    var truth = TRUTH_ACCOUNT_IDS[String(id)] ? {
+      company: truthMetric(id,'company_gmv_estimate'), purchases: truthMetric(id,'total_purchases_estimate'),
+      sell: truthMetric(id,'koronet_sell_gmv_ytd'), sellOnline: truthMetric(id,'koronet_sell_online_gmv_ytd'), sellShare: truthMetric(id,'koronet_sell_online_share_ytd'),
+      buy: truthMetric(id,'koronet_buy_gmv_ytd'), buyOnline: truthMetric(id,'koronet_buy_online_gmv_ytd'), buyShare: truthMetric(id,'koronet_buy_online_share_ytd')
+    } : null;
+    if(truth) {
+      a = Object.assign({}, a, {annual_sales_est: truth.company ? truth.company.value : null});
+      m = Object.assign({}, m || {}, {
+        sell_total: truth.sell ? truth.sell.value : null, sell_online: truth.sellOnline ? truth.sellOnline.value : null, online_pct: truth.sellShare ? truth.sellShare.value : null,
+        proc_total: truth.buy ? truth.buy.value : null, proc_online: truth.buyOnline ? truth.buyOnline.value : null
+      });
+    }
     var cfg = id ? CONFIG[id] : null;
     var opps = getOpportunities(a);
     var estSell = a.annual_sales_est;
@@ -1387,7 +1414,7 @@ function renderAccounts() {
     if(fees == null) fees = m ? m.fees_total : null;
 
     // BUY columns — V2 preferred, fall back to metrics + est_gmv cascade
-    var estData = id ? (window.EST_GMV || {})[id] : null;
+    var estData = truth ? (truth.purchases ? {est_buy_gmv:truth.purchases.value,est_buy_source:'account spine modeled purchase estimate'} : {}) : (id ? (window.EST_GMV || {})[id] : null);
     var koronetBuy, onlineBuy, koronetBuyDelta;
     if(v2Buy && v2Buy.buy_total) {
       koronetBuy = getV2Val(v2Buy.buy_total, tf);
@@ -1440,6 +1467,7 @@ function renderAccounts() {
       _m: m,
       _cfg: cfg,
       _estData: estData,
+      _truth: truth,
       _v2Sell: v2Sell,
       _v2Buy: v2Buy,
       _koronetSellDelta: koronetSellDelta || null,
@@ -1501,6 +1529,14 @@ function renderAccounts() {
     var impl = id ? CHRISTINE[id] : null;
     var bun = id ? BUNCHES[id] : null;
     var isEco = a.priority_level === 'ECOSYSTEM';
+    var coverage = (window.PRECARD_COVERAGE_BY_ID || {})[String(id)];
+    var coverageFields = coverage ? Object.values(coverage.fields || {}) : [];
+    var currentCount = coverageFields.filter(function(f){ return f.state === 'CURRENT'; }).length;
+    var historicalCount = coverageFields.filter(function(f){ return f.state === 'HISTORICAL'; }).length;
+    var potentialState = coverage && coverage.fields && coverage.fields.potential_estimate ? coverage.fields.potential_estimate.state : 'GAP';
+    var dataHtml = coverage
+      ? '<span style="font-size:10px;white-space:nowrap" title="'+currentCount+' current fields; '+historicalCount+' historical fields; potential: '+potentialState+'. Open the row for field detail."><b>'+currentCount+'</b> current'+(historicalCount ? '<br><span style="color:var(--text-muted)">'+historicalCount+' H1</span>' : '')+'<br><span style="color:'+(potentialState === 'CURRENT' ? 'var(--amber)' : 'var(--blue)')+'">GMV '+(potentialState === 'CURRENT' ? 'validate' : 'research')+'</span></span>'
+      : '<span style="color:var(--text-muted)">coverage pending</span>';
 
     // Compute display values
     var estSellDisplay = a.annual_sales_est ? fmt$(a.annual_sales_est) : '\u2014';
@@ -1647,6 +1683,7 @@ function renderAccounts() {
     html += '<td style="font-size:11px;white-space:nowrap">'+a.rep+'</td>';
     html += '<td>'+priorityBadge(a.priority_level)+'</td>';
     html += '<td style="white-space:nowrap">'+ctBadge(a.ct_id, a)+'</td>';
+    html += '<td>'+dataHtml+'</td>';
     html += '<td style="text-align:right;font-weight:600">'+estSellDisplay+'</td>';
     html += '<td style="text-align:right">'+koronetSellDisplay+'</td>';
     html += '<td style="text-align:right">'+penetrationDisplay+'</td>';
@@ -1677,10 +1714,10 @@ function renderAccounts() {
     html += '</tr>';
 
     // === EXPAND ROW — cards: POTENTIAL | OPPORTUNITIES | BUY | LIST | SELL ===
-    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="19"><div class="expand-cell"><div class="expand-grid">';
+    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="20"><div class="expand-cell"><div class="expand-grid">';
 
     // Data lookups needed across cards
-    var estData = a.company_id ? (window.EST_GMV||{})[a.company_id] : null;
+    var estData = a._estData || (a.company_id ? (window.EST_GMV||{})[a.company_id] : null);
     var concData = findConcentrationByName(a.name);
     var sellL30D = findSellL30D(a.name);
     var aovData = findAOV(a.name);
