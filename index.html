@@ -58,18 +58,6 @@ tr.eco-row:hover { opacity:1; }
 .expand-row.open { display:table-row; }
 .expand-cell { padding:12px 16px 12px 36px; background:#fafbfc; border-bottom:1px solid var(--border); }
 .expand-grid { display:grid; grid-template-columns:1fr; gap:12px; max-width:1180px; }
-.deep-dive-route { max-width:1180px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:0 0 10px; padding:8px 10px; border:1px solid #bfdbfe; border-radius:6px; background:#eff6ff; font-size:11px; color:#334155; }
-.deep-dive-route strong { color:#1e3a8a; }
-.deep-dive-route span { color:#475569; }
-.deep-dive-route a { margin-left:auto; color:#1d4ed8; font-weight:600; text-decoration:none; }
-.deep-dive-route a:hover { text-decoration:underline; }
-.deep-dive-gap { border-color:#e2e8f0; background:#f8fafc; }
-.deep-dive-gap strong { color:#475569; }
-.deep-dive-request { max-width:1180px; margin:0 0 10px; padding:10px 12px; border:1px solid #fde68a; border-radius:6px; background:#fffbeb; color:#334155; font-size:11px; }
-.deep-dive-request summary { cursor:pointer; color:#92400e; font-weight:700; }
-.deep-dive-request p { margin:7px 0 0; line-height:1.45; }
-.deep-dive-request .request-label { display:inline-block; min-width:106px; color:#64748b; font-weight:600; }
-.deep-dive-request .request-state { color:#92400e; font-weight:600; }
 .expand-section { background:var(--bg-card); border:1px solid var(--border); border-radius:6px; padding:10px 12px; }
 .expand-section h4 { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--text-muted); margin-bottom:6px; }
 .investigation-start { background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:12px 14px; }
@@ -209,7 +197,6 @@ tr.eco-row:hover { opacity:1; }
   <div class="tab" data-tab="sell">SELL</div>
   <div class="tab" data-tab="growth">GROWTH</div>
   <div class="tab" data-tab="whatif">What-If</div>
-  <div class="tab" data-tab="ai-requests">Control Room</div>
   <div class="tab" data-tab="glossary">Glossary</div>
 </div>
 
@@ -286,13 +273,13 @@ tr.eco-row:hover { opacity:1; }
           <th data-sort="rep">Owner <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="priority_order">Priority <span class="sort-arrow">&#9650;</span></th>
           <th>Products</th>
-          <th data-sort="est_sell" style="text-align:right">Company GMV est. <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="est_sell" style="text-align:right">Est. Sell GMV <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="koronet_sell" style="text-align:right" id="thKoronetSell">Koronet Sell <span class="sort-arrow">&#9650;</span><br><span class="tf-label" id="tfLabelSell">YTD</span></th>
-          <th data-sort="penetration" style="text-align:right">YTD / annual est. <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="penetration" style="text-align:right">Penetr. % <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="online_pct" style="text-align:right">Online Sell % <span class="sort-arrow">&#9650;</span></th>
-          <th data-sort="est_buy" style="text-align:right">Est. total purchases <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="est_buy" style="text-align:right">Est Buy GMV <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="koronet_buy" style="text-align:right" id="thKoronetBuy">Koronet Buy <span class="sort-arrow">&#9650;</span><br><span class="tf-label" id="tfLabelBuy">YTD</span></th>
-          <th data-sort="buy_penetration" style="text-align:right">YTD / annual est. <span class="sort-arrow">&#9650;</span></th>
+          <th data-sort="buy_penetration" style="text-align:right">Buy Pen. % <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="online_buy_pct" style="text-align:right">Online Buy % <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="fees" style="text-align:right">Fees <span class="sort-arrow">&#9650;</span></th>
           <th data-sort="take_rate" style="text-align:right">Take Rate <span class="sort-arrow">&#9650;</span></th>
@@ -500,24 +487,6 @@ tr.eco-row:hover { opacity:1; }
 <!-- TAB 8: GLOSSARY -->
 <div class="tab-content" id="tab-glossary"></div>
 
-<!-- TAB 9: TX CONTROL ROOM -->
-<div class="tab-content" id="tab-ai-requests">
-  <div style="padding:20px 0">
-    <h2 style="font-size:16px;margin-bottom:4px">TX CONTROL ROOM</h2>
-    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px">One place to see what the system needs, meeting follow-ups that may matter, and confirmed interventions. These are different states: a meeting follow-up is not a System Request or an active task.</p>
-    <div style="margin-bottom:16px;padding:9px 12px;border:1px solid #bfdbfe;border-radius:6px;background:#eff6ff;font-size:11px;color:#334155"><strong>Review rule:</strong> say the request ID and one decision — <strong>APPROVED</strong>, <strong>NEEDS EVIDENCE</strong> or <strong>REJECTED</strong>. The system records the decision, reason and owner in the canonical log; approval alone never executes external work.</div>
-    <div id="aiRequestsSummary" class="metrics-grid" style="margin-bottom:16px"></div>
-    <div class="section-header">A. System Requests — account investigation</div>
-    <div id="aiDeepDiveQueue" style="color:var(--text-muted);font-size:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px"><em>Building review queue...</em></div>
-    <div class="section-header" style="margin-top:20px">B. System Requests — data, decisions &amp; improvements</div>
-    <div id="aiGlobalRequests" style="color:var(--text-muted);font-size:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px"><em>Loading proposals...</em></div>
-    <div class="section-header" style="margin-top:20px">C. Meeting follow-ups to verify <span style="font-size:11px;font-weight:400;color:var(--text-muted)">not tasks; shown so real context is not lost</span></div>
-    <div id="meetingFollowups" style="color:var(--text-muted);font-size:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px"><em>Loading meeting follow-ups...</em></div>
-    <div class="section-header" style="margin-top:20px">D. Intervention pipeline</div>
-    <div id="interventionQueue" style="color:var(--text-muted);font-size:12px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px"><em>Loading intervention registry...</em></div>
-  </div>
-</div>
-
 <script>
 // === DATA LOAD (ALL 12 FILES + V2 TEMPORAL) ===
 var ACCOUNTS=[], METRICS={}, CONFIG={}, BUNCHES={}, SFDC=[], CHRISTINE={}, DEFINITIONS={};
@@ -534,13 +503,6 @@ window.METRICS_V2_PACING = null;  // Fix 10: network pacing totals
 window.BENCHMARKS = null;          // benchmarks.json — network/segment percentiles
 window.CONCENTRATION_V2 = null;    // buyer_concentration_v2.json — Top 5 buyers per account
 window.TIME_DEPTH_OFFLINE = null;  // time_depth_offline.json — offline time depth + best-in-class
-window.DEEP_DIVE_REGISTRY = null;  // deep_dive_registry.json — verified Core → Deep Dive routes
-window.AI_REQUEST_QUEUE = null;    // ai_request_queue.json — proposals for human review only
-window.SYSTEM_REQUEST_REVIEW = null; // system_request_review.json — canonical owner decisions
-window.INTERVENTIONS = null;         // interventions.json — human-owned follow-through and learning
-window.MEETING_FOLLOWUPS = null;      // meeting_followups.json — recap signals, never tasks by themselves
-window.ACCOUNT_SPINE = null;          // staged canonical account spine — Portfolio/POTENTIAL authority
-window.ACCOUNT_SPINE_STATUS = 'loading';
 
 // Active timeframe — default YTD
 var ACTIVE_TIMEFRAME = 'ytd';
@@ -635,25 +597,6 @@ async function loadData() {
     fetch(base+'product_division_gmv.json').then(function(r){return r.json();}).then(function(d){
       window.PRODUCT_DIVISION = d;
     }).catch(function(){ window.PRODUCT_DIVISION = null; }),
-    fetch(base+'deep_dive_registry.json').then(function(r){return r.json();}).then(function(d){
-      window.DEEP_DIVE_REGISTRY = d;
-    }).catch(function(){ window.DEEP_DIVE_REGISTRY = null; }),
-    fetch(base+'ai_request_queue.json').then(function(r){return r.json();}).then(function(d){
-      window.AI_REQUEST_QUEUE = d;
-    }).catch(function(){ window.AI_REQUEST_QUEUE = null; }),
-    fetch(base+'system_request_review.json').then(function(r){return r.json();}).then(function(d){
-      window.SYSTEM_REQUEST_REVIEW = d;
-    }).catch(function(){ window.SYSTEM_REQUEST_REVIEW = null; }),
-    fetch(base+'interventions.json').then(function(r){return r.json();}).then(function(d){
-      window.INTERVENTIONS = d;
-    }).catch(function(){ window.INTERVENTIONS = null; }),
-    fetch(base+'meeting_followups.json').then(function(r){return r.json();}).then(function(d){
-      window.MEETING_FOLLOWUPS = d;
-    }).catch(function(){ window.MEETING_FOLLOWUPS = null; }),
-    fetch(base+'account_spine_2026-07-30_staged.json').then(function(r){return r.json();}).then(function(d){
-      window.ACCOUNT_SPINE = d;
-      window.ACCOUNT_SPINE_STATUS = 'ready';
-    }).catch(function(){ window.ACCOUNT_SPINE = null; window.ACCOUNT_SPINE_STATUS = 'failed'; }),
   ]);
 
   updateFreshnessBanner();
@@ -665,31 +608,6 @@ async function loadData() {
 }
 
 // === V2 LOOKUP HELPERS ===
-
-// Portfolio/POTENTIAL read only this staged spine.  It carries field-level
-// source, period, coverage and evidence state; legacy files remain available
-// to other unfinished tabs but are never a fallback for this account view.
-function getSpineAccount(companyId) {
-  if(!companyId || !window.ACCOUNT_SPINE || !window.ACCOUNT_SPINE.accounts) return null;
-  return window.ACCOUNT_SPINE.accounts[String(companyId)] || null;
-}
-function getSpineMetric(companyId, key) {
-  var account = getSpineAccount(companyId);
-  return account && account.metrics ? account.metrics[key] || null : null;
-}
-function spineValue(companyId, key) {
-  var metric = getSpineMetric(companyId, key);
-  return metric && (metric.evidence_state === 'observed' || metric.evidence_state === 'modeled') && metric.value != null ? metric.value : null;
-}
-function spineStateHtml(metric, money) {
-  if(!metric) return '<span class="data-label">MISSING</span>';
-  if(metric.evidence_state === 'observed' || metric.evidence_state === 'modeled') {
-    var val = money ? fmt$(metric.value) : (metric.unit === 'percent' ? fmtPct(metric.value) : fmtN(metric.value));
-    return val + (metric.evidence_state === 'modeled' ? ' <span class="data-label">MODEL</span>' : '');
-  }
-  var state = metric.evidence_state === 'blocked' ? 'BLOCKED' : 'MISSING';
-  return '<span class="data-label" title="'+(metric.reason || metric.note || 'Not available')+'">'+state+'</span>';
-}
 
 // Get V2 sell data for a company by name (normName match)
 function getV2Sell(name) {
@@ -781,12 +699,6 @@ function getV2Delta(metricObj, tf) {
   };
 }
 
-// A CORE value is observed Koronet procurement, not an estimate of the account's
-// annual BUY potential. Never use it as a potential/penetration denominator.
-function hasUsableBuyEstimate(estData) {
-  return !!(estData && estData.est_buy_gmv > 0 && String(estData.est_buy_source || '').toUpperCase() !== 'CORE');
-}
-
 // Render "$45K ▲ +7% MoM" inline value with delta
 function fmtV2WithDelta(val, delta) {
   if(val == null) return '\u2014';
@@ -800,16 +712,6 @@ function updateFreshnessBanner() {
   var banner = document.getElementById('freshnessBanner');
   if(!banner) return;
   var asOf = '\u2014';
-  if(window.ACCOUNT_SPINE && window.ACCOUNT_SPINE._metadata) {
-    var quality = window.ACCOUNT_SPINE.quality || {};
-    asOf = window.ACCOUNT_SPINE._metadata.as_of || asOf;
-    var keyedCount = Object.keys(window.ACCOUNT_SPINE.accounts || {}).length;
-    banner.innerHTML = '<strong>Account spine staged as of ' + asOf + '.</strong> ' +
-      keyedCount + '/' + (quality.account_count || ACCOUNTS.length) + ' accounts have canonical identity; ' +
-      (quality.buy_v2_exact_matches || 0) + ' exact BUY and ' + (quality.sell_v2_exact_matches || 0) + ' exact SELL joins. ' +
-      '<span style="color:#64748b;margin-left:8px">Portfolio + POTENTIAL use this spine only. <em>BLOCKED</em>/<em>MISSING</em> is not zero and legacy fallback is disabled.</span>';
-    return;
-  }
   // Run 11: compute portfolio-specific coverage (how many of 399 accounts have data),
   // not metadata totals (which count all companies ever queried, not just our portfolio).
   var sellCov = 0, buyCov = 0, feesCov = 0, vendorsCov = 0;
@@ -897,12 +799,6 @@ function getRep(acct) {
   if(sfdcMatch.length > 0) return sfdcMatch[0].owner;
   // Fallback: Unassigned
   return 'Unassigned';
-}
-
-// The staged Accounts view is intentionally stricter than legacy surfaces:
-// only a direct company_id mapping is enough to display an operational owner.
-function getStagedRep(acct) {
-  return acct && acct.company_id && CHRISTINE[acct.company_id] ? 'Implementations' : 'Unassigned';
 }
 
 // === SFDC MATCH ===
@@ -1343,8 +1239,7 @@ function configHasIssues(id, acct) {
 // === POPULATE FILTERS ===
 function populateFilters() {
   // Rep filter
-  var repLookup = window.ACCOUNT_SPINE && window.ACCOUNT_SPINE.accounts ? getStagedRep : getRep;
-  var repSet = new Set(ACCOUNTS.map(function(a){ return repLookup(a); }));
+  var repSet = new Set(ACCOUNTS.map(function(a){ return getRep(a); }));
   var sel = document.getElementById('repFilter');
   Array.from(repSet).sort().forEach(function(rep) {
     var o = document.createElement('option');
@@ -1366,125 +1261,7 @@ var sortCol = 'est_sell';
 var sortDir = -1; // desc
 
 // === RENDER ACCOUNTS (Tab 1) ===
-function renderStagedAccounts() {
-  // The staged spine presently contains one comparable YTD window only. Do not
-  // let the old selector imply month/quarter movement that this source cannot prove.
-  ACTIVE_TIMEFRAME = 'ytd';
-  var tfSelect = document.getElementById('timeframeSelect');
-  if(tfSelect) { tfSelect.value = 'ytd'; tfSelect.disabled = true; tfSelect.title = 'Movement unlocks after two compatible daily spine snapshots.'; }
-  var tfSell = document.getElementById('tfLabelSell'), tfBuy = document.getElementById('tfLabelBuy');
-  if(tfSell) tfSell.textContent = 'YTD 2026';
-  if(tfBuy) tfBuy.textContent = 'YTD 2026';
-  ['listFilter','sellFilter'].forEach(function(id) { var el=document.getElementById(id); if(el) { el.value='ALL'; el.disabled=true; el.title='Blocked until compatible LIST/SELL evidence is materialized in the account spine.'; } });
-  var rep = document.getElementById('repFilter').value;
-  var search = document.getElementById('searchInput').value.toLowerCase();
-  var priority = document.getElementById('priorityFilter').value;
-  var ctFilterVal = document.getElementById('ctFilter').value;
-  var cfgFilter = document.getElementById('configFilter').value;
-  var implFilterVal = document.getElementById('implFilter').value;
-  var hasDataOnly = document.getElementById('hasDataOnly').checked;
-  var buyFilterVal = document.getElementById('buyFilter').value;
-  var listFilterVal = document.getElementById('listFilter').value;
-  var sellFilterVal = document.getElementById('sellFilter').value;
-  var scope = ACCOUNTS.filter(function(a) {
-    var spine = getSpineAccount(a.company_id);
-    if(priority === 'EXCLUDE_ECO' && a.priority_level === 'ECOSYSTEM') return false;
-    if(priority !== 'ALL' && priority !== 'EXCLUDE_ECO' && a.priority_level !== priority) return false;
-    if(rep !== 'all' && getStagedRep(a) !== rep) return false;
-    if(search && !(a.name||'').toLowerCase().includes(search) && !(a.company_id||'').includes(search)) return false;
-    if(ctFilterVal !== 'ALL' && (a.ct_id||'UNKNOWN') !== ctFilterVal) return false;
-    if(cfgFilter !== 'ALL') {
-      var issues = configHasIssues(a.company_id, a);
-      if(cfgFilter === 'issues' && issues !== true) return false;
-      if(cfgFilter === 'ok' && issues !== false) return false;
-    }
-    if(implFilterVal !== 'ALL') {
-      var impl = a.company_id ? CHRISTINE[a.company_id] : null;
-      if(!impl || impl.stage !== implFilterVal) return false;
-    }
-    if(hasDataOnly && !(spine && (spineValue(a.company_id, 'koronet_buy_gmv_ytd') != null || spineValue(a.company_id, 'koronet_sell_gmv_ytd') != null))) return false;
-    if(buyFilterVal !== 'ALL') {
-      var online = spineValue(a.company_id, 'koronet_buy_online_share_ytd');
-      if(buyFilterVal === 'HIGH' && !(online != null && online > 10)) return false;
-      if(buyFilterVal === 'LOW' && !(online != null && online < 5)) return false;
-      if(buyFilterVal === 'ZERO' && online != null) return false;
-    }
-    // LIST and SELL behavior filters need compatible inventory/buyer extracts.
-    // Leave scope intact and surface that constraint in the account card.
-    return true;
-  }).map(function(a) {
-    var id = a.company_id, spine = getSpineAccount(id);
-    var estSell = spineValue(id, 'company_gmv_estimate');
-    var sell = spineValue(id, 'koronet_sell_gmv_ytd');
-    var estBuy = spineValue(id, 'total_purchases_estimate');
-    var buy = spineValue(id, 'koronet_buy_gmv_ytd');
-    return Object.assign({}, a, {
-      _spine: spine,
-      rep: getStagedRep(a),
-      priority_order: PRIORITY_ORDER[a.priority_level] != null ? PRIORITY_ORDER[a.priority_level] : 99,
-      est_sell: estSell, koronet_sell: sell, est_buy: estBuy, koronet_buy: buy,
-      penetration: estSell && sell != null ? sell / estSell * 100 : null,
-      buy_penetration: estBuy && buy != null ? buy / estBuy * 100 : null,
-      online_pct_val: spineValue(id, 'koronet_sell_online_share_ytd'),
-      online_buy_pct: spineValue(id, 'koronet_buy_online_share_ytd')
-    });
-  });
-  window.FILTERED_ACCOUNTS = scope;
-  scope.sort(function(a,b) {
-    if(sortCol === 'name' || sortCol === 'rep') return ((a[sortCol]||'').toLowerCase()).localeCompare((b[sortCol]||'').toLowerCase()) * sortDir;
-    var av = sortCol === 'online_pct' ? a.online_pct_val : a[sortCol];
-    var bv = sortCol === 'online_pct' ? b.online_pct_val : b[sortCol];
-    return ((av == null ? -1 : av) - (bv == null ? -1 : bv)) * sortDir;
-  });
-  var totals = {estSell:0,sell:0,estBuy:0,buy:0,count:scope.length};
-  var html = '';
-  scope.forEach(function(a,i) {
-    var id = a.company_id, s = a._spine, m = s ? s.metrics : {};
-    var sellOnline = m.koronet_sell_online_share_ytd, buyOnline = m.koronet_buy_online_share_ytd;
-    var unkeyed = !s;
-    if(a.est_sell != null) totals.estSell += a.est_sell;
-    if(a.koronet_sell != null) totals.sell += a.koronet_sell;
-    if(a.est_buy != null) totals.estBuy += a.est_buy;
-    if(a.koronet_buy != null) totals.buy += a.koronet_buy;
-    var status = unkeyed ? '<span class="data-label">UNKEYED</span>' : '';
-    html += '<tr><td><button class="expand-btn" data-idx="'+i+'">&#9654;</button></td><td><strong>'+a.name+'</strong> '+status+'<br><span class="data-label">'+(id || 'no canonical company ID')+'</span></td>'+
-      '<td>'+a.rep+'</td><td>'+priorityBadge(a.priority_level)+'</td><td>'+ctBadge(a.ct_id,a)+'</td>'+
-      '<td style="text-align:right">'+spineStateHtml(m.company_gmv_estimate,true)+'</td><td style="text-align:right">'+spineStateHtml(m.koronet_sell_gmv_ytd,true)+'</td><td style="text-align:right">'+(a.penetration == null ? '—' : fmtPct(a.penetration))+'</td><td style="text-align:right">'+spineStateHtml(sellOnline,false)+'</td>'+
-      '<td style="text-align:right">'+spineStateHtml(m.total_purchases_estimate,true)+'</td><td style="text-align:right">'+spineStateHtml(m.koronet_buy_gmv_ytd,true)+'</td><td style="text-align:right">'+(a.buy_penetration == null ? '—' : fmtPct(a.buy_penetration))+'</td><td style="text-align:right">'+spineStateHtml(buyOnline,false)+'</td>'+
-      '<td style="text-align:right">'+spineStateHtml(m.direct_transaction_fees_ytd,true)+'</td><td style="text-align:right">—</td><td style="text-align:center"><span class="data-label">NEEDS 2 SNAPSHOTS</span></td><td style="text-align:center"><span class="data-label">BLOCKED</span></td><td style="text-align:center">—</td><td><span class="data-label">NOT JOINED</span></td></tr>';
-    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="19"><div class="expand-content">';
-    if(unkeyed) {
-      html += '<div class="expand-section"><h4>POTENTIAL</h4><p>This row has no canonical company ID, so it is deliberately excluded from the operational spine. Resolve identity before interpreting any metric.</p></div>';
-    } else {
-      var buyScenario = a.est_buy != null ? fmt$(a.est_buy * .10)+' online GMV and '+fmt$(a.est_buy * .10 * .015)+' indirect fee scenario' : 'requires a company purchase estimate';
-      html += '<div class="expand-section"><h4>POTENTIAL</h4><p><strong>Company scale:</strong> '+spineStateHtml(m.company_gmv_estimate,true)+' · <strong>estimated total purchases:</strong> '+spineStateHtml(m.total_purchases_estimate,true)+'. These are models, not observed company totals.</p><p><strong>Observed through 2026-07-30:</strong> '+spineStateHtml(m.koronet_buy_gmv_ytd,true)+' Koronet BUY; '+spineStateHtml(m.koronet_sell_gmv_ytd,true)+' Koronet SELL. The ratios in the table are YTD observed / annual model, not annualized penetration.</p></div>';
-      html += '<div class="expand-section"><h4>OPPORTUNITIES</h4><p>No play is asserted from incomplete data. The current account reading is a decision surface: validate company GMV/purchases, then investigate BUY adoption or SELL activation only with compatible evidence.</p><p><span class="data-label">DATA GAPS:</span> LIST parity '+spineStateHtml(m.listing_inventory_parity,false)+' · SELL buyers '+spineStateHtml(m.sell_buyer_counts_ytd,false)+' · direct fees '+spineStateHtml(m.direct_transaction_fees_ytd,true)+'.</p></div>';
-      html += '<div class="expand-section"><h4>BUY</h4><p><strong>Observed Koronet BUY:</strong> '+spineStateHtml(m.koronet_buy_gmv_ytd,true)+'; online share '+spineStateHtml(buyOnline,false)+'. A +10 pp online scenario against the modeled purchase base is '+buyScenario+'; it is a planning scenario, not an opportunity claim.</p></div>';
-      html += '<div class="expand-section"><h4>LIST</h4><p><strong>Not measured.</strong> Active online/offline catalogue, vendor/category/variety/SKU parity, time horizon, bunches and fulfillment data are not in a compatible spine. Historical sale breadth is intentionally not shown as inventory coverage.</p></div>';
-      html += '<div class="expand-section"><h4>SELL</h4><p><strong>Observed Koronet SELL:</strong> '+spineStateHtml(m.koronet_sell_gmv_ytd,true)+'; online share '+spineStateHtml(sellOnline,false)+'. Buyer counts, conversion and direct fees are blocked, so this view cannot yet recommend traffic versus shop activation.</p></div>';
-    }
-    if(listFilterVal !== 'ALL' || sellFilterVal !== 'ALL') html += '<p style="font-size:11px;color:var(--amber)">LIST/SELL behavior filters are not applied: their required compatible data is blocked in the staged spine.</p>';
-    html += '</div></td></tr>';
-  });
-  document.getElementById('accountsBody').innerHTML = html;
-  document.getElementById('accountsFoot').innerHTML = '<tr class="total-row"><td></td><td>TOTAL ('+totals.count+' shown) — staged YTD</td><td></td><td></td><td></td><td style="text-align:right">'+fmt$(totals.estSell)+'</td><td style="text-align:right">'+fmt$(totals.sell)+'</td><td style="text-align:right">'+(totals.estSell ? fmtPct(totals.sell/totals.estSell*100) : '—')+'</td><td>—</td><td style="text-align:right">'+fmt$(totals.estBuy)+'</td><td style="text-align:right">'+fmt$(totals.buy)+'</td><td style="text-align:right">'+(totals.estBuy ? fmtPct(totals.buy/totals.estBuy*100) : '—')+'</td><td>—</td><td>BLOCKED</td><td>—</td><td>—</td><td>BLOCKED</td><td>—</td><td>NOT JOINED</td></tr>';
-  document.getElementById('filterCount').textContent = scope.length+' of '+ACCOUNTS.length+' accounts · staged spine';
-  document.querySelectorAll('.expand-btn').forEach(function(btn) { btn.addEventListener('click', function() { var row=document.querySelector('tr[data-expand="'+this.dataset.idx+'"]'); this.classList.toggle('open'); if(row) row.classList.toggle('open'); }); });
-  // Lead lists and the Control Room retain their separate, uncut sources until
-  // each has its own compatible contract. Do not refresh them from this view.
-}
-
-function renderAccountSpineUnavailable() {
-  var body = document.getElementById('accountsBody');
-  var foot = document.getElementById('accountsFoot');
-  if(body) body.innerHTML = '<tr><td colspan="19" style="padding:24px;color:var(--red)"><strong>Account spine unavailable.</strong> Portfolio/POTENTIAL metrics are intentionally withheld rather than falling back to legacy files with incompatible windows and proxies. Reload after <code>account_spine_2026-07-30_staged.json</code> is available.</td></tr>';
-  if(foot) foot.innerHTML = '';
-  var count = document.getElementById('filterCount'); if(count) count.textContent = '0 shown · staged spine unavailable';
-}
-
 function renderAccounts() {
-  if(window.ACCOUNT_SPINE && window.ACCOUNT_SPINE.accounts) { renderStagedAccounts(); return; }
-  if(window.ACCOUNT_SPINE_STATUS === 'failed') { renderAccountSpineUnavailable(); return; }
   var rep = document.getElementById('repFilter').value;
   var search = document.getElementById('searchInput').value.toLowerCase();
   var priority = document.getElementById('priorityFilter').value;
@@ -1614,9 +1391,9 @@ function renderAccounts() {
 
     // Est Buy cascade (unchanged)
     var estBuyVal = 0;
-    if(hasUsableBuyEstimate(estData)) {
+    if(estData && estData.est_buy_gmv > 0) {
       estBuyVal = estData.est_buy_gmv;
-    } else if(!(estData && String(estData.est_buy_source || '').toUpperCase() === 'CORE')) {
+    } else {
       var estSellRef = (estData && estData.est_sell_gmv > 0) ? estData.est_sell_gmv : (a.annual_sales_est || 0);
       var mSellTotal = m ? m.sell_total : 0;
       var mProcTotal = m ? m.proc_total : 0;
@@ -1890,24 +1667,7 @@ function renderAccounts() {
     html += '</tr>';
 
     // === EXPAND ROW — cards: POTENTIAL | OPPORTUNITIES | BUY | LIST | SELL ===
-    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="19"><div class="expand-cell">';
-    var deepDive = window.DEEP_DIVE_REGISTRY && window.DEEP_DIVE_REGISTRY.accounts ? window.DEEP_DIVE_REGISTRY.accounts[a.company_id] : null;
-    if(deepDive && deepDive.path && window.DEEP_DIVE_REGISTRY.source_repository && window.DEEP_DIVE_REGISTRY.source_branch) {
-      var deepDiveUrl = window.DEEP_DIVE_REGISTRY.source_repository + '/blob/' + window.DEEP_DIVE_REGISTRY.source_branch + '/' + deepDive.path;
-      html += '<div class="deep-dive-route"><strong>Deep Dive available</strong><span>Account-specific evidence · as of '+deepDive.as_of+'</span><a href="'+deepDiveUrl+'" target="_blank" rel="noopener">Open '+deepDive.label+' ↗</a></div>';
-    } else {
-      html += '<div class="deep-dive-route deep-dive-gap"><strong>Deep Dive not published</strong><span>The compact cards are the current evidence. Capture the consequential unanswered question before creating one.</span></div>';
-      var requestOpp = (a._opps && a._opps.length) ? (a._opps[0].action || a._opps[0].text) : 'determine the first BUY, LIST, SELL or configuration constraint worth testing';
-      var requestWhy = 'Estimated annual sell GMV '+fmt$(a.est_sell)+'; Koronet sell '+fmt$(a.koronet_sell)+' ('+fmtPct(a.penetration)+' capture)';
-      if(a.online_pct_val != null) requestWhy += '; '+fmtPct(a.online_pct_val)+' of observed Koronet sell is online';
-      html += '<details class="deep-dive-request"><summary>REQUEST DRAFT · not sent or executed</summary>';
-      html += '<p><span class="request-label">Why now</span>'+requestWhy+'. The Core can size the gap but cannot attribute its driver.</p>';
-      html += '<p><span class="request-label">Opportunity</span>Determine whether the material growth path is capture, online adoption, supply/listing readiness, or buyer conversion — before assigning a play.</p>';
-      html += '<p><span class="request-label">Decision needed</span>'+requestOpp+'.</p>';
-      html += '<p><span class="request-label">Data requested</span>Offline vs online BUY/SELL by customer, vendor, category and time horizon; what was bought versus actually listed; active connections and configuration/workflow blockers; customer objective, owner and prior response.</p>';
-      html += '<p><span class="request-label">Status</span><span class="request-state">DRAFT ONLY</span> — review/approval required before a Deep Dive, customer contact or data pull.</p></details>';
-    }
-    html += '<div class="expand-grid">';
+    html += '<tr class="expand-row" data-expand="'+i+'"><td colspan="19"><div class="expand-cell"><div class="expand-grid">';
 
     // Data lookups needed across cards
     var estData = a.company_id ? (window.EST_GMV||{})[a.company_id] : null;
@@ -1967,7 +1727,7 @@ function renderAccounts() {
     var sellPenColor = sellPenPct === null ? 'var(--text-muted)' : sellPenPct > 50 ? 'var(--green)' : sellPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var potCardBuyTotal = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : null);
     var potCardBuyTotalAnnualized = potCardBuyTotal != null ? potCardBuyTotal * tfMultiplier : null;
-    var buyPenPct = (hasUsableBuyEstimate(estData) && potCardBuyTotalAnnualized != null) ? (potCardBuyTotalAnnualized / estData.est_buy_gmv * 100) : null;
+    var buyPenPct = (estData && estData.est_buy_gmv > 0 && potCardBuyTotalAnnualized != null) ? (potCardBuyTotalAnnualized / estData.est_buy_gmv * 100) : null;
     var buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var sellGap = sellEstDenom && potCardSellTotalAnnualized != null ? (sellEstDenom - potCardSellTotalAnnualized) : null;
     var oraCalcDiverge = a.annual_sales_est && estData && estData.est_sell_gmv > 0 ? Math.abs(a.annual_sales_est - estData.est_sell_gmv) / Math.max(a.annual_sales_est, estData.est_sell_gmv) * 100 : 0;
@@ -2037,11 +1797,9 @@ function renderAccounts() {
     // Est Buy — calculate from buy/sell ratio if missing
     var estBuyVal = 0;
     var estBuyNote = '';
-    if(hasUsableBuyEstimate(estData)) {
+    if(estData && estData.est_buy_gmv > 0) {
       estBuyVal = estData.est_buy_gmv;
       estBuyNote = estData.est_buy_source+' ('+estData.est_buy_confidence+')';
-    } else if(estData && String(estData.est_buy_source || '').toUpperCase() === 'CORE') {
-      estBuyNote = 'Needs validated potential — CORE value is observed BUY, not an estimate';
     } else {
       var estSellRef = estData && estData.est_sell_gmv > 0 ? estData.est_sell_gmv : (a.annual_sales_est || 0);
       if(met && met.proc_total > 0 && met.sell_total > 0 && estSellRef > 0) {
@@ -2401,7 +2159,7 @@ function renderAccounts() {
     html += '<div class="expand-section"><h4>BUY \u2014 \u00bfCompra por la plataforma?</h4>';
 
     // --- RESUMEN — prefer V2 temporal values ---
-    var buyEstTotal = estBuyVal > 0 ? estBuyVal : (hasUsableBuyEstimate(estData) ? estData.est_buy_gmv : 0);
+    var buyEstTotal = estBuyVal > 0 ? estBuyVal : (estData ? estData.est_buy_gmv : 0);
     var buyViaKomet = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : 0);
     var buyOnline = potBuyOnline != null ? potBuyOnline : (met ? met.proc_online : 0);
     var buyOffline = buyViaKomet - buyOnline;
@@ -2409,20 +2167,15 @@ function renderAccounts() {
     var buyOnlinePctCard = buyViaKomet > 0 ? (buyOnline / buyViaKomet * 100) : 0;
 
     // UNIT ECONOMICS — what 10% more online procurement means
-    var ueIncrement = buyEstTotal > 0 ? Math.round(buyEstTotal * 0.10) : null;
-    var ueIndirectFee = ueIncrement != null ? Math.round(ueIncrement * 0.015) : null;
+    var ueIncrement = Math.round(buyEstTotal * 0.10);
+    var ueIndirectFee = Math.round(ueIncrement * 0.015);
     var currentProcOnlinePct = buyViaKomet > 0 ? (buyOnline / buyViaKomet * 100) : 0;
     var currentIndirectFees = Math.round(buyOnline * 0.015);
     html += '<div style="margin-bottom:6px"><strong style="font-size:11px;color:var(--text-muted)">UNIT ECONOMICS</strong></div>';
     html += '<div style="background:rgba(37,99,235,0.06);border-left:3px solid var(--blue);padding:6px 10px;border-radius:0 4px 4px 0;margin-bottom:6px;font-size:11px">';
-    if(ueIncrement != null) {
-      html += '<div style="font-weight:600;margin-bottom:3px">For every 10% more online procurement:</div>';
-      html += '<div style="padding-left:8px">= <strong>'+fmt$(ueIncrement)+'</strong> in procurement</div>';
-      html += '<div style="padding-left:8px">= <strong>'+fmt$(ueIndirectFee)+'</strong> in indirect fees (1.5%)</div>';
-    } else {
-      html += '<div style="font-weight:600;margin-bottom:3px">Scenario blocked</div>';
-      html += '<div style="padding-left:8px;color:var(--text-muted)">Needs a validated annual BUY potential; observed CORE procurement is not a denominator.</div>';
-    }
+    html += '<div style="font-weight:600;margin-bottom:3px">For every 10% more online procurement:</div>';
+    html += '<div style="padding-left:8px">= <strong>'+fmt$(ueIncrement)+'</strong> in procurement</div>';
+    html += '<div style="padding-left:8px">= <strong>'+fmt$(ueIndirectFee)+'</strong> in indirect fees (1.5%)</div>';
     html += '<div style="margin-top:4px;color:var(--text-muted)">Currently: <strong>'+fmtPct(currentProcOnlinePct)+'</strong> online \u2192 <strong>'+fmt$(currentIndirectFees)+'</strong> in indirect fees</div>';
     html += '</div>';
 
@@ -2932,15 +2685,11 @@ function renderAccounts() {
       + ' | Offline: ' + fmt$(sellOfflineVal)
       + '</span></div>';
     // Offline buyer summary from BUYERS_FULL
-    if(sellBf && sellOfflineVal > 0) {
+    if(sellBf) {
       html += '<div style="font-size:11px;padding:4px 8px;background:rgba(217,119,6,0.06);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;margin:4px 0">';
       html += '<strong>Offline:</strong> '+(sellBf.offline_buyers||0)+' total buyers, '+(sellBf.offline_buyers_l30d||0)+' active L30D';
       html += ' | AOV: '+(sellBf.aov_offline ? fmt$(sellBf.aov_offline) : '\u2014');
       html += ' | Churned: '+(sellBf.churned_buyers||0);
-      html += '</div>';
-    } else if(sellBf) {
-      html += '<div style="font-size:11px;padding:4px 8px;background:rgba(217,119,6,0.06);border-left:3px solid var(--amber);border-radius:0 4px 4px 0;margin:4px 0;color:var(--text-muted)">';
-      html += 'Offline buyer counts withheld: this card has no corroborated offline GMV for the selected window.';
       html += '</div>';
     }
     // SO WHAT
@@ -2997,17 +2746,15 @@ function renderAccounts() {
       + '<th>Metric</th><th>Online</th><th>Offline</th><th>Total</th>'
       + '</tr></thead><tbody>';
     // Buyers row — prefer BUYERS_FULL, fall back to buyerData (buyers.json)
-    var onlineBuyerCountsUsable = sellOnlineVal > 0;
-    var offlineBuyerCountsUsable = sellOfflineVal > 0;
-    var bfOnline = onlineBuyerCountsUsable ? (bf ? bf.online_buyers : (buyerData ? buyerData.online_buyers : null)) : null;
-    var bfOffline = offlineBuyerCountsUsable ? (bf ? bf.offline_buyers : (buyerData ? buyerData.offline_buyers : null)) : null;
-    var bfTotal = (onlineBuyerCountsUsable || offlineBuyerCountsUsable) ? (bf ? bf.total_buyers : (buyerData ? buyerData.total_buyers : null)) : null;
+    var bfOnline = bf ? bf.online_buyers : (buyerData ? buyerData.online_buyers : null);
+    var bfOffline = bf ? bf.offline_buyers : (buyerData ? buyerData.offline_buyers : null);
+    var bfTotal = bf ? bf.total_buyers : (buyerData ? buyerData.total_buyers : null);
     html += '<tr><td>Buyers</td><td>' + (bfOnline != null ? bfOnline : '\u2014') + '</td><td>' + (bfOffline != null ? bfOffline : '\u2014') + '</td><td>' + (bfTotal != null ? bfTotal : '\u2014') + '</td></tr>';
     // Active L30D — prefer BUYERS_FULL, fall back to bv2, then sellL30D
-    var bfL30DOnline = onlineBuyerCountsUsable && bf ? bf.online_buyers_l30d : null;
-    var bfL30DOffline = offlineBuyerCountsUsable && bf ? bf.offline_buyers_l30d : null;
-    var bfL30DOnlineStr = onlineBuyerCountsUsable ? (bfL30DOnline != null ? bfL30DOnline : (bv2 && (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) ? (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) : (sellL30D ? sellL30D.buyers_online_l30d : '\u2014'))) : '\u2014';
-    var bfL30DOfflineStr = offlineBuyerCountsUsable && bfL30DOffline != null ? bfL30DOffline : '\u2014';
+    var bfL30DOnline = bf ? bf.online_buyers_l30d : null;
+    var bfL30DOffline = bf ? bf.offline_buyers_l30d : null;
+    var bfL30DOnlineStr = bfL30DOnline != null ? bfL30DOnline : (bv2 && (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) ? (bv2.ACTIVE_BUYERS_L30D || bv2.active_buyers_l30d) : (sellL30D ? sellL30D.buyers_online_l30d : '\u2014'));
+    var bfL30DOfflineStr = bfL30DOffline != null ? bfL30DOffline : '\u2014';
     html += '<tr><td>Active L30D</td><td>' + bfL30DOnlineStr + '</td><td>' + bfL30DOfflineStr + '</td><td>\u2014</td></tr>';
     // New buyers — prefer BUYERS_FULL current_month, fall back to Q2 with explicit label
     var bfNewMonth = bf ? bf.new_buyers_current_month : null;
@@ -3259,81 +3006,6 @@ function renderAccounts() {
 
   // Refresh lead lists to match the current portfolio filter
   renderLeadLists();
-  renderAIRequests();
-}
-
-// === SYSTEM REQUESTS / IDEAS — review-only queue, never an execution engine ===
-function renderAIRequests() {
-  function setInner(id, html) { var el = document.getElementById(id); if(el) el.innerHTML = html; }
-  if(!ACCOUNTS.length) return;
-  var decisions = window.SYSTEM_REQUEST_REVIEW && window.SYSTEM_REQUEST_REVIEW.decisions ? window.SYSTEM_REQUEST_REVIEW.decisions : {};
-  function reviewed(id, fallback) { return decisions[id] || {status:fallback || 'DRAFT'}; }
-  function statusBadge(review) {
-    var colors = {DRAFT:'background:#fef3c7;color:#92400e', NEEDS_EVIDENCE:'background:#dbeafe;color:#1d4ed8', APPROVED:'background:#dcfce7;color:#166534', REJECTED:'background:#fee2e2;color:#991b1b'};
-    return '<span class="badge" style="'+(colors[review.status] || colors.DRAFT)+'">'+review.status+'</span>';
-  }
-  var registry = window.DEEP_DIVE_REGISTRY && window.DEEP_DIVE_REGISTRY.accounts ? window.DEEP_DIVE_REGISTRY.accounts : {};
-  var queueScope = window.FILTERED_ACCOUNTS || ACCOUNTS;
-  // Deep Dives are operational review requests, not a research backlog. Exclude
-  // ECOSYSTEM by default: its estimates/coverage are not a valid priority queue.
-  var operationalCohorts = {TA:true, IMPL:true, P1:true, CS_P2:true, CS_TRACKED:true, WATCH:true};
-  var deepDiveRequests = queueScope.filter(function(a) {
-    return a.company_id && operationalCohorts[a.priority_level] && !registry[a.company_id] && ((a.annual_sales_est || 0) > 0 || (METRICS[a.company_id] && METRICS[a.company_id].sell_total > 0));
-  }).map(function(a) {
-    var m = METRICS[a.company_id] || {};
-    var est = a.annual_sales_est || 0;
-    var sell = m.sell_total || 0;
-    var gap = Math.max(0, est - sell);
-      return { request_id:'DD-'+a.company_id, account:a, est:est, sell:sell, gap:gap, online:m.online_pct, priority:a.priority_level || 'UNASSIGNED' };
-  }).sort(function(x, y) {
-    var xPriority = PRIORITY_ORDER[x.priority] != null ? PRIORITY_ORDER[x.priority] : 99;
-    var yPriority = PRIORITY_ORDER[y.priority] != null ? PRIORITY_ORDER[y.priority] : 99;
-    if(xPriority !== yPriority) return xPriority - yPriority;
-    return (y.gap || y.est) - (x.gap || x.est);
-  });
-  var globalRequests = window.AI_REQUEST_QUEUE && Array.isArray(window.AI_REQUEST_QUEUE.global_requests) ? window.AI_REQUEST_QUEUE.global_requests : [];
-  var interventions = window.INTERVENTIONS && Array.isArray(window.INTERVENTIONS.records) ? window.INTERVENTIONS.records : [];
-  var meetingFollowups = window.MEETING_FOLLOWUPS && Array.isArray(window.MEETING_FOLLOWUPS.followups) ? window.MEETING_FOLLOWUPS.followups : [];
-  var approvedRequestCount = Object.keys(decisions).filter(function(id){ return decisions[id] && decisions[id].status === 'APPROVED'; }).length;
-  setInner('aiRequestsSummary',
-    metricCard('Deep Dive drafts', deepDiveRequests.length, 'Operating cohorts only; priority first, then visible sell gap') +
-    metricCard('Data / system drafts', globalRequests.length, 'Known gaps and suggestions for review') +
-    metricCard('Meeting signals', meetingFollowups.length, 'Unverified context; not tasks or system requests') +
-    metricCard('Interventions', interventions.length+' / '+approvedRequestCount, 'Recorded / approved requests; no external execution from this tab'));
-  if(!deepDiveRequests.length) {
-    setInner('aiDeepDiveQueue', '<em>No Deep Dive requests in the current account filter.</em>');
-  } else {
-    var rows = deepDiveRequests.map(function(r, idx) {
-      var why = 'Est. sell '+fmt$(r.est)+' vs Koronet sell '+fmt$(r.sell)+(r.online != null ? '; online '+fmtPct(r.online) : '');
-      var review = reviewed(r.request_id);
-      return '<tr><td>'+(idx + 1)+'</td><td><strong>'+r.account.name+'</strong><span style="display:block;font-size:10px;color:var(--text-muted);margin-top:2px">'+r.request_id+'</span></td><td>'+statusBadge(review)+'</td><td>'+r.priority+'</td><td>'+why+'</td><td>Identify whether capture, BUY, LIST, SELL or configuration is the highest-value constraint.</td><td>Offline/online BUY+SELL by customer/vendor/category/horizon; listed vs bought inventory; connections, blockers and prior customer response.</td></tr>';
-    }).join('');
-    setInner('aiDeepDiveQueue', '<p style="margin-bottom:10px;color:var(--text-muted)">Operating cohorts only: TA, IMPL, P1, CS P2, CS Tracked and WATCH. ECOSYSTEM is intentionally excluded from this review queue because potential/coverage alone is not a valid intervention priority. Rank is a review aid, not a decision.</p><div style="overflow-x:auto"><table class="def-table"><thead><tr><th>#</th><th>Account</th><th>Status</th><th>Priority</th><th>Why now</th><th>Opportunity / question</th><th>Data requested</th></tr></thead><tbody>'+rows+'</tbody></table></div>');
-  }
-  if(!globalRequests.length) {
-    setInner('aiGlobalRequests', '<em>No global requests generated.</em>');
-  } else {
-    setInner('aiGlobalRequests', globalRequests.map(function(r) {
-      var review = reviewed(r.request_id, r.status);
-      var reviewNote = review.decision_reason ? '<p><span class="request-label">Review</span>'+statusBadge(review)+' · '+review.decision_reason+(review.decision_by ? ' · '+review.decision_by : '')+'</p>' : '<p><span class="request-label">Review</span>'+statusBadge(review)+'</p>';
-      return '<details class="deep-dive-request"><summary>'+r.type+' · '+r.request_id+' · '+review.status+'</summary><p><span class="request-label">Request</span><strong>'+r.title+'</strong></p><p><span class="request-label">Why now</span>'+r.why_now+'</p><p><span class="request-label">Opportunity</span>'+r.opportunity+'</p><p><span class="request-label">Decision needed</span>'+r.decision_needed+'</p><p><span class="request-label">Requested</span>'+r.requested+'</p>'+reviewNote+'<p><span class="request-label">Source</span>'+r.source+'</p></details>';
-    }).join(''));
-  }
-  if(!meetingFollowups.length) {
-    setInner('meetingFollowups', '<em>No meeting follow-ups captured.</em>');
-  } else {
-    setInner('meetingFollowups', meetingFollowups.map(function(f) {
-      return '<details class="deep-dive-request"><summary>'+f.account_name+' · '+f.followup_id+' · '+f.status+'</summary><p><span class="request-label">What it means</span>'+f.plain_language+'</p><p><span class="request-label">Recorded owner</span>'+f.recorded_owner+'</p><p><span class="request-label">Later, confirm</span>'+f.what_to_confirm_later+'</p><p><span class="request-label">Trust</span>'+f.trust+'</p><p><span class="request-label">Source</span>'+f.source+'</p></details>';
-    }).join(''));
-  }
-  if(!interventions.length) {
-    setInner('interventionQueue', '<p><strong>No intervention is active.</strong> After an explicit request approval, create a proposal here with: objective, evidence, owner, next action, next check and source. It remains review-gated until the action owner confirms it.</p><p style="margin-top:7px;color:var(--text-muted)">Completion later requires customer response/result, measured outcome and learning — so the system can improve the play instead of merely marking work done.</p>');
-  } else {
-    var interventionRows = interventions.map(function(x) {
-      return '<tr><td><strong>'+x.intervention_id+'</strong></td><td>'+x.request_id+'</td><td>'+x.account_id+'</td><td>'+x.objective+'</td><td>'+x.owner+'</td><td>'+x.next_action+'</td><td>'+x.next_check_at+'</td><td>'+x.status+'</td></tr>';
-    }).join('');
-    setInner('interventionQueue', '<div style="overflow-x:auto"><table class="def-table"><thead><tr><th>Intervention</th><th>Request</th><th>Account</th><th>Objective</th><th>Owner</th><th>Next action</th><th>Next check</th><th>Status</th></tr></thead><tbody>'+interventionRows+'</tbody></table></div>');
-  }
 }
 
 // === HEALTH SUMMARY (Tab 2) — elements may not exist in current HTML; guards prevent JS errors ===
