@@ -6301,5 +6301,21 @@
     "annual_sales_est": 0,
     "has_scorecard": true,
     "config_source": "COMPANIES_SV_JUL30"
+  },
+  {
+    "name": "Stemline Wholesale",
+    "company_id": "742939",
+    "industry": "Floral - Wholesaler",
+    "ct_id": "WH_UNCLASSIFIED",
+    "priority_level": "NEEDS_REVIEW",
+    "system_type": "Needs source reconciliation",
+    "is_esuite": null,
+    "has_procurement": null,
+    "has_eshops": null,
+    "go_live": null,
+    "status": "Observed TX activity; account metadata needs reconciliation",
+    "annual_sales_est": null,
+    "has_scorecard": true,
+    "config_source": "HISTORICAL_SCORECARD_AND_V2_TX_DATA"
   }
 ]
