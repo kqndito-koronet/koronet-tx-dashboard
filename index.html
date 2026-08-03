@@ -983,6 +983,16 @@ function getBenchmark(metricKey, segment) {
   return bm.network || null;
 }
 
+// Shared renderer for opportunity provenance. It must be global because the
+// account-table renderer and getOpportunities() both use it.
+function leadMeta(lead) {
+  return '<div style="font-size:9px;color:var(--text-muted);margin-top:2px;padding-left:16px">'
+    + (lead.status || 'DRAFT') + ' · prerequisite: ' + (lead.prerequisite || 'needs review')
+    + ' · source: ' + (lead.source || 'not mapped')
+    + ' · measure: ' + (lead.outcome_metric || 'needs definition')
+    + '</div>';
+}
+
 // === OPPORTUNITY GENERATOR ===
 // Generates ALL opportunities (config + BUY + LIST + SELL), each with:
 //   - text: human-readable description with SO WHAT
