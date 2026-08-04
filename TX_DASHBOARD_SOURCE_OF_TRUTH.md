@@ -8,7 +8,8 @@ This document explains what the dashboard is for, what each tab is allowed to an
 
 ## What “operational” means
 
-This is not a reporting destination. It is the weekly operating loop for priority accounts:
+This is not a reporting destination. It feeds a three-times-daily operating
+loop for priority accounts:
 
 ```text
 priority account → evidence → bottleneck → next action → owner → customer result → learning → next review
@@ -53,6 +54,11 @@ The user must be able to move easily between **all accounts**, **current priorit
 ## Delivery priority
 
 ### P0 — correct Tab 1 structure
+
+**Terminology guard:** this `P0` is the immediate **P0 Build / Tab 1**
+priority. It is distinct from the later **P0 Operations Action Layer** defined
+in `TX_DASHBOARD_SYSTEM_OBJECTIVE.md`: a dashboard-native, review-gated human
+action layer. Completing the cockpit does not make that action layer ready.
 
 The immediate goal is not to build the entire operating loop. It is to make the account cockpit structurally correct:
 
@@ -119,7 +125,19 @@ Metrics are inputs to that loop. A tab, card or lead that does not help move the
 
 The dashboard is an account-first operating surface for Transactions. It answers: **how much potential does this account have, what do we capture, what is blocking the next stage, who acts next, and how will we know it worked?**
 
-The operating sequence is **CONFIG → BUY → LIST → SELL**. SELL interpretations are not valid when LIST is not ready; LIST interpretations are not valid when BUY is not happening. The dashboard shows evidence and bottlenecks. Facu decides priorities; it does not autonomously make strategy decisions.
+It feeds the TX portfolio review with evidence-backed account cases. It does
+not replace the Board/Opportunity portfolio, decide cross-lane trade-offs, or
+turn a `DRAFT` opportunity into a team instruction. Those decisions belong to
+the review layer and Facu.
+
+For broad operating execution, the default readiness sequence is **CONFIG → BUY
+→ LIST → SELL**. In the broad motion, do not infer that a later-stage problem
+is solved without the relevant earlier-stage evidence. This is a diagnostic
+guard, not a claim that every account or strategic test must move one stage at
+a time. A parallel test must visibly name its cohort, readiness, confidence,
+prerequisites, owner, metric and expected learning. The dashboard shows
+evidence and bottlenecks. Facu decides priorities; it does not autonomously
+make strategy decisions.
 
 Out of scope: replacing the pacing dashboard, board/TAM opportunity sizing, unsupported strategic conclusions, or a second disconnected data model.
 
@@ -142,7 +160,8 @@ The UI reads local JSON files from `docs/transactions/data/`. The build/update p
 
 | Data needed | File(s) currently used | Meaning / rule |
 |---|---|---|
-| Account identity, type, owner, priority | `accounts.json`, `companies_sv_full.json` | Match by `company_id`; normalized name only as fallback |
+| Account identity and product/configuration context | `accounts.json`, `companies_sv_full.json` | Match by `company_id`; normalized name only as fallback. These sources do not define the operating portfolio. |
+| Operating portfolio: section(s), phase, owner, tags and stated blocker | `ops/canonical/accounts_registry.md` | **Canonical manual source.** Preserve its multi-tag taxonomy (`Implementation`, `TA`, `CS P2`, `P1`, `WATCH`, `MultiLocation`, `Pipeline`, `PARKED`); do not collapse it into the single `accounts.json.priority_level` field. `accounts.json` is a data mirror for dashboard joins, not a substitute for the registry. |
 | Est. total sell/buy GMV | `est_gmv.json`, `christine.json`, `sfdc_ora_backfill.json` | ORA/SFDC/Christine source preferred; estimate explicitly labeled |
 | Koronet sell/buy, penetration | `metrics.json`, `buy_detail.json`, `sell_detail.json` | Penetration denominator is estimated total buying/selling, not only Koronet volume |
 | Configuration and implementation | `config.json`, `config_backfill.json`, `definitions.json` | Product-type-specific blockers; do not infer a product conclusion from missing input |
@@ -154,6 +173,22 @@ The UI reads local JSON files from `docs/transactions/data/`. The build/update p
 | Format and order mix | `loop2_sell_format_time_v2.json`, `buy_detail.json` | Boxes/bunches/short/forward and order mix |
 
 ## Applied Facu feedback
+
+### Feedback → no-regression contract
+
+Reviewed operating feedback is recorded first as immutable source feedback,
+then decomposed into atomic findings linked to the account, dashboard surface,
+metric/data contract and acceptance test. A blocking finding must have an
+explicit resolution or waiver with evidence; it is not considered resolved
+because a later dashboard build happens to render.
+
+`data/feedback_fixtures.json` is the machine-readable release gate. The TX
+build invokes `scripts/validate_tx_card_contract.py`, which evaluates those
+fixtures. A failing fixture blocks `VERIFIED` promotion; it neither alters
+account data nor autonomously selects an account intervention. Price's is the
+first fixture (`TX-PRICE-20260801-METRIC-INTEGRITY`). Future repeated feedback
+must extend the relevant fixture or create a new case before a change can be
+called verified.
 
 - One unified dashboard; POTENTIAL first; MONETIZE merged into POTENTIAL; OPPORTUNITIES merged into CONFIG.
 - No unexplained semaphores; show real evidence inline.

@@ -27,6 +27,114 @@ Centro de operaciones para Cata, Facu y Christine. No es un reporte, no es un da
 - No es board/TAM opportunity sizing
 - No toma decisiones estratégicas — muestra evidencia, Facu/Cata/Christine deciden
 
+## Aug 1 resolution — one dashboard core, many connected inputs/outputs
+
+This resolves older references to separate Scorecard, Artifact, Leadership,
+CS and Implementation dashboards.
+
+**There is one TX Dashboard Core:** `docs/transactions/index.html` with one
+canonical data layer in `docs/transactions/data/`. It is the shared operating
+surface for Facu, Cata and Christine. It owns portfolio selection, account
+diagnosis, evidence/trust, priority context and the source-backed lead
+registry.
+
+Department-specific consumption must be derived from this core — approved
+filters/views, deep links or an execution package that consumes the same lead
+objects. It must not recreate metrics, lead logic, scores or account truth in
+another HTML/app.
+
+| Surface | Role under this decision | Rule |
+|---|---|---|
+| TX Dashboard Core (`index.html`) | Shared operational source of account diagnosis and priority evidence | The only place new account metric/lead logic may be introduced. |
+| Account Deep Dives (`accounts/`) | Account-specific investigation/history for a consequential unanswered question | Linked from Core; never reimplements portfolio logic. |
+| CS/Implementation execution package | Approved lead + playbook/enablement + case capture for the assigned team/account | Consumes Core evidence; may not calculate a competing health score or lead list. |
+| Leadership/Pacing/Opportunity | Aggregate target, ecosystem health and board context | Inputs/context to Core; not a replacement for account operations. |
+| Reporting | Priorities, actions, owners, leading indicators, KPI movement, blockers and learning | Reads the same Core/case data; does not become another account dashboard. |
+
+`leadership.html`, `cs.html`, `implementations.html` and historical Artifact
+files are **frozen reference surfaces**, not current sources of truth. No new
+feature, data logic or publish target may be added to them. A capability may
+be migrated from a reference surface only through a no-loss inventory that
+names its source, user, current behavior and Core destination. They remain
+available for audit until that migration is explicitly complete; do not delete
+or silently revive them.
+
+### Dashboard Core Loop — the bounded loop to build now
+
+The Dashboard Core Loop owns the quality and usefulness of the one dashboard;
+it does not own all commercial execution or Product delivery.
+
+```text
+Inputs: data refresh + account/CS/Implementation feedback + call/case evidence
+    → Dashboard Core: portfolio / account diagnosis / DRAFT & APPROVED leads
+    → Outputs: weekly priorities + execution packages + blocker requests
+    → Returned evidence: action, customer response, leading indicator, KPI,
+      objection, product/process friction
+    → Reporting + learning: reprioritize, strengthen/retire plays, update Core
+```
+
+The Core Loop must continuously answer: what changed, which account/play is
+priority, what action or decision is needed, who owns it, what evidence will
+prove progress, and what the system learned. It may propose; Facu/Cata/
+Christine retain priority and customer-action decisions.
+
+### P0 Operations Action Layer — acceptance gates
+
+The existing Control Room, Deep Dive drafts, meeting follow-ups and
+interventions are useful inputs to one dashboard-native P0 action layer. They
+are not themselves P0 merely because they appear in a queue. Do not build a
+separate workbench or account model.
+
+Before any surfaced account can be called P0-ready, it must make all five
+items visible:
+
+1. **Evidence-based selection** — why this account belongs in the small P0
+   set, not merely its legacy priority label or a generic gap.
+2. **Why now** — a dated metric movement, material event or source-backed
+   change, including source and freshness.
+3. **One account truth** — the P0 row/card reconciles with Core account
+   evidence across BUY/LIST/SELL/monetization; it cannot introduce a competing
+   score or account diagnosis.
+4. **Useful move** — a concrete next move, feasible owner/handoff, and how a
+   human can use it in a call, email or meeting. A data request alone is a
+   Deep Dive draft, not an action layer item.
+5. **Honest uncertainty and learning** — missing facts, blocker and confidence
+   before action; then result/customer response and learning after action.
+
+`DRAFT`, `NEEDS EVIDENCE`, `APPROVED` and intervention states remain review
+gates. The dashboard never uses P0 to execute an external action, change an
+account state, decide company priority or promote a play. Codex verifies these
+gates and the Price's feedback fixture before the layer is declared ready.
+
+### File organization and change law
+
+Keep the application root stable:
+
+```text
+docs/transactions/
+  index.html                  # only current Dashboard Core UI
+  data/                       # only canonical dashboard JSON layer
+  TX_DASHBOARD_SCOPE_V2.md    # authoritative product/surface contract
+  TX_DASHBOARD_SOURCE_OF_TRUTH.md
+  TX_FACU_FEEDBACK_AUG1.md    # source feedback and acceptance queue
+  TX_LOOP_STATE.md            # live Core Loop state
+  TX_DASHBOARD_*GUIDE*.md     # execution/reference material
+  TX_*OBJECTIVE*.md / TX_*OWNER_LOOP*.md  # north-star and operating contract
+  archive/reference files     # frozen, never a publish target
+```
+
+Do not perform a disruptive folder migration while the MVP is under audit.
+Instead, new work must be placed in the relevant current contract/data path
+and historical/reference surfaces must be explicitly labeled as such. Physical
+archive moves happen only after a no-loss inventory verifies all links and
+published routes.
+
+**Change law:** any proposed dashboard change must declare one of these
+destinations: Core UI, Core data contract, lead/play contract, execution
+package, reporting, deep dive, or reference archive. If it would introduce a
+second account data model, second lead engine, or second department dashboard,
+it is out of scope unless Facu explicitly changes this decision.
+
 ---
 
 ## Tab 1: ACCOUNTS (Cockpit)

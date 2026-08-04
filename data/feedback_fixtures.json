@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "purpose": "Machine-readable, blocking acceptance fixtures derived from reviewed operating feedback. A fixture prevents VERIFIED promotion; it never changes business data or chooses an intervention.",
+  "cases": [
+    {
+      "case_key": "TX-PRICE-20260801-METRIC-INTEGRITY",
+      "title": "TX Dashboard metric integrity — Price's validation fixture",
+      "status": "blocking",
+      "subject": {"type": "account", "id": "816515", "name": "Price's Floral Wholesale, LLC"},
+      "feedback_record": "docs/transactions/TX_PRICES_ACCEPTANCE_FEEDBACK_2026-08-01.md",
+      "targets": [
+        "transactions/accounts/816515",
+        "transactions/buy",
+        "transactions/list",
+        "transactions/sell",
+        "transactions/metric-definitions"
+      ],
+      "promotion_rule": "No dashboard card, lead or account diagnosis touching a listed target may be marked VERIFIED while a blocking finding fails.",
+      "findings": [
+        {
+          "finding_key": "PRICE-POT-001",
+          "kind": "metric_semantics",
+          "requirement": "Observed Koronet BUY must not be labelled estimated BUY potential.",
+          "acceptance_test": "Potential has method, inputs, date and confidence; otherwise observed BUY is separately named and windowed."
+        },
+        {
+          "finding_key": "PRICE-BUY-002",
+          "kind": "time_window",
+          "requirement": "Online BUY percentage must expose its period, denominator and as-of date.",
+          "acceptance_test": "A reviewer can distinguish current-month, prior-quarter and YTD values without calculating or guessing."
+        },
+        {
+          "finding_key": "PRICE-LIST-003",
+          "kind": "metric_definition",
+          "requirement": "LIST must not conflate listing, inventory, sales-recency or coverage; online/offline comparison needs one definition.",
+          "acceptance_test": "The rendered metric carries a definition and compatible online/offline coverage, or is explicitly unavailable/proxy."
+        },
+        {
+          "finding_key": "PRICE-SELL-004",
+          "kind": "spine_reconciliation",
+          "requirement": "Online/offline buyer counts and sell GMV must use the same source population and window.",
+          "acceptance_test": "Counts reconcile to total and no online-buyer claim is shown beside $0 online sell GMV without an explicit compatible explanation."
+        },
+        {
+          "finding_key": "PRICE-CONTEXT-005",
+          "kind": "commercial_context",
+          "requirement": "Reimplementation and pre-existing individual-ecommerce purchasing are source-backed context, not automatic Procurement attribution.",
+          "acceptance_test": "The account narrative cites dated evidence or says context is not yet verified."
+        },
+        {
+          "finding_key": "PRICE-LEAKAGE-006",
+          "kind": "decision_readiness",
+          "requirement": "BUY coverage can identify vendor/category/variety/SKU gaps and recurring online-to-offline leakage, or explicitly asks for the missing investigation.",
+          "acceptance_test": "No coverage card implies that a small offline vendor count explains offline GMV without compatible volume and transition evidence."
+        }
+      ]
+    }
+  ]
+}

@@ -167,6 +167,52 @@ provides the independent check queue for Codex/Facu. A P0/P1 finding blocks
 promotion. P2 findings must be explicitly carried into the next cycle or
 marked as an intentional, source-backed limitation.
 
+### Operating roadmap and authority gates
+
+Codex audits the builder loop, records reusable loop learnings, and proposes
+the next work. Claude builds. Facu retains approval over product priorities,
+customer-facing actions and any expansion of authority.
+
+| Phase | Delivered capability | Gate to advance | Authority |
+|---|---|---|---|
+| 0. Correct MVP | Correct account selection, POTENTIAL → lead → evidence flow, honest DRAFT leads, reusable data/semantic/UI contracts | No unresolved P0/P1; source/freshness visible; contrasting fixture evidence; user can investigate an account without misleading claims | Builder may implement scoped fixes; Facu approves priorities and customer actions |
+| 1. Daily reporting + refresh | Append-only daily snapshot, coverage/freshness, high-level daily movement and weekly cycle report | Two compatible snapshots; reconciled denominators; report separates observed movement from hypotheses | System may report and propose; never attributes causality or changes customer state |
+| 2. Assisted operations | Approved lead handoff with play, evidence, objection/pain-point capture, owner and outcome measurement | Recommendation quality reviewed by type; false-positive/approval/outcome rates measured | System proposes ranked actions; Facu approves each new action class |
+| 3. Progressive delegated operations | Pre-approved, reversible actions within narrowly defined play types; continual recommendation calibration | Stable approval and outcome quality for that exact action type; rollback/audit trail; Facu explicitly delegates it | Authority expands per action type, never globally |
+| 4. Learning-connected system | Deep dives and call/review outputs feed approved evidence into lead logic, plays, objections and pain points | Source/trust/review gates; no private commentary or unverified call inference becomes fact | System proposes learning promotions; Facu/owner approves canonical changes |
+
+#### Audit cadence
+
+For each Claude cycle, Codex checks: (1) the change against Facu's latest
+requirement, (2) source/denominator/timeframe and DRAFT semantics, (3) the
+smallest contrasting account fixture set, (4) cross-card consistency, and (5)
+whether the loop produced a shipped capability, a genuine blocker, or a
+decision-ready proposal. Repeated failure modes are captured as candidate
+system learnings; they are not promoted to universal rules without evidence
+and owner review.
+
+#### Data-discovery rule — no stopping at the current local files
+
+A schema, UI placeholder, or partial coverage result is a **BUILD artifact**,
+not completion of a data-pipeline outcome. When a required source is missing
+or incomplete, the builder must continue with a bounded discovery cycle before
+declaring `BLOCKED`:
+
+1. name the exact missing field, period, account population and acceptance
+   threshold;
+2. search the registered source, current pipeline outputs and relevant owner
+   runbooks for it; inspect schemas/coverage rather than assuming absence;
+3. try the smallest safe retrieval or reconciliation path available;
+4. record attempts, result, freshness and remaining gap; then either build the
+   next dependency or issue a decision-ready block naming the owner/access
+   required.
+
+`VERIFIED` applies only to the outcome claimed. A schema may be
+`AUTOMATED_CHECKED`; it cannot certify a daily reporting pipeline until a
+compatible snapshot exists, its source/freshness/coverage are verified, and
+the next scheduled retrieval is runnable. Never end a cycle merely because a
+locally buildable artifact exists while the requested data can still be sought.
+
 ## 5. How the system improves rather than accumulates reports
 
 For every approved action, capture one outcome metric and one learning state:

@@ -15,6 +15,16 @@ account evidence → priority / bottleneck → owner action → observed outcome
       └──── verification ← Facu feedback ← learning proposal ─┘
 ```
 
+## Architecture decision (Aug 1)
+
+`index.html` plus `data/` is the one TX Dashboard Core. It is the current
+operating source for Facu, Cata and Christine. Department-specific execution
+must consume this Core's approved evidence/lead objects; it must not duplicate
+account metrics or lead logic in a separate dashboard. `leadership.html`,
+`cs.html`, `implementations.html` and historical Artifact files are frozen
+reference surfaces pending no-loss migration. See `TX_DASHBOARD_SCOPE_V2.md`
+for the binding architecture and change law.
+
 ## Read in this order
 
 | Need | Read / open |

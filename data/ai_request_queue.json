@@ -107,6 +107,42 @@
       "source": "docs/transactions/data/gmv_research/816515.json · ops/frameworks/floral_gmv_estimator_prompt.md"
     },
     {
+      "request_id": "AI-DATA-TX-CONFIGURATION-AUDIT-FEED",
+      "type": "DATA_REQUEST",
+      "status": "DRAFT",
+      "title": "Publish a dated, raw configuration audit feed for eShop settings",
+      "why_now": "The compact config snapshot covers 397 accounts but often has no extraction date and can conflict with a raw COMPANY_SETTINGS extract. The MVP can show a verified snapshot, but it must not turn a stale or contradictory value into a blocker or play.",
+      "opportunity": "Lets LIST distinguish a product entitlement from the setting that actually controls visibility, bunches, future availability, on-hand and checkout.",
+      "decision_needed": "Confirm which source is canonical per setting and whether company or company-location scope wins when values conflict.",
+      "requested": "At each daily cutoff, return company_id, company_location_id where relevant, setting_key, raw_value, normalized_value, source view, source_updated_at or extraction timestamp, audit version, and conflict state for ecommerceEnabled, ecommerceMaxAge, ecommerceDaysInAdvance, ecommerceEnableSalesProductBunches, ecommerceAllowFutureSales, ecommerceAllowFutureSalesUnits, futureSalesEnabled, ecommerceEnableSalesOnHandInventory, vendorAvailabilityEcommerceEnabled and checkout/payment controls.",
+      "acceptance_test": "Price 816515 can show every listed setting with one source/date, or explicitly show a raw-source conflict; a conflicting or undated field cannot generate a LIST blocker.",
+      "source": "agents/rose/memory/tx_review_queries_jul29.md · scripts/sql/loop2_settings.sql · PHASE1_LIST_DATA_AUDIT.md"
+    },
+    {
+      "request_id": "AI-DATA-TX-BUY-PROCUREMENT-EVENT-SPINE",
+      "type": "DATA_REQUEST",
+      "status": "DRAFT",
+      "title": "Materialize procurement events, availability match and true purchase-ahead horizons",
+      "why_now": "Current BUY GMV and vendor recency are valid Koronet procurement evidence, but they cannot establish vendor/product availability, leakage, distribution, or how far ahead a buyer purchases.",
+      "opportunity": "Turns BUY from a channel-adoption summary into a diagnostic that separates migration candidates, supply gaps, no material gap and needs evidence.",
+      "decision_needed": "Confirm canonical vendor/product IDs, normalized channel taxonomy, and the date fields that define a purchase horizon.",
+      "requested": "Create a versioned company/location × vendor × product × channel event spine with canonical vendor/product IDs and aliases, PO/line IDs, order_created_at, required/arrival/ship dates, category/variety/SKU, total_cost/currency, connection history, and available_online_at_purchase. Derive daily channel, vendor concentration/lifecycle, product-horizon and offline-need availability-match tables.",
+      "acceptance_test": "The dashboard can label an offline purchase as migration candidate, supply gap, unmatched or no material gap only from a timestamped availability match; BUY horizon bars use order-created to required/ship dates, not shipping-to-arrival proxies.",
+      "source": "TX_BUY_DATA_AUDIT_2026-08-04.md"
+    },
+    {
+      "request_id": "AI-DATA-TX-LIST-SALES-PROXY-NORMALIZATION",
+      "type": "DATA_QUALITY",
+      "status": "DRAFT",
+      "title": "Normalize the historical LIST sales proxies while catalog parity is being built",
+      "why_now": "The MVP can use sales breadth and last-sale recency now, but the current extracts use incompatible product grains and periods; Zeidler demonstrates that their values must not be combined into a parity claim.",
+      "opportunity": "Makes the interim LIST matrix useful and clear instead of hiding available history or presenting it as current inventory.",
+      "decision_needed": "Choose the canonical historical grain for categories, varieties and SKUs and the comparable channel/window definitions.",
+      "requested": "Emit company_id/date/channel/dimension records for categories, varieties and SKUs with an explicit dedup key and grain; separately emit online/offline last-sale-recency buckets using the same cutoff and named benchmark cohort. Preserve the current catalog/listing request as the source for parity/current availability.",
+      "acceptance_test": "A LIST card can display online/offline/best-in-class sales proxies on one stated grain/window, while current catalog, uploads and future availability remain separately marked not measured.",
+      "source": "PHASE1_LIST_DATA_AUDIT.md"
+    },
+    {
       "request_id": "AI-WORKFLOW-INTERVENTION-SPINE",
       "type": "SYSTEM_IDEA",
       "status": "DRAFT",
