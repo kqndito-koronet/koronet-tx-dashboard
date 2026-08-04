@@ -504,6 +504,7 @@ window.METRICS_V2_PACING = null;  // Fix 10: network pacing totals
 window.BENCHMARKS = null;          // benchmarks.json — network/segment percentiles
 window.CONCENTRATION_V2 = null;    // buyer_concentration_v2.json — Top 5 buyers per account
 window.TIME_DEPTH_OFFLINE = null;  // time_depth_offline.json — offline time depth + best-in-class
+window.ANTICIPATION_REAL = null;   // created_on_date → shipping_date; BUY timing, never LIST depth
 window.ACCOUNT_TRUTH_SPINE = null; // truth override for Price's + the complete P1 cohort
 
 // Active timeframe — default YTD
@@ -614,6 +615,9 @@ async function loadData() {
     fetch(base+'precard_coverage_2026-08-03.json').then(function(r){return r.json();}).then(function(d){
       window.PRECARD_COVERAGE_BY_ID = Object.fromEntries((d.records || []).map(function(r){ return [String(r.company_id), r]; }));
     }).catch(function(){ window.PRECARD_COVERAGE_BY_ID = {}; }),
+    fetch(base+'anticipation_real.json').then(function(r){return r.json();}).then(function(d){
+      window.ANTICIPATION_REAL = d;
+    }).catch(function(){ window.ANTICIPATION_REAL = null; }),
   ]);
 
   updateFreshnessBanner();
@@ -948,6 +952,24 @@ function findGA4(name) {
            h.includes(n.substring(0, Math.min(n.length, 10)));
   });
 }
+// Dedicated hostname mappings are evidence-based. Shared platform hostnames
+// remain available GA4 evidence, but are never attributed to one account.
+var GA4_ACCOUNT_HOSTNAMES = {
+  '44150': 'shop.kennicott.com',
+  '7030': 'komet.billdoran.com',
+  '395357': 'shop.pikespeakfloral.com',
+  '73730': 'shop.allurefarms.com'
+};
+function findGA4ForCompany(companyId) {
+  var hostname = GA4_ACCOUNT_HOSTNAMES[String(companyId)];
+  if(!hostname || !window.GA4 || !window.GA4.eshops) return null;
+  return window.GA4.eshops.find(function(r){ return r.hostname === hostname; }) || null;
+}
+function ga4SharedHostEvidence() {
+  if(!window.GA4 || !window.GA4.eshops) return [];
+  var shared = ['app.kometsales.com', 'eshops.kometsales.com'];
+  return window.GA4.eshops.filter(function(r){ return shared.indexOf(r.hostname) >= 0; });
+}
 function findListUsage(id) {
   if(!id || !window.LIST_USAGE) return null;
   return window.LIST_USAGE.find(function(r){ return r.company_id === id; });
@@ -1151,9 +1173,10 @@ function getOpportunities(acct) {
     addLead({text:inactive+'/'+met.k2k_total+' K2K inactive. Each connection required sales effort to establish.', type:'buy', gmv_impact: null, priority:2, action:'Reactivate dormant connections. Identify why they stopped buying.'});
   }
 
-  // B3: Leakage — vendors WITH K2K buying offline
+  // B3: Candidate leakage — vendor signal must be joined to availability before
+  // it becomes a recoverable-opportunity claim.
   if(vd && vd.leakage_vendors > 0 && vd.leakage_cost > 0) {
-    addLead({text:vd.leakage_vendors+' vendors with K2K still buying offline. '+fmt$(vd.leakage_cost)+' recoverable today.', type:'buy', gmv_impact: vd.leakage_cost, priority:1, action:'These vendors already have K2K. Move their procurement online for indirect fee revenue.'});
+    addLead({text:'Candidate vendor migration: '+vd.leakage_vendors+' K2K/vendor signals and '+fmt$(vd.leakage_cost)+' observed offline procurement require availability + lifecycle verification before calling it leakage.', type:'buy', gmv_impact: null, priority:2, action:'Validate same-need online availability, connection state and first/last transaction before proposing migration.'});
   }
 
   // B4: Large offline procurement at $0 indirect fees
@@ -1173,9 +1196,9 @@ function getOpportunities(acct) {
     var varBm = getBenchmark('8_distinct_varieties', acct.ct_id);
     if(listU && listU.distinct_varieties < 50) {
       var varBmStr = varBm ? ' Segment median: '+Math.round(varBm.median)+' varieties.' : '';
-      addLead({text:'Low variety coverage: only '+listU.distinct_varieties+' varieties online.'+varBmStr, type:'list', gmv_impact: null, priority:2, action:'Increase variety count. More varieties = more relevant search results for buyers.'});
+      addLead({text:'DRAFT LIST investigation: only '+listU.distinct_varieties+' varieties sold online in the H1 sales proxy.'+varBmStr+' This is not current listing breadth.', type:'list', gmv_impact: null, priority:2, action:'Compare current publishable assortment and buyer demand before proposing a variety change.'});
     } else if(listU && varBm && listU.distinct_varieties < varBm.median * 0.5) {
-      addLead({text:'Below-median variety count: '+listU.distinct_varieties+' vs segment median '+Math.round(varBm.median)+'.', type:'list', gmv_impact: null, priority:3, action:'Compare variety list to best-in-class. What categories are missing?'});
+      addLead({text:'DRAFT LIST investigation: H1 online sales proxy has '+listU.distinct_varieties+' varieties vs segment reference '+Math.round(varBm.median)+'.', type:'list', gmv_impact: null, priority:3, action:'Compare current publishable assortment to a scoped comparator before inferring a gap.'});
     }
 
     // L2: No long-term inventory
@@ -1185,32 +1208,26 @@ function getOpportunities(acct) {
       addLead({text:'Sales-recency proxy: no online varieties sold in the 30d+ bucket. This does not prove listing depth; verify future availability before diagnosing buyer demand.', type:'list', gmv_impact: null, priority:2, action:'Verify future inventory visibility. Check MaxAge, Future Sales and actual available supply.'});
     }
 
-    // L3: Bunches not listed — 95% TAM invisible
-    if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
+    // L3: verified bunches configuration, still a DRAFT visibility hypothesis.
+    if(cfg && cfg.audited === true && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
       var listBunchGmvAmt = bun && bun.total_bunch_gmv > 0 ? bun.total_bunch_gmv : null;
-      var listBunchDollar = listBunchGmvAmt ? ' '+fmt$(listBunchGmvAmt)+' in offline bunch GMV not visible online.' : '.';
-      addLead({text:'Bunches not listed \u2014 95% TAM invisible to retail buyers'+listBunchDollar, type:'list', gmv_impact: listBunchGmvAmt, priority:1, action:'Enable bunches flag. 5-min fix. Opens the retail buyer segment.'});
+      var listBunchDollar = listBunchGmvAmt ? ' '+fmt$(listBunchGmvAmt)+' bunch-related GMV is observed, but its channel/window comparability is not yet established.' : '';
+      addLead({text:'DRAFT bunches visibility investigation: verified setting is OFF; confirm publishable bunch breadth and buyer impact before estimating opportunity.'+listBunchDollar, type:'list', gmv_impact: null, priority:2, action:'Compare online/offline bunch breadth and GMV on one definition/window before proposing a configuration change.'});
     }
 
     // L4: No Open Market GMV
     var bdCheck = findBuyDetail(acct.name);
     if(bdCheck && bdCheck.open_market_gmv === 0) {
-      addLead({text:'No Open Market GMV \u2014 no future inventory uploaded (proxy).', type:'list', gmv_impact: null, priority:3, action:'Check if wholesaler uploads future inventory. Open Market = forward visibility for buyers.'});
+      addLead({text:'DRAFT Open Market investigation: no observed Open Market sales in this extract; this does not prove no inventory was uploaded.', type:'list', gmv_impact: null, priority:3, action:'Request a publish/upload snapshot before diagnosing future visibility.'});
     }
 
-    // L5: Category gap — offline categories not sold online
-    var supSell = findSupplySell(acct.name);
-    if(supSell && supSell.total_categories_sold > 0) {
-      var offlineCats = supSell.total_categories_sold - (supSell.online_categories_sold || 0);
-      if(offlineCats > 3) {
-        addLead({text:offlineCats+' categories sold offline but not online. Invisible to online buyers.', type:'list', gmv_impact: null, priority:3, action:'Review category gaps. Each missing category = buyers who cannot find what they need online.'});
-      }
-    }
+    // No automatic category-gap lead: current total+online coverage does not
+    // supply an offline category population and channel sets can overlap.
   }
 
   // === CONFIG OPPORTUNITIES (lower priority — enablers, not revenue) ===
 
-  if(cfg) {
+  if(cfg && cfg.audited === true) {
     if(cfg.max_age === 0 || cfg.max_age === null) {
       addLead({text:'MaxAge=0/null. GATE fail. 5-min fix.', type:'config', gmv_impact: null, priority:1, action:'Set MaxAge to at least 10. Without it, inventory is invisible.'});
     } else if(cfg.max_age !== null && cfg.max_age <= 10 && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) {
@@ -1241,9 +1258,10 @@ function getOpportunities(acct) {
 
 // === BOTTLENECK ===
 function computeBottleneck(acct, cfg, met) {
-  if(cfg && (cfg.max_age === 0 || cfg.max_age === null) && acct.ct_id !== 'IMP_CORE') return 'GATE: MaxAge=0';
+  var verifiedCfg = cfg && cfg.audited === true;
+  if(verifiedCfg && (cfg.max_age === 0 || cfg.max_age === null) && acct.ct_id !== 'IMP_CORE') return 'GATE: MaxAge=0';
   if(!acct.has_eshops && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'GATE: No eShop';
-  if(cfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'FORMAT: Bunches OFF';
+  if(verifiedCfg && !cfg.bunches_flag && (acct.ct_id === 'WH_CORE' || acct.ct_id === 'WH_ESUITE')) return 'FORMAT: Bunches OFF';
   // Fix 2026-07-31: WH_K2K accounts don't buy inventory — proc_online=0 is expected, not a bottleneck.
   if(acct.ct_id !== 'WH_K2K' && met && (met.buy_stage === 'NO_CONNECTIONS' || met.buy_stage === 'CONNECTIONS_NO_BUY')) return 'BUY: No active connections';
   if(met && met.buy_stage === 'ACTIVATING') return 'BUY: Activating';
@@ -1257,6 +1275,7 @@ function computeBottleneck(acct, cfg, met) {
 function configHasIssues(id, acct) {
   var cfg = CONFIG[id];
   if(!cfg) return null; // no data
+  if(cfg.audited !== true) return null; // unknown, not a confirmed issue
   if(acct.ct_id === 'WH_PROC') return false; // Procurement only — no eShop settings apply
   if(acct.ct_id === 'WH_K2K') {
     // K2K: only vendor_avail matters
@@ -2246,6 +2265,94 @@ function renderAccounts() {
     // --- Card 3: BUY — "¿Compra por la plataforma?" ---
     html += '<div class="expand-section"><h4>BUY \u2014 \u00bfCompra por la plataforma?</h4>';
 
+    // Phase 3 BUY: procurement diagnosis. It deliberately does not reuse the
+    // POTENTIAL estimate cascade: observed Core/Koronet BUY is not company
+    // total purchases and cannot silently become a unit-economics denominator.
+    var buyObservedTotal = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : null);
+    var buyObservedOnline = potBuyOnline != null ? potBuyOnline : (met ? met.proc_online : null);
+    var buyObservedOffline = (buyObservedTotal != null && buyObservedOnline != null) ? Math.max(0, buyObservedTotal - buyObservedOnline) : null;
+    var buyObservedPct = (buyObservedTotal && buyObservedOnline != null) ? buyObservedOnline / buyObservedTotal * 100 : null;
+    var buyAsOf = (v2Buy && v2Buy.buy_total && v2Buy.buy_total.as_of) ? v2Buy.buy_total.as_of : 'not available';
+    var buySource = v2Buy ? 'PROCUREMENTS_SV · Koronet transactions only' : 'legacy procurement extract';
+    var buyDecision = a._displayDecision || null;
+    var buyScenarioBase = null, buyScenarioLabel = '', buyScenarioConfidence = '';
+    if(buyDecision && buyDecision.buy_potential_range && buyDecision.buy_potential_range.mid != null) {
+      buyScenarioBase = buyDecision.buy_potential_range.mid;
+      buyScenarioLabel = 'approved candidate range '+fmt$(buyDecision.buy_potential_range.low)+'–'+fmt$(buyDecision.buy_potential_range.high)+' '+(buyDecision.currency_code || 'USD');
+      buyScenarioConfidence = 'low confidence · '+(buyDecision.label || 'display decision');
+    } else if(estData && estData.est_buy_gmv > 0 && !/core/i.test(String(estData.est_buy_source || ''))) {
+      buyScenarioBase = estData.est_buy_gmv;
+      buyScenarioLabel = String(estData.est_buy_source || 'modeled purchases');
+      buyScenarioConfidence = String(estData.est_buy_confidence || 'confidence not supplied');
+    }
+    var buyCoverageAvailable = !!supBuy;
+    var buyGapState = 'needs evidence';
+    if(buyObservedOffline === 0 && buyObservedTotal != null) buyGapState = 'no material offline BUY observed in this Koronet window';
+    else if(buyObservedOffline > 0 && buyCoverageAvailable) buyGapState = 'needs evidence — offline BUY exists; availability and vendor/product event join are missing';
+    var buyConclusion = buyObservedTotal == null ? 'Needs evidence: no period-matched Koronet BUY extract for this account.' :
+      (buyObservedOffline > 0 ? 'Needs evidence before a BUY play: offline Koronet procurement exists, but we cannot yet prove whether the same need was available online.' : 'No offline Koronet BUY observed in this window; validate supply coverage before concluding there is no gap.');
+    html += '<div style="margin:0 0 7px;padding:7px 10px;background:rgba(37,99,235,0.06);border-left:3px solid var(--blue);font-size:11px"><strong>Conclusion:</strong> '+buyConclusion+' <span style="color:var(--text-muted)">Next: '+(buyObservedOffline > 0 ? 'investigate supply / lifecycle; then test LIST feasibility.' : 'test whether supply can be made visible in LIST.')+'</span></div>';
+    html += '<div style="font-size:10px;color:var(--text-muted);margin:-2px 0 7px">Observed base: '+buySource+' · '+tf.replace('_',' ')+' · as-of '+buyAsOf+' · online/offline use the same selected Koronet window.</div>';
+
+    html += '<div style="margin:7px 0 3px"><strong style="font-size:11px;color:var(--text-muted)">UNIT ECONOMICS — SCENARIO, NOT OBSERVED FEES</strong></div>';
+    if(buyScenarioBase != null) {
+      var buyScenarioIncrement = Math.round(buyScenarioBase * 0.10), buyScenarioFees = Math.round(buyScenarioIncrement * 0.015);
+      html += '<div style="background:rgba(37,99,235,0.06);border-left:3px solid var(--blue);padding:6px 10px;border-radius:0 4px 4px 0;font-size:11px">+10pp online BUY = <strong>'+fmt$(buyScenarioIncrement)+'</strong> online procurement = <strong>'+fmt$(buyScenarioFees)+'</strong> indirect fees <span style="color:var(--text-muted)">(1.5% assumed)</span><br><span style="font-size:10px;color:var(--text-muted)">Base: '+buyScenarioLabel+' · '+buyScenarioConfidence+'. Period alignment and fee eligibility require validation.</span></div>';
+    } else {
+      html += '<div style="padding:6px 10px;background:rgba(217,119,6,0.06);border-left:3px solid var(--amber);font-size:11px"><strong>Blocked:</strong> total company purchases is not a validated model for this account. Koronet BUY '+(buyObservedTotal != null ? fmt$(buyObservedTotal) : '—')+' is observed platform activity, not a scenario denominator.</div>';
+    }
+
+    var v2VendorsPhase3 = getV2Vendors(a.name);
+    var vendorOnline = v2VendorsPhase3 ? v2VendorsPhase3.vendors_online : (vd ? vd.online_vendors : null);
+    var vendorOffline = v2VendorsPhase3 ? v2VendorsPhase3.vendors_offline : (vd ? vd.offline_vendors : null);
+    var vendorTotal = v2VendorsPhase3 ? v2VendorsPhase3.vendors_total : (vd && vendorOnline != null && vendorOffline != null ? vendorOnline + vendorOffline : null);
+    var vendorActive = v2VendorsPhase3 ? v2VendorsPhase3.vendors_active_l30d : null;
+    var categoriesOnline = supBuy ? supBuy.online_categories_bought : null;
+    var categoriesTotal = supBuy ? supBuy.total_categories_bought : null;
+    // supply_matrix has total distinct categories and online distinct categories,
+    // not an explicit offline category population. Categories may overlap across
+    // channels, so subtraction would manufacture a false offline count.
+    var categoriesOffline = null;
+    function buyCoverageCell(v) { return v == null ? '<span style="color:var(--text-muted)">not available</span>' : fmtN(v); }
+    function buyGapCell(on, off, kind) {
+      if(on == null || off == null) return '<span style="color:var(--amber)">needs evidence</span>';
+      if(off === 0) return '<span style="color:var(--text-muted)">not a parity proof</span>';
+      return '<span style="color:var(--amber)">needs availability join</span>';
+    }
+    html += '<div style="margin:9px 0 3px"><strong style="font-size:11px;color:var(--text-muted)">COVERAGE & GAP — procurement evidence</strong></div>';
+    html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:3px 0 5px"><thead><tr style="background:#f1f5f9"><th style="padding:4px 7px;text-align:left">Dimension</th><th style="padding:4px 7px;text-align:right;color:var(--green)">Online</th><th style="padding:4px 7px;text-align:right;color:var(--amber)">Offline</th><th style="padding:4px 7px;text-align:left">Classification / availability</th></tr></thead><tbody>';
+    html += '<tr><td style="padding:4px 7px;font-weight:600">Total vendors</td><td style="padding:4px 7px;text-align:right">'+buyCoverageCell(vendorOnline)+'</td><td style="padding:4px 7px;text-align:right">'+buyCoverageCell(vendorOffline)+'</td><td style="padding:4px 7px">'+buyGapCell(vendorOnline,vendorOffline,'vendor')+'</td></tr>';
+    html += '<tr><td style="padding:4px 7px;padding-left:15px">Active vendors <span style="font-size:9px;color:var(--text-muted)">L30D</span></td><td style="padding:4px 7px;text-align:right">'+buyCoverageCell(vendorActive)+'</td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not comparable</span></td><td style="padding:4px 7px"><span style="color:var(--amber)">offline L30D active vendors missing</span></td></tr>';
+    html += '<tr><td style="padding:4px 7px">Categories bought <span style="font-size:9px;color:var(--text-muted)">H1 2026</span></td><td style="padding:4px 7px;text-align:right">'+buyCoverageCell(categoriesOnline)+'</td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px"><span style="color:var(--amber)">not comparable — total '+buyCoverageCell(categoriesTotal)+'; source has total + online, no explicit offline population</span></td></tr>';
+    html += '<tr><td style="padding:4px 7px">Varieties bought</td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px"><span style="color:var(--amber)">procurement product spine required</span></td></tr>';
+    html += '<tr><td style="padding:4px 7px">SKUs bought</td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px"><span style="color:var(--amber)">procurement product spine required</span></td></tr>';
+    ['Short (0–7d)','Medium (8–30d)','Long (31d+)'].forEach(function(label){ html += '<tr><td style="padding:4px 7px">'+label+' supply horizon</td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px;text-align:right"><span style="color:var(--text-muted)">not available</span></td><td style="padding:4px 7px"><span style="color:var(--amber)">ORDER/CREATED_DATE + availability required</span></td></tr>'; });
+    html += '<tr style="background:rgba(37,99,235,0.03)"><td style="padding:4px 7px;font-weight:600">Koronet procurement GMV</td><td style="padding:4px 7px;text-align:right">'+(buyObservedOnline != null ? fmt$(buyObservedOnline) : '—')+'</td><td style="padding:4px 7px;text-align:right">'+(buyObservedOffline != null ? fmt$(buyObservedOffline) : '—')+'</td><td style="padding:4px 7px"><strong>'+buyGapState+'</strong></td></tr>';
+    html += '</tbody></table><div style="font-size:10px;color:var(--text-muted)">Counts are coverage signals, not proof that a vendor/product was available online at purchase time. “Leakage” is reserved until that availability join exists.</div>';
+
+    var connectedP3 = met && met.k2k_total != null ? met.k2k_total : null;
+    var activatedP3 = met && met.k2k_active != null ? met.k2k_active : null;
+    var connectedInactiveP3 = (connectedP3 != null && activatedP3 != null) ? Math.max(0, connectedP3 - activatedP3) : null;
+    var dormantP3 = v2VendorsPhase3 ? v2VendorsPhase3.vendors_dormant_30_90d : (vd ? vd.dormant_vendors : null);
+    var churnedP3 = v2VendorsPhase3 ? v2VendorsPhase3.vendors_churned_90plus : (vd ? vd.churned_vendors : null);
+    html += '<div style="margin:9px 0 3px"><strong style="font-size:11px;color:var(--text-muted)">CONNECTIONS & LIFECYCLE</strong></div>';
+    html += '<div style="padding:6px 9px;background:#f8fafc;font-size:11px">Connected K2K: <strong>'+(connectedP3 != null ? connectedP3 : 'not available')+'</strong> → activated: <strong>'+(activatedP3 != null ? activatedP3 : 'not available')+'</strong> → active vendor count L30D: <strong>'+(vendorActive != null ? vendorActive : 'not available')+'</strong><br><span style="color:var(--text-muted)">Exceptions: connected-not-activated '+(connectedInactiveP3 != null ? connectedInactiveP3 : 'not available')+' · dormant 30–90d '+(dormantP3 != null ? dormantP3 : 'not available')+' · churned >90d '+(churnedP3 != null ? churnedP3 : 'not available')+'. Churned→offline is <strong>needs evidence</strong>.</span></div>';
+
+    var buyBenchmark = window.BENCHMARKS && window.BENCHMARKS.benchmarks && window.BENCHMARKS.benchmarks['3_online_buy_pct_ytd'];
+    var buyComparator = buyBenchmark && (buyBenchmark.by_segment && buyBenchmark.by_segment[a.ct_id] || buyBenchmark.network);
+    html += '<div style="margin:9px 0 3px"><strong style="font-size:11px;color:var(--text-muted)">BEST-IN-CLASS CONTEXT</strong></div>';
+    if(buyComparator) html += '<div style="font-size:11px;padding:5px 8px;border-left:3px solid var(--green);background:rgba(5,150,105,0.05)">Same-model comparator: median '+fmtPct(buyComparator.median)+' online BUY · p75 '+fmtPct(buyComparator.p75)+' · best '+(buyComparator.best_account || 'not named')+' '+fmtPct(buyComparator.best_value)+' <span style="color:var(--text-muted)">(metrics_v2_buy YTD; n='+buyComparator.n+'). Reference, not account offline coverage or causal proof.</span></div>';
+    else html += '<div style="font-size:11px;color:var(--amber)">Comparator unavailable — retain this as a data gap.</div>';
+
+    if(String(a.company_id) === '816515' && v2Buy) {
+      var pYtd = getV2Val(v2Buy.buy_online_pct,'ytd'), pMonth = getV2Val(v2Buy.buy_online_pct,'current_month'), pPrior = getV2Val(v2Buy.buy_online_pct,'prior_quarter');
+      html += '<div style="margin-top:8px;padding:6px 9px;background:rgba(217,119,6,0.06);border-left:3px solid var(--amber);font-size:11px"><strong>Price’s window check:</strong> '+fmtPct(pYtd)+' YTD · '+fmtPct(pMonth)+' current month · '+fmtPct(pPrior)+' prior quarter. Reimplementation / prior vendor-eCommerce context is an open comparison request; do not attribute Procurement acceleration.</div>';
+    }
+    html += '<div style="margin-top:8px;font-size:11px"><strong>DRAFT candidate:</strong> '+(buyObservedOffline > 0 ? 'validate offline procurement availability and lifecycle before classifying migration vs supply gap.' : 'validate supply coverage before closing the BUY question.')+' <a href="#buyLeadList" style="color:var(--blue)">Open BUY lead + enablement context</a> <span style="color:var(--text-muted)">(no task or outreach created).</span></div>';
+
+    // Retained only for source history while Phase 3 replaces it above.
+    if(false) {
+
     // --- RESUMEN — prefer V2 temporal values ---
     var buyEstTotal = estBuyVal > 0 ? estBuyVal : (estData ? estData.est_buy_gmv : 0);
     var buyViaKomet = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : 0);
@@ -2468,9 +2575,12 @@ function renderAccounts() {
         html += '<div class="detail-row"><span class="detail-label">Order Mix</span><span>\u2014</span></div>';
       }
     } // end WH_PROC check
+    } // end retained pre-Phase-3 BUY renderer
 
     html += '</div>';
 
+    // Legacy LIST implementation retained only for audit. Phase 3 below is the active renderer.
+    if(false) {
     // --- Card 4: LIST — "¿Lo vende online?" (proxy: no listing data, best proxy = sales) ---
     html += '<div class="expand-section"><h4>LIST \u2014 \u00bfQu\u00e9 vende online vs offline?</h4>';
     html += '<div style="font-size:10px;color:var(--text-muted);margin-bottom:4px">Proxy: no hay data de lo que LISTAN en el eShop. Mostramos lo que VENDIERON online vs offline (SALES_SV). Si lo vendieron online, estaba listado.</div>';
@@ -2755,9 +2865,175 @@ function renderAccounts() {
     }
     html += '</div>';
     } // end if(a.ct_id !== 'WH_PROC')
+    } // end legacy LIST renderer
+
+    // --- Card 4: LIST — Phase 3 evidence-first renderer ---
+    html += '<div class="expand-section"><h4>LIST — ¿Pueden encontrar la oferta online?</h4>';
+    html += '<div style="margin:0 0 8px;padding:6px 9px;background:rgba(37,99,235,.06);border-left:3px solid var(--blue);font-size:10px"><strong>Evidence state: sales-assortment proxies, not catalog/listing inventory.</strong> H1 2026 where noted · online: eCommerce + K2K + API · current publishable inventory snapshot: <strong>not available</strong>.</div>';
+    if(a.ct_id === 'WH_PROC') {
+      html += '<div style="padding:8px 12px;background:rgba(220,38,38,.08);border-left:3px solid var(--red);font-size:12px;font-weight:600;color:var(--red)">NOT APPLICABLE — Procurement-only account has no owned eShop/listing surface. Confirm product scope before investigating LIST.</div>';
+    } else {
+      if(a.ct_id === 'WH_K2K') html += '<div style="padding:7px 10px;background:rgba(217,119,6,.08);border-left:3px solid var(--amber);font-size:11px;margin-bottom:8px"><strong>K2K limitation:</strong> online availability depends on connected vendors, not the account’s own inventory. A vendor-availability extract is required before claiming own-assortment parity.</div>';
+
+      // Capacity is a prerequisite fact, never proof of listing/offer parity.
+      var p3MaxAge = cfg && cfg.max_age != null ? cfg.max_age+'d' : 'Not available';
+      var p3Future = cfg ? (cfg.future ? 'ON' : 'OFF') : 'Not available';
+      var p3OnHand = cfg ? (cfg.on_hand ? 'ON' : 'OFF') : 'Not available';
+      var p3BunchFlag = cfg ? (cfg.bunches_flag ? 'ON' : 'OFF') : 'Not available';
+      var p3ConfigVerified = !!(cfg && cfg.audited === true);
+      var p3SellFormat = findSellFormat(a.name);
+      html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Capacity to publish <span style="font-weight:400">(prerequisites, not proof of offer)</span></div>';
+      if(cfg && !p3ConfigVerified) {
+        html += '<div style="margin-bottom:8px;padding:6px 9px;background:rgba(217,119,6,.08);border-left:3px solid var(--amber);font-size:11px"><strong>UNKNOWN — configuration snapshot is not audited.</strong> Values are retained below only as an unverified source record; they cannot diagnose a publishing blocker or justify a play.</div>';
+        html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:8px;color:var(--text-muted)"><tbody><tr><td style="padding:3px 6px;font-weight:600">Unverified source record</td><td style="padding:3px 6px">'+(cfg.source || 'config.json')+'</td><td style="padding:3px 6px">needs reconciliation</td></tr></tbody></table>';
+        var p3ObservedFormat = p3SellFormat && p3SellFormat.online_gmv != null ? ('Observed online sales: '+fmt$(p3SellFormat.online_gmv)+'; bunches '+fmtPct(p3SellFormat.online_pct_bunches)+' (H1 sales-format evidence).') : 'No observed format extract to test this configuration.';
+        html += '<div style="margin:-3px 0 8px;padding:5px 8px;background:rgba(217,119,6,.08);border-left:3px solid var(--amber);font-size:10px"><strong>Configuration unverified:</strong> do not use it as a prerequisite/blocker. '+p3ObservedFormat+' Reconcile the account configuration before diagnosing visibility.</div>';
+      } else {
+        html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:8px"><tbody><tr><td style="padding:3px 6px;font-weight:600">MaxAge</td><td style="padding:3px 6px">'+p3MaxAge+'</td><td style="padding:3px 6px;color:var(--text-muted)">forward-visibility setting</td></tr><tr><td style="padding:3px 6px;font-weight:600">Future sales</td><td style="padding:3px 6px">'+p3Future+'</td><td style="padding:3px 6px;color:var(--text-muted)">setting only</td></tr><tr><td style="padding:3px 6px;font-weight:600">On-hand / sync</td><td style="padding:3px 6px">'+p3OnHand+'</td><td style="padding:3px 6px;color:var(--text-muted)">setting only</td></tr><tr><td style="padding:3px 6px;font-weight:600">Source</td><td colspan="2" style="padding:3px 6px;color:var(--text-muted)">'+(cfg ? (cfg.source || 'config.json')+' · audited' : 'Not available')+'</td></tr></tbody></table>';
+      }
+
+      // Three distinct proxy views; values remain separate when source/window differs.
+      var p3Usage = findListUsage(a.company_id);
+      var p3Cats = findListingCats(a.name);
+      var p3Sku = findSkuData(a.name);
+      var p3OnRecency = findListTimeDepthV2(a.company_id);
+      var p3OffRecency = findOfflineTimeDepth(a.name);
+      var p3Best = window.TIME_DEPTH_OFFLINE ? window.TIME_DEPTH_OFFLINE.best_in_class : null;
+      function p3Cell(v) { return v == null ? '<span style="color:var(--text-muted)">Not available</span>' : fmtN(v); }
+      // `total_categories` and `online_categories` are overlapping distinct sets in
+      // the current SALES_SV proxy; subtraction is not an offline population.
+      var p3OnCats = p3Cats ? p3Cats.online_categories : null, p3TotalCats = p3Cats ? p3Cats.total_categories : null, p3OffCats = null;
+      var p3OnVar = p3Usage ? p3Usage.distinct_varieties : null, p3OffVar = p3OffRecency ? p3OffRecency.total_varieties : null;
+      var p3OnSku = p3Sku ? p3Sku.online_skus : (p3Usage ? p3Usage.distinct_skus : null), p3OffSku = p3Sku ? p3Sku.offline_skus : null;
+      html += '<div style="margin:8px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Sales-assortment evidence <span style="font-weight:400">(not current inventory/listing)</span></div><table style="width:100%;font-size:11px;border-collapse:collapse;margin-bottom:4px"><thead><tr style="border-bottom:1px solid var(--border);text-align:left"><th style="padding:3px 6px">Dimension</th><th style="padding:3px 6px;color:var(--green)">ACCOUNT ONLINE sales proxy</th><th style="padding:3px 6px;color:var(--amber)">ACCOUNT OFFLINE sales proxy</th><th style="padding:3px 6px;color:var(--blue)">BEST-IN-CLASS ONLINE proxy</th><th style="padding:3px 6px">Evidence state</th></tr></thead><tbody>';
+      html += '<tr><td style="padding:3px 6px;font-weight:600">Categories</td><td style="padding:3px 6px">'+p3Cell(p3OnCats)+'</td><td style="padding:3px 6px"><span style="color:var(--text-muted)">Not available</span></td><td style="padding:3px 6px">—</td><td style="padding:3px 6px;color:var(--text-muted)">'+(p3Cats ? 'Total '+p3Cell(p3TotalCats)+' / online '+p3Cell(p3OnCats)+' H1 SALES_SV proxy. Not comparable — source has total + online, no offline category population.' : 'Not comparable — H1 channel proxy absent.')+'</td></tr>';
+      html += '<tr><td style="padding:3px 6px;font-weight:600">Varieties</td><td style="padding:3px 6px">'+p3Cell(p3OnVar)+'</td><td style="padding:3px 6px">'+p3Cell(p3OffVar)+'</td><td style="padding:3px 6px">'+p3Cell(p3Best ? p3Best.total_varieties : null)+'</td><td style="padding:3px 6px;color:var(--text-muted)">'+(p3Usage && p3OffRecency ? 'Not comparable — different proxy extracts.' : 'Not comparable — missing account-side proxy.')+'</td></tr>';
+      html += '<tr><td style="padding:3px 6px;font-weight:600">SKUs</td><td style="padding:3px 6px">'+p3Cell(p3OnSku)+'</td><td style="padding:3px 6px">'+p3Cell(p3OffSku)+'</td><td style="padding:3px 6px">—</td><td style="padding:3px 6px;color:var(--text-muted)">'+(p3Sku ? 'Not comparable — YTD SKU proxy; no common listing snapshot.' : 'Not comparable — SKU proxy absent.')+'</td></tr></tbody></table>';
+      html += '<div style="font-size:10px;color:var(--text-muted);font-style:italic">Categories: listing_detail.json · H1 2026 SALES_SV. Varieties: loop2_list_usage_v2.json H1. SKUs: skus_online_offline.json YTD. Best-in-class: Kennicott online sales-recency cohort H1 — reference only.</div>';
+      if(p3Usage && p3Cats && ((p3Usage.distinct_categories != null && p3Usage.distinct_categories !== p3Cats.online_categories) || (p3Usage.distinct_skus != null && p3Usage.distinct_skus !== p3Cats.online_skus))) html += '<div style="margin-top:5px;padding:5px 8px;background:rgba(217,119,6,.07);border-left:3px solid var(--amber);font-size:10px"><strong>Conflicting proxy source:</strong> H1 list-usage values differ from H1 SALES_SV channel values. Do not infer parity or a listing gap until the semantic join is reconciled.</div>';
+
+      // Sales recency is not an arrival horizon or future availability claim.
+      function p3Recency(x) { return x ? fmtN(x.total_varieties)+' varieties · '+((x.pct_31_90_days||0)+(x.pct_over_90_days||0)).toFixed(1)+'% last sold 31d+' : '<span style="color:var(--text-muted)">Not available</span>'; }
+      html += '<div style="margin:9px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Sales recency by variety <span style="font-weight:400">(not arrival horizon / future availability)</span></div><table style="width:100%;font-size:11px;border-collapse:collapse"><tbody><tr><td style="padding:3px 6px;font-weight:600">Account ONLINE sales proxy</td><td style="padding:3px 6px">'+p3Recency(p3OnRecency)+'</td><td style="padding:3px 6px;color:var(--text-muted)">H1 · last shipment vs Jun 30</td></tr><tr><td style="padding:3px 6px;font-weight:600">Account OFFLINE sales proxy</td><td style="padding:3px 6px">'+p3Recency(p3OffRecency)+'</td><td style="padding:3px 6px;color:var(--text-muted)">H1 · last shipment vs Jun 30</td></tr><tr><td style="padding:3px 6px;font-weight:600">BEST-IN-CLASS ONLINE proxy</td><td style="padding:3px 6px">'+p3Recency(p3Best)+'</td><td style="padding:3px 6px;color:var(--text-muted)">Kennicott · H1 · reference only</td></tr></tbody></table><div style="font-size:10px;color:var(--amber);margin-top:3px">Not comparable for future supply: request 0–7d, 8–14d, 15–30d, 31–90d and 90d+ available-supply snapshots.</div>';
+      var p3Anticipation = window.ANTICIPATION_REAL && window.ANTICIPATION_REAL.companies ? window.ANTICIPATION_REAL.companies[a.name] : null;
+      if(p3Anticipation && p3Anticipation.online && p3Anticipation.online.total_orders > 0) {
+        var p3SpotPct = p3Anticipation.online.pct_0_3d;
+        html += '<div style="font-size:10px;color:var(--text-muted);margin-top:4px"><strong>Observed procurement timing (separate from LIST):</strong> '+fmtPct(p3SpotPct)+' of online orders were 0–3d from order creation to shipping (YTD through Jul 31). Source: anticipation_real.json / SALES_SV created_on_date→shipping_date. This is BUY-order timing, not listing depth, future availability or an online/offline LIST comparison.</div>';
+      }
+
+      var p3BunchGmv = bun && bun.total_bunch_gmv != null ? fmt$(bun.total_bunch_gmv) : 'Not available';
+      html += '<div style="margin:9px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Bunches <span style="font-weight:400">(separate offer format)</span></div><div class="detail-row"><span class="detail-label">eShop bunches setting</span><span>'+p3BunchFlag+'</span></div><div class="detail-row"><span class="detail-label">Observed bunch-related GMV</span><span>'+p3BunchGmv+' <span style="font-size:10px;color:var(--text-muted)">· bunches.json · channel/window comparability not supplied</span></span></div><div style="font-size:10px;color:var(--amber);margin-top:2px">Not comparable — request online/offline bunch breadth and GMV on one object/window before estimating hidden offer or TAM.</div>';
+      html += '<div style="margin:9px 0 4px;font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Open Market publishing / availability</div><div style="font-size:11px;color:var(--text-muted)">Current source only has sales-classified Open Market evidence, not a publish/upload snapshot. It is not BUY behavior and cannot prove what is currently available online.</div>';
+      var p3Conclusion = 'NEEDS EVIDENCE — obtain company-keyed current listed/publishable inventory and comparable offline available supply, with category/variety/SKU and arrival-horizon buckets.';
+      if(p3ConfigVerified && (cfg.max_age === 0 || cfg.max_age === null || !cfg.future)) p3Conclusion = 'PUBLISHING / CONFIGURATION PREREQUISITE — verify the setting effect with a current listing snapshot; do not call it parity yet.';
+      html += '<div style="margin-top:9px;padding:7px 9px;background:rgba(217,119,6,.07);border-left:3px solid var(--amber);font-size:11px"><strong>Conclusion:</strong> '+p3Conclusion+' <button type="button" class="account-card-link" data-expand="'+i+'" data-card="1" style="margin-left:5px">DRAFT LIST investigation / enablement context</button><span style="font-size:10px;color:var(--text-muted)"> · review link only; no task created</span></div>';
+    }
+    html += '</div>';
 
     // --- Card 5: SELL — "¿Vende online?" ---
     html += '<div class="expand-section"><h4>SELL \u2014 \u00bfVende online?</h4>';
+
+    // Phase 3 SELL: observed GMV stays primary; buyer, retention and conversion
+    // evidence stays visible in separately labelled windows until a canonical
+    // account-level SELL spine reconciles every population.
+    var sellV2Meta = (window.METRICS_V2_SELL && window.METRICS_V2_SELL._metadata) || {};
+    var sellPrimaryTotal = v2Sell && v2Sell.sell_total ? getV2Val(v2Sell.sell_total, tf) : null;
+    var sellPrimaryOnline = v2Sell && v2Sell.sell_online ? getV2Val(v2Sell.sell_online, tf) : null;
+    var sellPrimaryOffline = v2Sell && v2Sell.sell_offline ? getV2Val(v2Sell.sell_offline, tf) : null;
+    var sellPrimaryPct = v2Sell && v2Sell.online_pct ? getV2Val(v2Sell.online_pct, tf) : null;
+    var sellPeriodLabel = tf === 'ytd' ? 'YTD 2026 through 2026-07-30' : ('V2 '+tf.replace('_',' ')+' through '+(sellV2Meta.as_of || '2026-07-30'));
+    var sellDelta = v2Sell && v2Sell.sell_total ? getV2Delta(v2Sell.sell_total, tf) : null;
+    var buyersFull = findBuyersFull(a.name);
+    var loginCvrSell = (window.ESHOP_LOGIN_CVR || {})[String(id)];
+    var dedicatedGa4 = findGA4ForCompany(id);
+    var sharedGa4 = ga4SharedHostEvidence();
+    var sellConc = findConcentrationV2(a.name);
+    var sellRepeat = findRepeatRate(a.name);
+    var sellChannelMix = findChannelMix(a.name);
+    var sellFormat = findSellFormat(a.name);
+    var sellProductDivision = findProductDivision(a.name);
+    var sellBenchOnline = getBenchmark('1_online_sell_pct_ytd', a.ct_id);
+    var sellBenchRepeat = getBenchmark('4_repeat_rate_pct', a.ct_id);
+    var sellBenchCvr = getBenchmark('6_cvr_ga4_own_hostname', null);
+    var listEvidence = findListUsage(id);
+    var listGate = listEvidence ? 'LIST evidence is partial (sales/listing proxy, not verified catalog parity)' : 'LIST parity evidence is not yet available';
+    var checkoutRelevant = CONFIG[id] || null;
+
+    html += '<div style="margin:4px 0 7px;padding:6px 8px;background:#f8fafc;border-left:3px solid var(--blue);border-radius:0 4px 4px 0;font-size:11px">';
+    html += '<strong>DECISION GATE:</strong> '+(sellPrimaryTotal != null ? 'Observed SELL is available; buyer/GMV activation and traffic conclusions remain blocked until their populations reconcile.' : 'Observed SELL spine unavailable for this account; no SELL intervention can be concluded.')+'<br>';
+    html += '<span style="color:var(--text-muted)">First viable move: verify LIST/shop readiness, then prove an eligible offline cohort before traffic. <span class="account-card-link" data-expand="'+i+'" data-card="3" style="cursor:pointer;color:var(--blue);text-decoration:underline">Open LIST evidence</span>.</span>';
+    html += '</div>';
+
+    html += '<div style="margin:7px 0"><div style="font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Observed SELL GMV <span style="font-weight:400;text-transform:none">('+sellPeriodLabel+' · metrics_v2_sell.json · company matched by normalized name)</span></div>';
+    if(sellPrimaryTotal != null) {
+      html += '<div class="detail-row"><span class="detail-label">Channel GMV</span><span>Online '+fmt$(sellPrimaryOnline)+' ('+fmtPct(sellPrimaryPct)+') · Offline '+fmt$(sellPrimaryOffline)+' · Total <strong>'+fmt$(sellPrimaryTotal)+'</strong>'+(sellDelta ? ' · '+sellDelta.html : '')+'</span></div>';
+      if(sellBenchOnline) html += '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">Comparator (online SELL share, same setup where available): median '+fmtPct(sellBenchOnline.median)+' · p75 '+fmtPct(sellBenchOnline.p75)+' · best '+(sellBenchOnline.best_account || '—')+' '+fmtPct(sellBenchOnline.best_value)+'. Benchmark is context, not account truth.</div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">Channel GMV</span><span style="color:var(--amber)">MISSING — needs canonical company match in metrics_v2_sell.json.</span></div>';
+    }
+    html += '</div>';
+
+    html += '<div style="margin:7px 0"><div style="font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Customer evidence <span style="font-weight:400;text-transform:none">(YTD Jan 1–Jul 31 · metrics_v2_buyers_full.json · separate one-day cutoff from SELL GMV)</span></div>';
+    if(buyersFull) {
+      html += '<div style="overflow-x:auto"><table class="def-table"><thead><tr><th>Metric / window</th><th>Online</th><th>Offline</th><th>Total</th></tr></thead><tbody>';
+      html += '<tr><td>Customers, YTD</td><td>'+buyersFull.online_buyers+'</td><td>'+buyersFull.offline_buyers+'</td><td>'+buyersFull.total_buyers+'</td></tr>';
+      html += '<tr><td>Active L30D</td><td>'+buyersFull.online_buyers_l30d+'</td><td>'+buyersFull.offline_buyers_l30d+'</td><td>—</td></tr>';
+      html += '<tr><td>AOV, YTD</td><td>'+fmt$(buyersFull.aov_online)+'</td><td>'+fmt$(buyersFull.aov_offline)+'</td><td>n/a</td></tr>';
+      html += '<tr><td>New customers, Jul</td><td colspan="3">'+buyersFull.new_buyers_current_month+' (online + offline population)</td></tr>';
+      html += '<tr><td>Churned</td><td colspan="3">'+buyersFull.churned_buyers+' (definition in source: Q2 buyers absent in Jul)</td></tr>';
+      html += '</tbody></table></div>';
+      html += '<div style="font-size:10px;color:var(--amber);margin-top:3px">These online/offline populations can overlap; total is not their sum. This block is evidence only—not a same-window buyer/GMV conversion claim.</div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">Customers</span><span style="color:var(--amber)">MISSING — request buyer extract keyed to this company and selected SELL window.</span></div>';
+    }
+    html += '</div>';
+
+    html += '<div style="margin:7px 0"><div style="font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Shop readiness & conversion <span style="font-weight:400;text-transform:none">(traffic gate)</span></div>';
+    html += '<div class="detail-row"><span class="detail-label">LIST prerequisite</span><span style="color:var(--amber)">'+listGate+' · <span class="account-card-link" data-expand="'+i+'" data-card="3" style="cursor:pointer;color:var(--blue);text-decoration:underline">review LIST</span></span></div>';
+    if(checkoutRelevant) {
+      var configVerified = checkoutRelevant.audited === true && !/not verified/i.test(checkoutRelevant.source || '');
+      var checkoutFlag = checkoutRelevant.hide_checkout_without_payment;
+      var checkoutText = !configVerified ? 'Config snapshot NOT VERIFIED — do not infer checkout, bunches, or shop readiness from it' : (checkoutFlag === true || checkoutFlag === 1 || checkoutFlag === '1' ? 'hideCheckoutWithoutPayment ON — verify payment access before activation' : 'No verified checkout blocker in current config snapshot');
+      html += '<div class="detail-row"><span class="detail-label">Checkout/config</span><span>'+checkoutText+' <span style="font-size:10px;color:var(--text-muted)">(config.json snapshot; not proof of purchase success)</span></span></div>';
+    } else {
+      html += '<div class="detail-row"><span class="detail-label">Checkout/config</span><span style="color:var(--amber)">MISSING — verify account checkout/payment state.</span></div>';
+    }
+    if(dedicatedGa4 && dedicatedGa4.sessions > 0) {
+      var dedicatedCvr = dedicatedGa4.transactions / dedicatedGa4.sessions * 100;
+      html += '<div style="margin-top:4px;padding:5px 8px;background:#f1f5f9;border-radius:4px;font-size:11px"><strong>GA4 session CVR (attributable):</strong> '+dedicatedGa4.hostname+' · '+dedicatedGa4.sessions+' sessions → '+dedicatedGa4.transactions+' transactions = <strong>'+fmtPct(dedicatedCvr)+'</strong> · '+fmt$(dedicatedGa4.revenue)+' revenue <span style="color:var(--text-muted)">(local GA4 extract '+((window.GA4||{}).date_range || 'date window in source')+')</span>';
+      if(sellBenchCvr && sellBenchCvr.active_eshops_only) html += '<div style="font-size:10px;color:var(--text-muted);margin-top:2px">GA4 comparator: active dedicated eShops median '+fmtPct(sellBenchCvr.active_eshops_only.median*100)+' · p75 '+fmtPct(sellBenchCvr.active_eshops_only.p75*100)+' · benchmark window/scope shown in benchmarks.json.</div>';
+      html += '</div>';
+    } else {
+      html += '<div style="margin-top:4px;padding:5px 8px;background:#f8fafc;border-radius:4px;font-size:11px"><strong>GA4 session CVR:</strong> GA4 is live and available; this account has no explicit dedicated hostname mapping in the current local extract. '+(sharedGa4.length ? 'Shared Core/eShop hostname traffic is visible in GA4 but is an attribution/model state, not this account’s CVR.' : 'Refresh the live GA4 Sheet/source metadata before attribution.')+'</div>';
+    }
+    if(loginCvrSell) html += '<div style="margin-top:4px;font-size:11px"><strong>Login CVR upper bound (separate metric):</strong> '+fmtPct(loginCvrSell.cvr_pct)+' · '+loginCvrSell.purchase_logins+'/'+loginCvrSell.total_logins+' customer eCommerce logins, YTD through 2026-07-31. It is not session CVR.</div>';
+    else html += '<div style="margin-top:4px;font-size:11px;color:var(--text-muted)"><strong>Login CVR upper bound:</strong> no >=10-login company record in the YTD source.</div>';
+    html += '<div style="margin-top:4px;padding:4px 8px;background:rgba(217,119,6,.08);border-left:3px solid var(--amber);font-size:11px"><strong>Traffic recommendation: BLOCKED.</strong> '+listGate+'; existing-traffic attribution and an eligible offline cohort are not yet proven.</div>';
+    html += '</div>';
+
+    html += '<div style="margin:7px 0"><div style="font-weight:700;font-size:11px;text-transform:uppercase;color:var(--text-muted)">Retention, concentration & supplemental sell evidence</div>';
+    if(sellConc) html += '<div class="detail-row"><span class="detail-label">Top 5 concentration</span><span>'+fmtPct(sellConc.top5_pct)+' of online GMV · Jan 1–Jul 30 · online only; no offline comparator.</span></div>';
+    else html += '<div class="detail-row"><span class="detail-label">Top 5 concentration</span><span style="color:var(--text-muted)">No account record in buyer_concentration_v2.json.</span></div>';
+    if(sellRepeat) html += '<div class="detail-row"><span class="detail-label">Repeat rate</span><span>'+fmtPct(sellRepeat.repeat_rate_pct)+' online, H1 Jan–Jun · buyer active in 2+ months'+(sellBenchRepeat ? ' · comparator median '+fmtPct(sellBenchRepeat.median)+', p75 '+fmtPct(sellBenchRepeat.p75) : '')+'. Historical signal, not current retention.</span></div>';
+    else html += '<div class="detail-row"><span class="detail-label">Repeat rate</span><span style="color:var(--text-muted)">No H1 repeat record; request selected-period retention trend.</span></div>';
+    if(sellChannelMix && sellChannelMix.length) html += '<div class="detail-row"><span class="detail-label">Channel mix</span><span>'+sellChannelMix.map(function(c){ return c.sales_channel+' '+fmt$(c.channel_gmv); }).join(' · ')+' <span style="font-size:10px;color:var(--text-muted)">(H1 Jan–Jun · sell_by_channel.json · SFDC account-id scope)</span></span></div>';
+    else html += '<div class="detail-row"><span class="detail-label">Channel mix</span><span style="color:var(--text-muted)">No H1 channel record.</span></div>';
+    if(sellFormat) html += '<div class="detail-row"><span class="detail-label">Format</span><span>Boxes '+fmtPct(sellFormat.online_pct_boxes)+' · Bunches '+fmtPct(sellFormat.online_pct_bunches)+' · Short '+fmtPct(sellFormat.online_pct_short)+' / Forward '+fmtPct(sellFormat.online_pct_forward)+' <span style="font-size:10px;color:var(--text-muted)">(online only, H1; not assortment parity)</span></span></div>';
+    else html += '<div class="detail-row"><span class="detail-label">Format</span><span style="color:var(--text-muted)">No H1 online format record.</span></div>';
+    if(sellProductDivision) {
+      var productParts = [];
+      if(sellProductDivision.freshcut_gmv_total > 0) productParts.push('Fresh cut '+fmt$(sellProductDivision.freshcut_gmv_online)+' online / '+fmt$(sellProductDivision.freshcut_gmv_offline)+' offline');
+      if(sellProductDivision.hardgoods_gmv_total > 0) productParts.push('Hardgoods '+fmt$(sellProductDivision.hardgoods_gmv_online)+' online / '+fmt$(sellProductDivision.hardgoods_gmv_offline)+' offline');
+      if(sellProductDivision.plants_gmv_total > 0) productParts.push('Plants '+fmt$(sellProductDivision.plants_gmv_online)+' online / '+fmt$(sellProductDivision.plants_gmv_offline)+' offline');
+      html += '<div class="detail-row"><span class="detail-label">Product division</span><span>'+productParts.join(' · ')+' <span style="font-size:10px;color:var(--text-muted)">(YTD extract includes forward/standing orders; supplemental only)</span></span></div>';
+    } else html += '<div class="detail-row"><span class="detail-label">Hardgoods / divisions</span><span style="color:var(--text-muted)">No valid product-division extract for this account.</span></div>';
+    html += '</div>';
+
+    html += '<div style="margin:7px 0;padding:6px 8px;background:rgba(217,119,6,.06);border-left:3px solid var(--amber);font-size:11px"><strong>Offline cohort & unit economics:</strong> NEEDS EVIDENCE — customer-to-eShop eligibility/access and same-window channel history are not in the current sources. No generic “10% more buyers” scenario is shown.</div>';
+
+    // Keep the prior renderer below as non-executing reference while Phase 3
+    // is reviewed; it must not emit mixed-window claims.
+    if(false) {
 
     // FIX 7 + FIX-CONSISTENCY (2026-07-31): SELL RESUMEN — use V2 temporal values to match POTENTIAL card.
     // Prior bug: sellOnlineVal/sellOfflineVal/sellOnlinePctVal were always static met values,
@@ -2979,6 +3255,7 @@ function renderAccounts() {
       html += '<div style="margin-top:4px;font-size:11px"><span style="color:var(--text-muted)">Online retention:</span> '+sellL30D.buyers_online_l30d+' active L30D of '+buyerData.online_buyers+' total online = <span style="color:'+(retentionPct>50?'var(--green)':retentionPct>25?'var(--amber)':'var(--red)')+';font-weight:600">'+fmtPct(retentionPct)+'</span></div>';
     }
     html += '</div>';
+    } // end legacy SELL renderer retained as non-executing reference
 
     html += '</div></div></td></tr>';
   });
