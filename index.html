@@ -1799,12 +1799,12 @@ function renderAccounts() {
     var potCardSellTotal = potSellTotal != null ? potSellTotal : (met ? met.sell_total : null);
     var potCardSellTotalAnnualized = potCardSellTotal != null ? potCardSellTotal * tfMultiplier : null;
     // Sell penetration: prefer ORA, fall back to est_gmv calc estimate (G11 fix)
-    var sellEstDenom = (a.annual_sales_est && a.annual_sales_est > 0) ? a.annual_sales_est : (estData && estData.est_sell_gmv > 0 ? estData.est_sell_gmv : null);
+    var sellEstDenom = a.est_sell > 0 ? a.est_sell : ((estData && estData.est_sell_gmv > 0) ? estData.est_sell_gmv : null);
     var sellPenPct = (sellEstDenom && potCardSellTotalAnnualized != null) ? (potCardSellTotalAnnualized / sellEstDenom * 100) : null;
     var sellPenColor = sellPenPct === null ? 'var(--text-muted)' : sellPenPct > 50 ? 'var(--green)' : sellPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var potCardBuyTotal = potBuyTotal != null ? potBuyTotal : (met ? met.proc_total : null);
     var potCardBuyTotalAnnualized = potCardBuyTotal != null ? potCardBuyTotal * tfMultiplier : null;
-    var buyPenPct = (estData && estData.est_buy_gmv > 0 && potCardBuyTotalAnnualized != null) ? (potCardBuyTotalAnnualized / estData.est_buy_gmv * 100) : null;
+    var buyPenPct = (a.est_buy > 0 && potCardBuyTotalAnnualized != null) ? (potCardBuyTotalAnnualized / a.est_buy * 100) : null;
     var buyPenColor = buyPenPct === null ? 'var(--text-muted)' : buyPenPct > 50 ? 'var(--green)' : buyPenPct > 20 ? 'var(--amber)' : 'var(--red)';
     var sellGap = sellEstDenom && potCardSellTotalAnnualized != null ? (sellEstDenom - potCardSellTotalAnnualized) : null;
     var oraCalcDiverge = a.annual_sales_est && estData && estData.est_sell_gmv > 0 ? Math.abs(a.annual_sales_est - estData.est_sell_gmv) / Math.max(a.annual_sales_est, estData.est_sell_gmv) * 100 : 0;
@@ -1819,6 +1819,12 @@ function renderAccounts() {
     html += '<button type="button" class="account-card-link" data-expand="'+i+'" data-card="4">5. SELL evidence</button>';
     html += '</div></div>';
     html += '<div class="expand-section"><h4>POTENTIAL \u2014 \u00bfCu\u00e1n grande es?</h4>';
+    var researchPotential = a._research && a._research.company_gmv;
+    if(a._displayDecision) {
+      html += '<div style="margin-bottom:8px;padding:6px 10px;background:rgba(37,99,235,0.07);border-left:3px solid var(--blue);font-size:11px"><strong>Display decision:</strong> '+a._displayDecision.label+' · '+(a._displayDecision.scope || '')+'</div>';
+    } else if(researchPotential) {
+      html += '<div style="margin-bottom:8px;padding:6px 10px;background:rgba(217,119,6,0.07);border-left:3px solid var(--amber);font-size:11px"><strong>Research:</strong> '+(researchPotential.state === 'estimate_candidate' ? 'candidate · '+researchPotential.confidence+' confidence' : 'blocked')+(researchPotential.reason ? ' · '+researchPotential.reason : '')+'</div>';
+    }
     // FIX 4: Pre go-live SO WHAT + FIX 5: Show impl stage
     if(sellGap && sellGap > 0) {
       var isImplAccount = impl && impl.stage && impl.stage !== 'Live';
@@ -1837,7 +1843,7 @@ function renderAccounts() {
     }
     html += '<table style="width:100%;font-size:11px;border-collapse:collapse;margin:4px 0">';
     html += '<tr style="background:#f1f5f9"><th colspan="3" style="padding:4px 8px;text-align:left;font-size:10px;text-transform:uppercase;color:var(--text-muted)">SELL SIDE</th></tr>';
-    html += '<tr><td style="padding:3px 8px">Est. Sell (ORA)</td><td style="text-align:right">'+(a.annual_sales_est?fmt$(a.annual_sales_est):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px">Christine ORA</td></tr>';
+    html += '<tr><td style="padding:3px 8px">Est. Company GMV</td><td style="text-align:right">'+(a.est_sell?fmt$(a.est_sell):'\u2014')+'</td><td style="font-size:10px;color:var(--text-muted);padding-left:6px">'+(a._displayDecision ? a._displayDecision.label : 'internal / research candidate')+'</td></tr>';
     // FIX 2: Hide Est Sell (calc) row when same as ORA
     var calcSameAsOra = estData && (estData.est_sell_source === 'Christine ORA' || (a.annual_sales_est && estData.est_sell_gmv === a.annual_sales_est));
     if(calcSameAsOra) {
@@ -2043,6 +2049,11 @@ function renderAccounts() {
 
     html += '<div class="expand-section" style="border-left:3px solid '+headerColor+'">';
     html += '<h4>OPPORTUNITIES <span style="font-size:10px;font-weight:400;color:var(--text-muted)">(revenue + config \u2014 prioritized by impact \u2014 DRAFT)</span></h4>';
+    if(researchPotential && researchPotential.state === 'blocked') {
+      html += '<div style="margin:0 0 8px;padding:6px 10px;background:rgba(217,119,6,0.07);font-size:11px"><strong>Research gate:</strong> '+researchPotential.reason+' Do not assert a GMV-based play until this is resolved.</div>';
+    } else if(researchPotential && researchPotential.state === 'estimate_candidate') {
+      html += '<div style="margin:0 0 8px;padding:6px 10px;background:rgba(37,99,235,0.07);font-size:11px"><strong>Research context:</strong> candidate estimate · '+researchPotential.confidence+' confidence. Validate before treating GMV impact as committed.</div>';
+    }
 
     // === TOTAL $ AT STAKE (summary banner at top) ===
     var totalImpact = 0;
