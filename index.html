@@ -1312,6 +1312,12 @@ function populateFilters() {
 // === SORT STATE ===
 var sortCol = 'est_sell';
 var sortDir = -1; // desc
+// Review links are deliberately explicit: opening ?account=Zeidler (or a
+// company id) narrows the spine and opens every card. The normal portfolio
+// view stays compact for scanning.
+var REVIEW_ACCOUNT = new URLSearchParams(window.location.search).get('account');
+var REVIEW_ACCOUNT_APPLIED = false;
+if(REVIEW_ACCOUNT) document.getElementById('searchInput').value = REVIEW_ACCOUNT;
 
 // === RENDER ACCOUNTS (Tab 1) ===
 function renderAccounts() {
@@ -3368,6 +3374,21 @@ function renderAccounts() {
       }
     });
   });
+
+  // A review link must land on evidence, not leave the reviewer to discover
+  // the row chevron and three collapsed cards. Apply once after this render
+  // has attached every handler.
+  if(REVIEW_ACCOUNT && !REVIEW_ACCOUNT_APPLIED && filtered.length === 1) {
+    var reviewBtn = document.querySelector('.expand-btn[data-idx="0"]');
+    var reviewRow = document.querySelector('tr[data-expand="0"]');
+    if(reviewBtn && reviewRow) {
+      reviewBtn.classList.add('open');
+      reviewRow.classList.add('open');
+      reviewRow.querySelectorAll('.expand-section').forEach(function(section) { setCardOpen(section, true); });
+      REVIEW_ACCOUNT_APPLIED = true;
+      setTimeout(function() { reviewRow.scrollIntoView({behavior:'smooth', block:'start'}); }, 0);
+    }
+  }
 
   // Refresh lead lists to match the current portfolio filter
   renderLeadLists();
