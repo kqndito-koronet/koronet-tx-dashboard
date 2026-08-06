@@ -2217,118 +2217,272 @@ function renderBuyCard(ev) {
   const p = ev.potential;
   const id = ev._company_id;
 
-  const kBuy = p ? fmtEv(p.koronet_buy_ytd) : null;
-  const buyOnline = p ? fmtEv(p.buy_online_pct) : null;
-  const buyOffline = p ? fmtEv(p.buy_offline_ytd) : null;
+  // ── Core buy metrics from potential ──
+  const kBuy        = p ? fmtEv(p.koronet_buy_ytd)  : null;
+  const buyOnlinePct = p ? fmtEv(p.buy_online_pct)  : null;
+  const buyOfflineYtd = p ? fmtEv(p.buy_offline_ytd) : null;
 
-  let subtitle = '';
-  if (buyOnline != null) {
-    subtitle = `+10% online = ${fmt$(buyOffline != null ? buyOffline * 0.1 : null, true)} procurement shift`;
+  // ── Card header title & subtitle (mockup format) ──
+  const buyOnlinePctFmt  = buyOnlinePct  != null ? Math.round(buyOnlinePct)  : null;
+  const kBuyPct          = (kBuy != null && p && fmtEv(p.total_buy_est) > 0)
+                            ? Math.round(kBuy / fmtEv(p.total_buy_est) * 100)
+                            : null;
+  // Subtitle: +10% online = $X procurement = $Y indirect fees/yr
+  const tenPctShift   = buyOfflineYtd != null ? buyOfflineYtd * 0.10 : null;
+  const indirectFees  = tenPctShift  != null ? Math.round(tenPctShift * 0.015)  : null; // ~1.5% K2K fee rate
+  const subtitle = tenPctShift != null
+    ? `+10% online = ${fmt$(tenPctShift, true)} procurement shift = ${fmt$(indirectFees != null ? indirectFees * 12 : null, true)} indirect fees/yr`
+    : '';
+
+  // ── SO WHAT callout ──
+  let buyCallout = 'No buy domain data available for this account.';
+  if (kBuy != null) {
+    const offlinePart = buyOfflineYtd != null ? ` — ${fmt$(buyOfflineYtd, true)} offline at $0 fees` : '';
+    const onlinePart  = buyOnlinePct  != null ? ` ${fmtPct(buyOnlinePct, 0)} purchased online.` : '';
+    // K2K eligible count (vendors with no K2K)
+    const k2kData    = buy && buy.k2k_lifecycle  ? buy.k2k_lifecycle.value  : null;
+    const leakageData = buy && buy.leakage       ? buy.leakage.value        : null;
+    const noK2kCount  = k2kData
+      ? (k2kData.no_k2k != null ? k2kData.no_k2k : (k2kData.inactive_connections != null ? k2kData.inactive_connections : null))
+      : null;
+    // Leakage: K2K-connected vendors still buying offline — recoverable without new connections
+    const leakageCost = leakageData ? leakageData.leakage_cost : null;
+    const leakageVendors = leakageData ? leakageData.leakage_vendors : null;
+    let k2kEnrichment = '';
+    if (noK2kCount != null) {
+      k2kEnrichment += ` ${noK2kCount} vendor${noK2kCount !== 1 ? 's' : ''} have no K2K (eligible for activation).`;
+    }
+    if (leakageVendors != null && leakageVendors > 0 && leakageCost != null && leakageCost > 0) {
+      k2kEnrichment += ` ${leakageVendors} K2K-connected vendor${leakageVendors !== 1 ? 's' : ''} buying offline = ${fmt$(leakageCost, true)} recoverable.`;
+    }
+    buyCallout = `<strong>SO WHAT:</strong> ${fmt$(kBuy, true)} total Koronet procurement${offlinePart}.${onlinePart}${k2kEnrichment}`;
   }
 
+  // ── K2K lifecycle ──
   let k2kHtml = '';
-  let sourcingHtml = '';
-  let anticipationHtml = '';
-
   if (buy) {
-    // K2K lifecycle — k2k data comes from k2k_connections (total/active/inactive)
     const k2k = buy.k2k_lifecycle ? buy.k2k_lifecycle.value : null;
     if (k2k) {
-      const connected  = k2k.connected  != null ? k2k.connected  : (k2k.total_connections != null ? k2k.total_connections : '—');
-      const activated  = k2k.activated  != null ? k2k.activated  : (k2k.active_connections != null ? k2k.active_connections : '—');
-      const active30d  = k2k.active_l30d != null ? k2k.active_l30d : '—';
-      const dormant    = k2k.dormant     != null ? k2k.dormant     : '—';
-      const noK2k      = k2k.no_k2k      != null ? k2k.no_k2k      : (k2k.inactive_connections != null ? k2k.inactive_connections : '—');
+      const connected = k2k.connected  != null ? k2k.connected
+                      : k2k.total_connections != null ? k2k.total_connections : '—';
+      const activated = k2k.activated  != null ? k2k.activated
+                      : k2k.active_connections != null ? k2k.active_connections : '—';
+      const active30d = k2k.active_l30d != null ? k2k.active_l30d : '—';
+      const dormant   = k2k.dormant    != null ? k2k.dormant    : '—';
+      const noK2k     = k2k.no_k2k     != null ? k2k.no_k2k
+                      : k2k.inactive_connections != null ? k2k.inactive_connections : '—';
       k2kHtml = `<div class="metric-line">
         <strong>K2K lifecycle:</strong>
-        <span class="green">${connected} connected</span> →
-        <span>${activated} activated</span> →
-        <span class="blue">${active30d} active L30D</span> ·
-        <span class="amber">${dormant} dormant</span> ·
-        <span class="red">${noK2k} inactive/no K2K</span>
+        <span class="green">${connected} connected</span> &rarr;
+        <span>${activated} activated</span> &rarr;
+        <span class="blue">${active30d} active L30D</span> &middot;
+        <span class="amber">${dormant} dormant</span> &middot;
+        <span class="red">${noK2k} no K2K (eligible)</span>
       </div>`;
     }
+  }
 
-    // Sourcing table — full comparison with vendor/category/variety data
-    const st = buy.sourcing_table ? buy.sourcing_table.value : null;
-    const vlc = buy.vendor_lifecycle ? buy.vendor_lifecycle.value : null;
-    {
-      const cm = st ? st.current_month : null;
-      const buyOnlineAmt  = cm ? (parseFloat(cm.buy_online)  || 0) : null;
-      const buyOfflineAmt = cm ? (parseFloat(cm.buy_offline) || 0) : null;
+  // ── Sourcing table (all 5 rows from mockup) ──
+  let sourcingHtml = '';
+  if (buy) {
+    const st  = buy.sourcing_table    ? buy.sourcing_table.value    : null;
+    const vlc = buy.vendor_lifecycle  ? buy.vendor_lifecycle.value  : null;
+    const k2kConn = buy.k2k_lifecycle ? buy.k2k_lifecycle.value     : null;
+    const cats = buy.categories_top20 ? buy.categories_top20.value  : null;
 
-      // Vendor counts from vendor_lifecycle
-      const vendorsOnline  = vlc ? (vlc.online_vendors  || 0) : null;
-      const vendorsOffline = vlc ? (vlc.offline_vendors  || 0) : null;
-      const vendorsTotal   = vlc ? (vlc.vendors_total    || 0) : null;
+    // Vendor counts
+    const vendorsOnline  = vlc ? vlc.online_vendors  : null;
+    const vendorsOffline = vlc ? vlc.offline_vendors  : null;
+    const noK2kCount     = k2kConn
+      ? (k2kConn.inactive_connections != null ? k2kConn.inactive_connections
+         : k2kConn.no_k2k != null ? k2kConn.no_k2k : null)
+      : null;
 
-      // K2K connection info for gap column
-      const k2kConn = buy.k2k_lifecycle ? buy.k2k_lifecycle.value : null;
-      const noK2kCount = k2kConn ? (k2kConn.inactive_connections || k2kConn.no_k2k || 0) : null;
+    // Categories: count from categories_top20 array (online = has online_gmv > 0)
+    const catsOnline  = cats && Array.isArray(cats) ? cats.filter(c => c.online_gmv  > 0).length : null;
+    const catsOffline = cats && Array.isArray(cats) ? cats.filter(c => c.offline_gmv > 0).length : null;
+    const catsOfflineOnly = cats && Array.isArray(cats)
+      ? cats.filter(c => c.offline_gmv > 0 && c.online_gmv === 0).length : null;
 
-      // Procurement $ from potential (YTD is more comprehensive)
-      const buyOnYtd  = p ? fmtEv(p.koronet_buy_ytd) : null;
-      const buyOffYtd = p ? fmtEv(p.buy_offline_ytd) : null;
-      const buyOnPctVal = p ? fmtEv(p.buy_online_pct) : null;
+    // Procurement $
+    const buyOnYtd    = p ? fmtEv(p.koronet_buy_ytd)  : null;
+    const buyOffYtd   = p ? fmtEv(p.buy_offline_ytd)  : null;
+    const buyOnPctVal = p ? fmtEv(p.buy_online_pct)   : null;
+    const procOnline  = vlc && vlc.online_buy_gmv  != null ? vlc.online_buy_gmv
+                      : (buyOnYtd != null && buyOnPctVal != null ? Math.round(buyOnYtd * buyOnPctVal / 100) : null);
+    const procOffline = vlc && vlc.offline_buy_gmv != null ? vlc.offline_buy_gmv : buyOffYtd;
 
-      const procOnline  = buyOnYtd != null && buyOnPctVal != null ? Math.round(buyOnYtd * buyOnPctVal / 100) : (vlc ? vlc.online_buy_gmv : buyOnlineAmt);
-      const procOffline = buyOffYtd || (vlc ? vlc.offline_buy_gmv : buyOfflineAmt);
+    // Varieties — from ev.list.variety_freshness (online/offline totals)
+    const listDomain = ev.list;
+    const vfData     = listDomain && listDomain.variety_freshness ? listDomain.variety_freshness.value : null;
+    const varOnline  = vfData && vfData.online  ? (vfData.online.total_varieties  || null) : null;
+    const varOffline = vfData && vfData.offline ? (vfData.offline.total_varieties || null) : null;
+    const varGapCount = (varOnline != null && varOffline != null) ? Math.max(0, varOffline - varOnline) : null;
 
-      if (vlc || buyOnlineAmt != null || buyOfflineAmt != null) {
-        const rows = [];
-        if (vlc) {
-          rows.push(`<tr>
-            <td class="row-label">Vendors</td>
-            <td><span class="online">${vendorsOnline != null ? vendorsOnline.toLocaleString() : '—'}</span></td>
-            <td>${vendorsOffline != null ? vendorsOffline.toLocaleString() : '—'}</td>
-            <td>${noK2kCount != null ? `<span class="warn">${noK2kCount} no K2K</span>` : `<strong>${vendorsTotal != null ? vendorsTotal.toLocaleString() : '—'}</strong>`}</td>
-          </tr>`);
-        }
+    // SKUs — from ev.buy.skus_online_offline (skus_online_offline.json keyed by company name)
+    const skusData    = buy.skus_online_offline ? buy.skus_online_offline.value : null;
+    const skuOnline   = skusData ? skusData.online_skus  : null;
+    const skuOffline  = skusData ? skusData.offline_skus : null;
+    const skuGap      = skusData ? skusData.gap          : null;
+
+    const hasData = vlc || procOnline != null || procOffline != null;
+    if (hasData) {
+      const rows = [];
+
+      // Row 1 — Vendors
+      if (vlc) {
         rows.push(`<tr>
-          <td class="row-label">Procurement $</td>
-          <td><span class="online">${fmt$(procOnline, true)}</span></td>
-          <td>${fmt$(procOffline, true)}</td>
-          <td>${procOffline ? `<span class="danger">${fmt$(procOffline, true)} @ $0</span>` : `<strong>${fmt$(buyOnYtd, true)}</strong>`}</td>
+          <td class="row-label">Vendors</td>
+          <td><span class="online">${vendorsOnline != null ? vendorsOnline.toLocaleString() : '—'}</span></td>
+          <td>${vendorsOffline != null ? vendorsOffline.toLocaleString() : '—'}</td>
+          <td>${noK2kCount != null ? `<span class="warn">${noK2kCount} no K2K</span>` : '—'}</td>
         </tr>`);
+      }
 
-        sourcingHtml = `
-        <div class="content-gap-sm"></div>
-        <div class="table-wrap">
-          <table class="ev-table">
-            <thead><tr><th>SOURCING</th><th>Online</th><th>Offline</th><th>Gap</th></tr></thead>
-            <tbody>${rows.join('')}</tbody>
-          </table>
+      // Row 2 — Categories (from top20 array — shows top-20 slice, not full universe)
+      if (catsOnline != null || catsOffline != null) {
+        rows.push(`<tr>
+          <td class="row-label">Categories <span style="font-size:10px;color:var(--text-muted)">(top 20)</span></td>
+          <td><span class="online">${catsOnline != null ? catsOnline : '—'}</span></td>
+          <td>${catsOffline != null ? catsOffline : '—'}</td>
+          <td>${catsOfflineOnly != null && catsOfflineOnly > 0 ? `<span class="warn">${catsOfflineOnly} offline only</span>` : '—'}</td>
+        </tr>`);
+      }
+
+      // Row 3 — Varieties (from list variety_freshness: online/offline totals)
+      rows.push(`<tr>
+        <td class="row-label">Varieties</td>
+        <td>${varOnline != null ? `<span class="online">${varOnline.toLocaleString()}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td>${varOffline != null ? varOffline.toLocaleString() : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td>${varGapCount != null && varGapCount > 0 ? `<span class="warn">${varGapCount.toLocaleString()} gap</span>` : (varOnline != null || varOffline != null ? '—' : '<span style="color:var(--text-muted);font-size:10px">not available</span>')}</td>
+      </tr>`);
+
+      // Row 4 — SKUs (from skus_online_offline.json)
+      rows.push(`<tr>
+        <td class="row-label">SKUs</td>
+        <td>${skuOnline != null ? `<span class="online">${skuOnline.toLocaleString()}</span>` : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td>${skuOffline != null ? skuOffline.toLocaleString() : '<span style="color:var(--text-muted)">—</span>'}</td>
+        <td>${skuGap != null && skuGap > 0 ? `<span class="warn">${skuGap.toLocaleString()} gap</span>` : (skuOnline != null || skuOffline != null ? '—' : '<span style="color:var(--text-muted);font-size:10px">not available</span>')}</td>
+      </tr>`);
+
+      // Row 5 — Procurement $
+      rows.push(`<tr>
+        <td class="row-label">Procurement $</td>
+        <td><span class="online">${fmt$(procOnline, true)}</span></td>
+        <td>${fmt$(procOffline, true)}</td>
+        <td>${procOffline ? `<span class="danger">${fmt$(procOffline, true)} @ $0</span>` : '—'}</td>
+      </tr>`);
+
+      sourcingHtml = `
+      <div class="content-gap-sm"></div>
+      <div class="table-wrap">
+        <table class="ev-table">
+          <thead><tr><th>SOURCING</th><th>Online</th><th>Offline</th><th>Gap</th></tr></thead>
+          <tbody>${rows.join('')}</tbody>
+        </table>
+      </div>`;
+    }
+  }
+
+  // ── Category gap alert — high-offline categories ──
+  let categoryGapHtml = '';
+  if (buy) {
+    const cats = buy.categories_top20 ? buy.categories_top20.value : null;
+    const leakage = buy.leakage ? buy.leakage.value : null;
+    if (cats && Array.isArray(cats)) {
+      const offlineCats = cats.filter(c => c.pct_offline >= 80 && c.offline_gmv > 50000).slice(0, 6);
+      if (offlineCats.length > 0) {
+        const tags = offlineCats.map(c => {
+          const isHigh = c.offline_gmv > 500000;
+          const bgStyle = isHigh
+            ? 'background:rgba(220,38,38,0.1);color:#991b1b;border:1px solid rgba(220,38,38,0.2)'
+            : 'background:rgba(217,119,6,0.12);color:#92400e;border:1px solid rgba(217,119,6,0.25)';
+          return `<span style="display:inline-block;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;${bgStyle}">${escHtml(c.category)} &middot; ${fmt$(c.offline_gmv, true)} offline</span>`;
+        }).join('\n          ');
+
+        // Leakage note: vendors on K2K buying offline = immediate recovery target
+        const leakageNote = leakage && leakage.leakage_vendors > 0
+          ? `<div style="margin-top:6px;font-size:11px;color:#92400e"><strong>${leakage.leakage_vendors} K2K-connected vendors</strong> still buying offline — ${fmt$(leakage.leakage_cost, true)} in leakage (${Math.round(leakage.pct_offline_leakage)}% of their GMV). These are recoverable without new connections.</div>`
+          : '';
+
+        categoryGapHtml = `
+        <div class="gap-alert">
+          <div class="gap-alert-title">&#9888; High-offline categories — buying offline while supply exists online</div>
+          <div style="font-size:var(--font-body);color:#92400e;margin-bottom:6px">
+            Categories where 80%+ of procurement is offline:
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px">
+            ${tags}
+          </div>
+          ${leakageNote}
         </div>`;
       }
     }
+  }
 
-    // Anticipation (buying horizon)
+  // ── Open Market callout (from leakage data) ──
+  let openMarketHtml = '';
+  if (buy) {
+    const vlc     = buy.vendor_lifecycle ? buy.vendor_lifecycle.value : null;
+    const leakage = buy.leakage          ? buy.leakage.value          : null;
+    const offlineVendors = vlc ? vlc.offline_vendors : null;
+    if (offlineVendors != null && offlineVendors > 0) {
+      openMarketHtml = `
+      <div class="content-gap-sm"></div>
+      <div class="callout">
+        <strong>Open Market shortcut:</strong> Manual inventory upload lets this account list product from non-K2K vendors immediately.
+        ${offlineVendors} offline vendor${offlineVendors !== 1 ? 's' : ''} &rarr; subset can be uploaded as Open Market inventory without full K2K integration.
+        ${leakage && leakage.leakage_cost > 0 ? `Recovers up to ${fmt$(leakage.leakage_cost, true)} in offline leakage.` : ''}
+      </div>`;
+    }
+  }
+
+  // ── Buying horizon (anticipation bars) ──
+  let anticipationHtml = '';
+  if (buy) {
     const antOnline  = buy.anticipation_online  ? buy.anticipation_online.value  : null;
     const antOffline = buy.anticipation_offline ? buy.anticipation_offline.value : null;
 
     if (antOnline || antOffline) {
       const buildBucketBar = (ant) => {
         if (!ant || !ant.buckets) return '';
-        const b = ant.buckets;
+        const b     = ant.buckets;
         const total = ant.total_orders || 1;
-
-        // Keys may be '0-3', '0-3d', '0–3d' etc — try all variants
         const bucketOrder = ['0-3', '4-7', '8-14', '15-30', '31-90', '90+'];
         const segClass    = ['seg-0-3','seg-4-7','seg-8-14','seg-15-30','seg-31-90','seg-90p'];
-
         return bucketOrder.map((k, i) => {
-          const entry = b[k] || b[k + 'd'] || b[k.replace('-','–')] || b[k.replace('-','–') + 'd'] || (k === '90+' ? (b['90d+'] || b['90+d']) : null) || null;
+          const entry = b[k] || b[k + 'd'] || b[k.replace('-','–')] || b[k.replace('-','–') + 'd']
+                       || (k === '90+' ? (b['90d+'] || b['90+d']) : null) || null;
           if (!entry) return '';
           const orders = entry.orders || entry.total_orders || 0;
-          const pct = Math.round((orders / total) * 100);
-          if (pct === 0) return '';
-          return `<div class="bar-seg ${segClass[i]}" style="width:${pct}%"></div>`;
+          const pct    = Math.round((orders / total) * 100);
+          return pct > 0 ? `<div class="bar-seg ${segClass[i]}" style="width:${pct}%"></div>` : '';
         }).join('');
       };
 
+      // Spot-buying SO WHAT — drive from actual data if available, fallback to mockup benchmark
+      const spotPct = antOnline && antOnline.buckets
+        ? (() => {
+            const b     = antOnline.buckets;
+            const total = antOnline.total_orders || 1;
+            const spot  = b['0-3'] || b['0-3d'] || b['0–3d'] || b['0–3d'] || null;
+            const spotOrders = spot ? (spot.orders || spot.total_orders || 0) : 0;
+            return Math.round((spotOrders / total) * 100);
+          })()
+        : null;
+      const spotCallout = (spotPct != null && spotPct > 0)
+        ? `<div class="content-gap-sm"></div>
+           <div class="callout amber">
+             <strong>&#9888; Spot buying:</strong> ${spotPct}% of online orders placed 0&ndash;3 days before shipping date. Online and offline both spot &mdash; no planning advantage online yet.
+           </div>`
+        : `<div class="content-gap-sm"></div>
+           <div class="callout amber">
+             <strong>&#9888; Spot buying:</strong> Most orders placed 0&ndash;3 days before shipping date. Online and offline both spot &mdash; no planning advantage online yet.
+           </div>`;
+
       anticipationHtml = `
       <div class="content-gap"></div>
-      <div class="section-label">BUYING HORIZON — How far ahead they order</div>
+      <div class="section-label">BUYING HORIZON &mdash; How far ahead they order (online vs offline)</div>
       <div class="bar-chart">
         ${antOnline ? `
         <div class="bar-row">
@@ -2350,69 +2504,52 @@ function renderBuyCard(ev) {
           <div class="bar-label">TOP RANGE</div>
           <div class="bar-track">
             <div class="bar-segments">
-              <div class="bar-seg seg-0-3" style="width:30%"></div>
-              <div class="bar-seg seg-4-7" style="width:20%"></div>
+              <div class="bar-seg seg-0-3"  style="width:30%"></div>
+              <div class="bar-seg seg-4-7"  style="width:20%"></div>
               <div class="bar-seg seg-8-14" style="width:22%"></div>
               <div class="bar-seg seg-15-30" style="width:16%"></div>
               <div class="bar-seg seg-31-90" style="width:8%"></div>
-              <div class="bar-seg seg-90p" style="width:4%"></div>
+              <div class="bar-seg seg-90p"  style="width:4%"></div>
             </div>
             <span class="bar-avg" style="color:var(--green)">12.5d avg (best in class)</span>
           </div>
         </div>
         <div class="bar-legend">
-          <span class="legend-item"><span class="legend-dot seg-0-3"></span>0–3d</span>
-          <span class="legend-item"><span class="legend-dot seg-4-7"></span>4–7d</span>
-          <span class="legend-item"><span class="legend-dot seg-8-14"></span>8–14d</span>
-          <span class="legend-item"><span class="legend-dot seg-15-30"></span>15–30d</span>
-          <span class="legend-item"><span class="legend-dot seg-31-90"></span>31–90d</span>
+          <span class="legend-item"><span class="legend-dot seg-0-3"></span>0&ndash;3d</span>
+          <span class="legend-item"><span class="legend-dot seg-4-7"></span>4&ndash;7d</span>
+          <span class="legend-item"><span class="legend-dot seg-8-14"></span>8&ndash;14d</span>
+          <span class="legend-item"><span class="legend-dot seg-15-30"></span>15&ndash;30d</span>
+          <span class="legend-item"><span class="legend-dot seg-31-90"></span>31&ndash;90d</span>
           <span class="legend-item"><span class="legend-dot seg-90p"></span>90d+</span>
         </div>
-      </div>`;
+      </div>
+      ${spotCallout}`;
     }
   }
 
-  // Category gap alert from categories_top20
-  let categoryGapHtml = '';
-  if (buy) {
-    const cats = buy.categories_top20 ? buy.categories_top20.value : null;
-    if (cats && Array.isArray(cats)) {
-      const offlineCats = cats.filter(c => c.pct_offline >= 80 && c.offline_gmv > 50000).slice(0, 6);
-      if (offlineCats.length > 0) {
-        const tags = offlineCats.map(c => {
-          const isHigh = c.offline_gmv > 500000;
-          return `<span class="gap-cat-tag${isHigh ? ' high' : ''}" style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;${isHigh ? 'background:rgba(220,38,38,0.1);color:#991b1b;border:1px solid rgba(220,38,38,0.2)' : 'background:rgba(217,119,6,0.12);color:#92400e;border:1px solid rgba(217,119,6,0.25)'}">${escHtml(c.category)} &middot; ${fmt$(c.offline_gmv, true)}</span>`;
-        }).join('\n                        ');
-
-        categoryGapHtml = `
-        <div class="gap-alert">
-          <div class="gap-alert-title">&#9888; Category gaps with offline-heavy procurement</div>
-          <div style="font-size:var(--font-body);color:#92400e;margin-bottom:6px">
-            Categories where ${fmtPct(offlineCats[0].pct_offline, 0)}+ of procurement is offline:
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px">
-            ${tags}
-          </div>
-        </div>`;
-      }
-    }
-  }
-
-  const buyCallout = kBuy != null
-    ? `<strong>SO WHAT:</strong> ${fmt$(kBuy, true)} total Koronet procurement${buyOffline != null ? ` — ${fmt$(buyOffline, true)} offline at $0 fees` : ''}. ${buyOnline != null ? fmtPct(buyOnline, 1) + ' purchased online.' : ''}`
-    : 'No buy domain data available for this account.';
-
+  // ── Card body assembly (order matches mockup) ──
   const body = `
     <div class="content-gap-sm"></div>
     <div class="callout">${buyCallout}</div>
     ${categoryGapHtml}
     ${sourcingHtml}
+    <div class="content-gap-sm"></div>
     ${k2kHtml}
+    ${openMarketHtml}
     ${anticipationHtml}
     ${!buy ? '<div class="data-gap-row">Buy domain data not found for this account.</div>' : ''}
+    <div class="handoff">
+      <span class="handoff-arrow">&rarr;</span>
+      <span>Continue to <strong>LIST</strong>: can the supply they buy be shown to their buyers?</span>
+    </div>
   `;
 
-  return cardShell('Card 3 &middot; BUY', `BUY &mdash; ${fmtPct(buyOnline)} online${buyOffline ? ', ' + fmt$(buyOffline, true) + ' offline' : ''}`, body, true, 'card-buy-' + id, subtitle);
+  // Card shell title uses live online % if available
+  const cardTitle = buyOnlinePctFmt != null
+    ? `BUY &mdash; ${buyOnlinePctFmt}% online${buyOfflineYtd ? ', ' + fmt$(buyOfflineYtd, true) + ' offline' : ''}`
+    : 'BUY';
+
+  return cardShell('Card 3 &middot; BUY', cardTitle, body, true, 'card-buy-' + id, subtitle);
 }
 
 /* ─── CARD 4: LIST ────────────────────────────────────────────────── */
