@@ -1539,20 +1539,33 @@ function buildDiagnosis(ev) {
 }
 
 /* ─── AT-STAKE CALCULATOR ───────────────────────────────────────────── */
+// Returns { amount, source } where source = 'sfdc' | 'scenario', or null if no data.
 function calcAtStake(ev) {
-  if (!ev || !ev.potential) return null;
+  if (!ev) return null;
+
+  // Primary: sum of open SFDC opportunity amounts for this account
+  const sfdcId = ev.identity && ev.identity.sfdc_id ? ev.identity.sfdc_id : null;
+  if (sfdcId && _sfdcOpps[sfdcId] != null && _sfdcOpps[sfdcId] > 0) {
+    return { amount: _sfdcOpps[sfdcId], source: 'sfdc' };
+  }
+
+  // Fallback: directional scenario (offline × 10% shift × take rate × 12mo)
+  if (!ev.potential) return null;
   const p = ev.potential;
   const offlineSell = fmtEv(p.sell_offline_ytd);
-  const koronetSell = fmtEv(p.koronet_sell_ytd);
-  const feesYtd = fmtEv(p.fees_ytd_2026);
   const takeRate = fmtEv(p.take_rate);
 
   if (offlineSell == null) return null;
 
-  // Scenario: 10% of offline sell moves online at current take rate (or 0.2% fallback)
   const rate = (takeRate != null && takeRate > 0) ? takeRate / 100 : 0.002;
   const scenario = offlineSell * 0.10 * rate * 12; // annualized
-  return scenario > 0 ? scenario : null;
+  return scenario > 0 ? { amount: scenario, source: 'scenario' } : null;
+}
+
+// Convenience: return just the numeric amount (for sorting, formatting helpers)
+function calcAtStakeAmount(ev) {
+  const r = calcAtStake(ev);
+  return r ? r.amount : null;
 }
 
 /* ─── TABLE ROW RENDERER ────────────────────────────────────────────── */
@@ -1578,7 +1591,9 @@ function renderRow(ev, idx) {
   const ctId = identity ? (identity.ct_id || '') : '';
   const city = identity ? (identity.city || identity.location || '') : '';
   const amName = identity ? (identity.am_name || identity.account_manager || '') : '';
-  const atStake = calcAtStake(ev);
+  const atStakeResult = calcAtStake(ev);
+  const atStake = atStakeResult ? atStakeResult.amount : null;
+  const atStakeSource = atStakeResult ? atStakeResult.source : null;
   const diagnosis = buildDiagnosis(ev);
 
   // Online color (sell)
@@ -1712,7 +1727,7 @@ function renderRow(ev, idx) {
       </td>
       <td class="metric-cell">
         <div class="stake-value">${fmt$(atStake, true)}</div>
-        <div class="stake-opps">${interventionCount > 0 ? interventionCount + ' intervention' + (interventionCount !== 1 ? 's' : '') : '—'}</div>
+        <div class="stake-opps">${atStakeSource === 'sfdc' ? 'SFDC opp' : atStakeSource === 'scenario' ? 'scenario est.' : '—'}${interventionCount > 0 ? ' · ' + interventionCount + ' intervention' + (interventionCount !== 1 ? 's' : '') : ''}</div>
       </td>
     </tr>
     <tr id="expanded-${id}" style="display:none">
@@ -1796,15 +1811,20 @@ function renderPotentialCard(ev) {
 
   const title = `POTENTIAL \u2014 ${sellOffline ? fmt$(sellOffline, true) + ' offline at $0 fees. ' : ''}${sellPen ? fmtPct(sellPen) + ' sell captured' : ''}${sellOnline ? ', ' + fmtPct(sellOnline) + ' online' : ''}.`;
 
-  // ── Focus callout: offline sell + offline buy → ARR scenario ──
-  const atStake = calcAtStake(ev);
+  // ── Focus callout: offline sell + offline buy → $ at stake ──
+  const atStakeResult = calcAtStake(ev);
+  const atStake = atStakeResult ? atStakeResult.amount : null;
+  const atStakeSource = atStakeResult ? atStakeResult.source : null;
+  const atStakeLabel = atStakeSource === 'sfdc' ? 'SFDC open opportunities' : 'ARR scenario';
   // K2K take rate (use 1.5% as K2K-specific rate; fall back to computed takeRate)
   const k2kRate = 1.5;
   let focusText;
-  if (sellOffline && buyOffline) {
-    focusText = `${fmt$(sellOffline, true)} offline sell + ${fmt$(buyOffline, true)} offline buy &rarr; <strong>${fmt$(atStake, true)} ARR scenario</strong> if 10% shift online (10% conversion x ${fmtPct(k2kRate, 1)} K2K rate, 12-month window)`;
+  if (atStakeSource === 'sfdc') {
+    focusText = `<strong>${fmt$(atStake, true)} in open SFDC opportunities</strong> — what this account is expected to pay (from Salesforce).`;
+  } else if (sellOffline && buyOffline) {
+    focusText = `${fmt$(sellOffline, true)} offline sell + ${fmt$(buyOffline, true)} offline buy &rarr; <strong>${fmt$(atStake, true)} scenario</strong> if 10% shift online (10% conversion x ${fmtPct(k2kRate, 1)} K2K rate, 12-month window)`;
   } else if (sellOffline) {
-    focusText = `${fmt$(sellOffline, true)} offline sell &rarr; <strong>${fmt$(atStake, true)} ARR scenario</strong> if 10% shift online (10% conversion x ${fmtPct(k2kRate, 1)} K2K rate, 12-month window)`;
+    focusText = `${fmt$(sellOffline, true)} offline sell &rarr; <strong>${fmt$(atStake, true)} scenario</strong> if 10% shift online (10% conversion x ${fmtPct(k2kRate, 1)} K2K rate, 12-month window)`;
   } else {
     focusText = 'Pull more data to compute offline opportunity.';
   }
@@ -1924,7 +1944,7 @@ function renderPotentialCard(ev) {
     </div>
     <div class="handoff">
       <span class="handoff-arrow">&rarr;</span>
-      <span>Continue to <strong>OPPORTUNITIES</strong>${oppCount ? ': ' + oppCount + ' intervention' + (oppCount !== 1 ? 's' : '') + ' worth ' + fmt$(atStake, true) + ' ARR at stake' : ''}</span>
+      <span>Continue to <strong>OPPORTUNITIES</strong>${oppCount ? ': ' + oppCount + ' intervention' + (oppCount !== 1 ? 's' : '') + ' worth ' + fmt$(atStake, true) + ' ' + (atStakeSource === 'sfdc' ? '(SFDC opps)' : 'scenario') + ' at stake' : ''}</span>
     </div>
   `;
 
@@ -1939,7 +1959,9 @@ function renderOpportunitiesCard(ev) {
   const list = ev.list;
   const sell = ev.sell;
 
-  const atStake = calcAtStake(ev);
+  const atStakeResult2 = calcAtStake(ev);
+  const atStake = atStakeResult2 ? atStakeResult2.amount : null;
+  const atStakeSource2 = atStakeResult2 ? atStakeResult2.source : null;
   const opps = [];
 
   // ── Shared data needed across opps ──
@@ -2171,7 +2193,7 @@ function renderOpportunitiesCard(ev) {
     <div class="stake-banner">
       <div>
         <div class="stake-banner-value">${fmt$(totalArr, true)}</div>
-        <div class="stake-banner-label">ARR scenario &middot; 12-month window &middot; 10% conversion assumption</div>
+        <div class="stake-banner-label">${atStakeSource2 === 'sfdc' ? 'SFDC open opportunities &middot; from Salesforce' : 'Scenario &middot; 12-month window &middot; 10% conversion assumption'}</div>
       </div>
       <div class="stake-banner-right">
         <div class="stake-banner-count">${opps.length} intervention${opps.length !== 1 ? 's' : ''}</div>
@@ -2208,7 +2230,7 @@ function renderOpportunitiesCard(ev) {
     </div>
   `;
 
-  return cardShell('Card 2 &middot; OPPORTUNITIES', `OPPORTUNITIES &mdash; ${fmt$(totalArr, true)} ARR at stake &middot; ${opps.length} intervention${opps.length !== 1 ? 's' : ''}`, body, true, 'card-opps-' + id);
+  return cardShell('Card 2 &middot; OPPORTUNITIES', `OPPORTUNITIES &mdash; ${fmt$(totalArr, true)} ${atStakeSource2 === 'sfdc' ? '(SFDC opps)' : 'scenario'} at stake &middot; ${opps.length} intervention${opps.length !== 1 ? 's' : ''}`, body, true, 'card-opps-' + id);
 }
 
 /* ─── CARD 3: BUY ─────────────────────────────────────────────────── */
@@ -2893,10 +2915,10 @@ function renderSellCard(ev) {
   let calculatorHtml = '';
 
   if (sell) {
-    // ── Repeat rate + concentration (shown before CVR, per mockup)
+    // ── Repeat rate + concentration + GMV pills (shown before CVR, per mockup)
     const rr   = sell.repeat_rate   ? sell.repeat_rate.value   : null;
     const conc = sell.concentration ? sell.concentration.value : null;
-    if (rr || conc) {
+    {
       const rrPct   = rr   ? rr.repeat_rate_pct   : null;
       const top5Pct = conc ? conc.top5_pct         : null;
       const retentionPct = (() => {
@@ -2904,13 +2926,19 @@ function renderSellCard(ev) {
         if (bt2 && bt2.online_buyers && bt2.l30d_online) return Math.round((bt2.l30d_online / bt2.online_buyers) * 100);
         return null;
       })();
-      metricsHtml = `
+      const onlineGmv  = p ? fmtEv(p.koronet_sell_ytd) : null;
+      const offlineGmv = p ? fmtEv(p.sell_offline_ytd) : null;
+      const pills = [];
+      if (onlineGmv  != null) pills.push(`<div class="metric-pill good-pill"><strong>Online GMV:</strong> ${fmt$(onlineGmv, true)}</div>`);
+      if (offlineGmv != null) pills.push(`<div class="metric-pill warn-pill"><strong>Offline GMV:</strong> ${fmt$(offlineGmv, true)}</div>`);
+      if (rrPct      != null) pills.push(`<div class="metric-pill ${rrPct >= 80 ? 'good-pill' : 'warn-pill'}"><strong>Repeat rate:</strong> ${fmtPct(rrPct, 1)} <span style="color:var(--text-muted)">(p75 network)</span></div>`);
+      if (top5Pct    != null) pills.push(`<div class="metric-pill ${top5Pct < 20 ? 'good-pill' : 'warn-pill'}"><strong>Conc. Top 5:</strong> ${fmtPct(top5Pct, 1)} <span style="color:var(--text-muted)">${top5Pct < 20 ? 'healthy' : 'concentrated'}</span></div>`);
+      if (retentionPct != null) pills.push(`<div class="metric-pill warn-pill"><strong>Retention L30D:</strong> ${retentionPct}%</div>`);
+      if (pills.length) {
+        metricsHtml = `
       <div class="content-gap-sm"></div>
-      <div class="metrics-row">
-        ${rrPct != null ? `<div class="metric-pill good-pill"><strong>Repeat rate:</strong> ${fmtPct(rrPct, 1)}</div>` : ''}
-        ${top5Pct != null ? `<div class="metric-pill ${top5Pct < 20 ? 'good-pill' : 'warn-pill'}"><strong>Conc. Top 5:</strong> ${fmtPct(top5Pct, 1)}</div>` : ''}
-        ${retentionPct != null ? `<div class="metric-pill warn-pill"><strong>Retention L30D:</strong> ${retentionPct}%</div>` : ''}
-      </div>`;
+      <div class="metrics-row">${pills.join('')}</div>`;
+      }
     }
 
     // ── Buyers table (BUYER LANDSCAPE section)
@@ -2927,6 +2955,10 @@ function renderSellCard(ev) {
       const retLabel = (bt.online_buyers && bt.l30d_online)
         ? Math.round((bt.l30d_online / bt.online_buyers) * 100) + '% online retention'
         : '';
+      // Split new/churned by channel — fields new_online/new_offline/churned_online/churned_offline
+      // are optional (not yet in schema); fall back to showing total in the context column only.
+      const hasNewSplit     = bt.new_online != null || bt.new_offline != null;
+      const hasChurnedSplit = bt.churned_online != null || bt.churned_offline != null;
 
       buyersHtml = `
       <div class="section-label" style="margin-top:8px">BUYER LANDSCAPE</div>
@@ -2934,7 +2966,7 @@ function renderSellCard(ev) {
       <div class="net-indicator ${netClass}">
         <span style="font-size:16px">${netIcon}</span>
         <span>Net ${netBuyers >= 0 ? '+' : ''}${netBuyers} buyers</span>
-        <span class="net-detail">&nbsp;·&nbsp; ${bt.new_month != null ? '+' + bt.new_month + ' new' : ''} ${bt.churned != null ? '/ –' + bt.churned.toLocaleString() + ' churned L90D' : ''}</span>
+        <span class="net-detail">&nbsp;·&nbsp; ${bt.new_month != null ? '+' + bt.new_month + ' new' : ''} ${bt.churned != null ? '/ \u2013' + bt.churned.toLocaleString() + ' churned L90D' : ''}</span>
       </div>` : ''}
       <div class="table-wrap">
         <table class="ev-table" style="font-size:12px">
@@ -2948,7 +2980,7 @@ function renderSellCard(ev) {
               <td class="row-label" style="font-size:12px">Total Buyers</td>
               <td style="font-size:12px"><span class="online" style="font-size:12px">${bt.online_buyers != null ? bt.online_buyers.toLocaleString() : '—'}</span></td>
               <td style="font-size:12px">${bt.offline_buyers != null ? bt.offline_buyers.toLocaleString() : '—'}</td>
-              <td style="font-size:12px"><strong>${bt.total_buyers != null ? bt.total_buyers.toLocaleString() : '—'}</strong> total</td>
+              <td style="font-size:12px"><strong>${bt.total_buyers != null ? bt.total_buyers.toLocaleString() : '—'}</strong> total${bt.total_buyers != null && bt.online_buyers != null && bt.offline_buyers != null && bt.total_buyers < bt.online_buyers + bt.offline_buyers ? ' <span class="ev-state proxy">May overlap</span>' : ''}</td>
             </tr>
             <tr>
               <td class="row-label" style="font-size:12px">Active L30D</td>
@@ -2964,16 +2996,16 @@ function renderSellCard(ev) {
             </tr>
             ${bt.new_month != null ? `
             <tr style="background:var(--green-bg)">
-              <td class="row-label" style="font-size:12px"><span class="good">&#9679;</span> New (this mo)</td>
-              <td style="font-size:12px"><span class="good" style="font-size:12px">—</span></td>
-              <td style="font-size:12px"><span class="good">—</span></td>
+              <td class="row-label" style="font-size:12px"><span class="good">&#9679;</span> New (Jul)</td>
+              <td style="font-size:12px"><span class="good" style="font-size:12px">${hasNewSplit && bt.new_online != null ? bt.new_online.toLocaleString() : '—'}</span></td>
+              <td style="font-size:12px"><span class="good">${hasNewSplit && bt.new_offline != null ? bt.new_offline.toLocaleString() : '—'}</span></td>
               <td style="font-size:12px"><strong class="good">${bt.new_month} total</strong> &mdash; new activations</td>
             </tr>` : ''}
             ${bt.churned != null ? `
             <tr style="background:var(--red-bg)">
               <td class="row-label" style="font-size:12px"><span class="danger">&#9679;</span> Churned / Lapsed</td>
-              <td style="font-size:12px"><span class="danger" style="font-size:12px">—</span></td>
-              <td style="font-size:12px"><span class="danger">—</span></td>
+              <td style="font-size:12px"><span class="danger" style="font-size:12px">${hasChurnedSplit && bt.churned_online != null ? bt.churned_online.toLocaleString() : '—'}</span></td>
+              <td style="font-size:12px"><span class="danger">${hasChurnedSplit && bt.churned_offline != null ? bt.churned_offline.toLocaleString() : '—'}</span></td>
               <td style="font-size:12px"><strong class="danger">${bt.churned.toLocaleString()} L90D</strong> &mdash; at risk</td>
             </tr>` : ''}
           </tbody>
@@ -3112,6 +3144,28 @@ function renderSellCard(ev) {
     }
 
     if (rows.length) {
+      // Combined potential result row
+      let combinedGmv = 0; let canCombine = false;
+      if (rrPct != null && rrTopPct > rrPct) {
+        const sellTotC = (sell.sell_total_ytd && sell.sell_total_ytd.value) || null;
+        if (sellTotC) { combinedGmv += Math.round(sellTotC * (rrTopPct - rrPct) / 100); canCombine = true; }
+      }
+      if (aovOn != null && aovTopVal != null && aovTopVal > aovOn) {
+        combinedGmv += Math.round((bt3 ? (bt3.online_buyers || 0) : 0) * (aovTopVal - aovOn) * 12);
+        canCombine = true;
+      }
+      if (offB != null && aovOn != null) {
+        combinedGmv += Math.round(Math.round(offB * 0.20) * aovOn * 12);
+        canCombine = true;
+      }
+      const combinedFees = canCombine ? Math.round(combinedGmv * 0.002) : 0;
+      const combinedRow  = canCombine
+        ? `<div class="calc-result" style="color:var(--green);border-color:var(--green-border)">
+          <span>Combined potential uplift</span>
+          <span>+${fmt$(combinedGmv, true)} GMV &rarr; ~${fmt$(combinedFees, true)} fees/yr</span>
+        </div>`
+        : '';
+
       efficiencyCalcHtml = `
       <div class="content-gap"></div>
       <div class="section-label">EFFICIENCY CALCULATOR</div>
@@ -3119,31 +3173,64 @@ function renderSellCard(ev) {
       <div class="calculator-box" style="border-color:var(--green-border);background:var(--green-bg)">
         <div class="calc-header" style="color:var(--green)"><span>&#9889;</span> What if this account matched top-performer efficiency?</div>
         ${rows.join('')}
+        ${combinedRow}
       </div>`;
     }
   }
 
+  // ── SO WHAT callout — lead with online%, CVR, repeat rate, concentration
+  const _cvrSW  = sell && sell.cvr          ? sell.cvr.value          : null;
+  const _rrSW   = sell && sell.repeat_rate  ? sell.repeat_rate.value  : null;
+  const _concSW = sell && sell.concentration ? sell.concentration.value : null;
+  const swParts = [];
+  if (sellOnlinePct != null) swParts.push(`${fmtPct(sellOnlinePct, 1)} online`);
+  if (_cvrSW  && _cvrSW.user_cvr_pct   != null) swParts.push(`${fmtPct(_cvrSW.user_cvr_pct, 1)} CVR`);
+  if (_rrSW   && _rrSW.repeat_rate_pct != null) swParts.push(`${fmtPct(_rrSW.repeat_rate_pct, 1)} repeat rate`);
+  if (_concSW && _concSW.top5_pct      != null) swParts.push(`${fmtPct(_concSW.top5_pct, 1)} concentration`);
+  const swIntro = swParts.length ? swParts.join(', ') + '.' : 'Sell data loaded.';
+  const swGap   = offlineBuyers != null
+    ? ` The gap is activation: ${offlineBuyers.toLocaleString()} buyers trust this wholesaler offline and haven’t been invited online.`
+    : '';
   const sellCallout = sell
-    ? `<strong>SO WHAT:</strong> ${sellOnlinePct != null ? fmtPct(sellOnlinePct, 1) + ' of sell is online' : 'Sell data loaded'}${offlineBuyers != null ? `. ${offlineBuyers.toLocaleString()} offline buyers not yet invited online.` : '.'}`
+    ? `<strong>SO WHAT:</strong> ${swIntro}${swGap}`
     : 'No sell domain data available for this account.';
+
+  // ── Card subtitle: "+10% buyers online = $X GMV shift = $Y fees/yr"
+  let cardSubtitle = '';
+  if (offlineBuyers != null && bt && bt.aov_online) {
+    const shiftGmv  = Math.round(Math.round(offlineBuyers * 0.10) * bt.aov_online * 12);
+    const shiftFees = Math.round(shiftGmv * 0.002);
+    cardSubtitle = `+10% buyers online = ${fmt$(shiftGmv, true)} GMV shift = ${fmt$(shiftFees, true)} fees/yr`;
+  }
+
+  // ── Bottom-line callout (matches mockup closing green box)
+  const bottomLine = sell ? `
+    <div class="content-gap-sm"></div>
+    <div class="callout green">
+      <strong>Bottom line:</strong>${offlineBuyers != null
+        ? ` The biggest lever is activation — ${offlineBuyers.toLocaleString()} buyers who already trust this wholesaler offline haven’t been invited to order digitally.`
+        : ` Focus on moving offline GMV online — the CVR and repeat rate infrastructure is already in place.`}
+    </div>` : '';
 
   const body = `
     <div class="content-gap-sm"></div>
-    <div class="callout ${sellOnlinePct != null && sellOnlinePct >= 30 ? 'green' : ''}">${sellCallout}</div>
+    <div class="callout ${sellOnlinePct != null && sellOnlinePct < 30 ? '' : 'green'}">${sellCallout}</div>
     ${buyersHtml}
     ${metricsHtml}
     ${cvrHtml}
     ${efficiencyCalcHtml}
+    ${bottomLine}
+    <div class="content-gap-sm"></div>
     <div class="future-data-box">
-      <div class="future-data-label">Future data need</div>
-      <div class="future-data-text"><strong>Product mix &amp; channels:</strong> Channel split (eCom / K2K / API) and format breakdown (boxes / bunches, short / forward) not yet in sell_domain. Needed to identify API monetization gaps.</div>
+      <div class="future-data-label">Future data need &mdash; PRODUCT MIX &amp; CHANNELS</div>
+      <div class="future-data-text">Channel split (eCom / K2K / API) and format breakdown (Fresh Cut boxes / bunches, short / forward) not yet in sell_domain. Needed to identify API monetization gaps and format-level leakage.</div>
     </div>
     ${!sell ? '<div class="data-gap-row">Sell domain data not found for this account.</div>' : ''}
   `;
 
-  const title = `SELL — ${fmtPct(sellOnlinePct)} online${offlineBuyers ? '. ' + offlineBuyers.toLocaleString() + ' offline buyers not invited.' : '.'}`;
+  const title = `SELL — ${fmtPct(sellOnlinePct)} online${offlineBuyers ? '. ' + offlineBuyers.toLocaleString() + ' offline buyers not yet invited.' : '.'}`;
 
-  return cardShell('Card 5 &middot; SELL', title, body, true, 'card-sell-' + id);
+  return cardShell('Card 5 · SELL', title, body, true, 'card-sell-' + id, cardSubtitle);
 }
 
 /* ─── CARD 6: DATA FRESHNESS ─────────────────────────────────────── */
@@ -3273,6 +3360,23 @@ function clearAllFilters() {
   applyFilters();
 }
 
+/* ─── SFDC OPPORTUNITIES MAP (sfdc_id → total open opp amount) ──── */
+let _sfdcOpps = {};  // populated at init
+
+function _loadSfdcOpps() {
+  return fetch('data/sfdc_open_opportunities_v1.json')
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null)
+    .then(data => {
+      if (!data || !Array.isArray(data.records)) return;
+      data.records.forEach(rec => {
+        if (!rec.account_id) return;
+        const amt = parseFloat(rec.amount) || 0;
+        _sfdcOpps[rec.account_id] = (_sfdcOpps[rec.account_id] || 0) + amt;
+      });
+    });
+}
+
 /* ─── FILTER LOGIC ──────────────────────────────────────────────── */
 let _allEvidence = [];
 let _filteredEvidence = [];
@@ -3291,7 +3395,7 @@ function applyFilters() {
       const ctId = (ev.identity && ev.identity.ct_id) ? ev.identity.ct_id.toLowerCase() : '';
       if (!ctId.includes(ctFilter)) return false;
     }
-    if (priorityFilter) {
+    if (priorityFilter !== '') {
       const priority = (ev.identity && ev.identity.priority_level) ? ev.identity.priority_level.toLowerCase() : '';
       const implStage = (ev.identity && ev.identity.impl_stage) ? ev.identity.impl_stage.toLowerCase() : '';
       const status = (ev.identity && ev.identity.status) ? ev.identity.status.toLowerCase() : '';
@@ -3440,7 +3544,7 @@ function getSortValue(ev, key) {
     case 'buy_online_pct': return p ? fmtEvVal(p.buy_online_pct) : null;
     case 'fees':           return p ? fmtEvVal(p.fees_ytd_2026) : null;
     case 'take_rate':      return p ? fmtEvVal(p.take_rate) : null;
-    case 'at_stake':       return calcAtStake(ev);
+    case 'at_stake':       return calcAtStakeAmount(ev);
     default:               return null;
   }
 }
@@ -3496,7 +3600,7 @@ function onTimeframeChange() {
 }
 
 /* ─── MAIN INIT ─────────────────────────────────────────────────── */
-EvidenceAdapter.init().then(function() {
+Promise.all([EvidenceAdapter.init(), _loadSfdcOpps()]).then(function() {
   // Table already visible — nothing to toggle
 
   const tf = document.getElementById('timeframe-select').value;
