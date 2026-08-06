@@ -56,6 +56,14 @@
     "GRW": { "display": "Grower", "desc": "Produces flowers. Some have K2K/distribution activity. Verify behavior before excluding.", "examples": "Veldkamp's ($82K K2K)" }
   },
 
+  "tx_scorecard_contract": {
+    "refresh": "daily dashboard materialization",
+    "purpose": "Koronet independent Transactions scorecard. It joins expected transaction motion, applicable configuration evidence, activity and outcome without replacing implementation health.",
+    "per_account_fields": ["ct_id", "expected_motion", "tx_config_state_with_source_date_trust", "activation_state_with_evidence", "activity_state_last_next_owner_due_or_trigger", "outcome_state_change_or_no_change", "blocker_or_falta_contexto"],
+    "rules": ["Only evaluate stages applicable to the account type and actual modules.", "Missing evidence is FALTA_CONTEXTO, never a failure or a green pass.", "Activity is read from approved control-plane work/commitment projections; this file never creates tasks.", "No aggregate health score may hide which prerequisite, activity or evidence is missing."],
+    "implementation_health_boundary": "George and Christine calibrate config applicability and account exceptions. TX scorecard retains independent transaction expectation, activity, priority and reporting."
+  },
+
   "config_objectives": {
     "gate_eshop": {
       "setting": "ecommerceEnabled",
@@ -226,6 +234,37 @@
   },
 
   "sell_payment_gate": "Before escalating 'mandatory payment blocks conversions' → need FUNNEL DATA first. How much traffic? How many registered? How deep does the funnel go? If traffic is near-zero, payment gate isn't the real blocker — discovery is.",
+
+  "tx_measurement_contract": {
+    "entry_route_distribution": "Hostname or branded-domain route is an adoption/attribution diagnostic only. It must never rank eShop performance or account priority.",
+    "conversion_readiness_rule": "Conversion is interpretable only with inventory readiness and data coverage for the same account, channel and period. If either is absent or stale, display NOT_ASSESSABLE — never infer a conversion bottleneck.",
+    "conversion_diagnostic_chain": [
+      "demand: sessions and funnel progression",
+      "conversion: eligible sessions to completed online transaction",
+      "inventory_readiness: gate, breadth, depth, format and competitive price/terms"
+    ],
+    "diagnostic_outcomes": {
+      "demand_low_readiness_good": "Discovery/demand hypothesis; not a conversion verdict.",
+      "demand_good_readiness_low": "Supply/listing/readiness hypothesis; not a conversion verdict.",
+      "demand_and_readiness_good_conversion_low": "Checkout, price, terms or UX hypothesis; requires evidence before action.",
+      "any_required_input_missing": "NOT_ASSESSABLE"
+    },
+    "monetization": {
+      "grain": "account_id × channel × period × transaction_side",
+      "transaction_side": ["DIRECT", "INDIRECT", "UNATTRIBUTED"],
+      "direct_indirect_rule": "Direct and indirect GMV and fees must be calculated separately from validated transaction-side mapping. Unknown or ambiguous mappings remain UNATTRIBUTED; they must not be guessed.",
+      "monetizable_gmv": "GMV eligible to generate a Koronet fee under the validated account/channel/side rule. It is not synonymous with online GMV.",
+      "effective_take_rate": "SUM(fee_amount) / SUM(relevant_gross_gmv), shown only when denominator coverage is valid.",
+      "billed_coverage": "SUM(billed_fee_amount) / SUM(expected_fee_amount on monetizable_gmv), shown only when rate and attribution coverage are valid.",
+      "unmonetized_monetizable_gap": "monetizable_gmv less the validated fee-bearing GMV; never estimated from an unverified fee rate."
+    },
+    "source_gate": [
+      "Stable account/storefront join to the account spine",
+      "Daily source freshness and stated period cut-off",
+      "Coverage and reconciliation against the authoritative fee/account-rate source",
+      "Validated transaction-side mapping before DIRECT or INDIRECT is shown"
+    ]
+  },
 
   "sell_buyer_onboarding": [
     "Identify top offline buyers (rank by offline GMV, no eShop activity)",
