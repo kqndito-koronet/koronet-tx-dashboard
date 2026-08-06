@@ -1217,6 +1217,38 @@
   .opp-rank { font-size: 9px; font-weight: 700; color: var(--text-muted); }
   .opp-desc { font-size: var(--font-body); color: var(--text-secondary); margin-bottom: 3px; }
 
+  .opp-link {
+    font-size: 10px;
+    color: var(--blue);
+    text-decoration: none;
+    cursor: pointer;
+    display: inline-block;
+    margin-top: 2px;
+  }
+  .opp-link:hover { text-decoration: underline; }
+
+  /* Effort badge variants */
+  .badge-quick   { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+  .badge-invest  { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+  .badge-project { background: #faf5ff; color: #7c3aed; border: 1px solid #ddd6fe; }
+
+  /* Collapsed toggle row (product profile / config issues) */
+  .collapse-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-body);
+    margin-bottom: 6px;
+    background: #fafbfd;
+    transition: background 0.15s;
+  }
+  .collapse-row:hover { background: var(--border-light); }
+  .collapse-row span { color: var(--text-muted); font-size: 10px; }
+
   /* Data gap row */
   .data-gap-row {
     font-size: 10px;
@@ -1612,8 +1644,11 @@ function renderRow(ev, idx) {
     return count;
   })();
 
-  // Account meta line (#20) — city + AM name
-  const metaParts = [ctId];
+  // Account meta line — priority + ct_id + city + AM
+  const priorityLevel = identity ? (identity.priority_level || '') : '';
+  const metaParts = [];
+  if (priorityLevel) metaParts.push('<span style="font-weight:700;color:' + (priorityLevel === 'P1' ? 'var(--red)' : priorityLevel === 'IMPL' ? 'var(--amber)' : priorityLevel === 'TA' ? 'var(--blue)' : 'var(--text-muted)') + '">' + escHtml(priorityLevel) + '</span>');
+  metaParts.push(ctId);
   if (identity && identity.sfdc_type) metaParts.push(escHtml(identity.sfdc_type));
   if (city) metaParts.push(escHtml(city));
   if (amName) metaParts.push('AM: ' + escHtml(amName));
@@ -1907,55 +1942,124 @@ function renderOpportunitiesCard(ev) {
   const atStake = calcAtStake(ev);
   const opps = [];
 
-  // Build opportunities from available data
-  // Opp 1: BUY — offline procurement at $0 fees
+  // ── Shared data needed across opps ──
+  const sellOfflineYtd = p ? fmtEv(p.sell_offline_ytd) : null;
+
+  // ── Opp 1: BUY — offline procurement at $0 fees
   const buyOffline = p ? fmtEv(p.buy_offline_ytd) : null;
-  const buyOnline = p ? fmtEv(p.buy_online_pct) : null;
-  const k2k = buy && buy.k2k_lifecycle ? buy.k2k_lifecycle.value : null;
-  const vendorLc = buy && buy.vendor_lifecycle ? buy.vendor_lifecycle.value : null;
-  const noK2k = k2k ? (k2k.no_k2k || k2k.inactive_connections || 0) : 0;
+  const buyOnline  = p ? fmtEv(p.buy_online_pct)  : null;
+  const k2k        = buy && buy.k2k_lifecycle   ? buy.k2k_lifecycle.value   : null;
+  const vendorLc   = buy && buy.vendor_lifecycle ? buy.vendor_lifecycle.value : null;
 
   if (buyOffline && buyOffline > 0) {
     const arrEst = Math.round(buyOffline * 0.10 * 0.015 * 12); // 10% shift, 1.5% K2K rate, annualized
+    const offlineVendors = vendorLc && vendorLc.offline_vendors != null ? vendorLc.offline_vendors : null;
+    // K2K-eligible = vendors that are offline (no K2K) — use inactive/no_k2k from k2k_lifecycle
+    const k2kEligible = k2k ? (k2k.no_k2k != null ? k2k.no_k2k : (k2k.inactive_connections != null ? k2k.inactive_connections : null)) : null;
+    // "Recoverable immediately" = K2K-eligible vendors × avg buy per vendor (approximated as buyOffline / offlineVendors)
+    const avgBuyPerVendor = (offlineVendors && offlineVendors > 0) ? buyOffline / offlineVendors : null;
+    const recoverableNow = (k2kEligible != null && avgBuyPerVendor != null) ? Math.round(k2kEligible * avgBuyPerVendor * 0.015) : null;
+    const arrSustained   = arrEst; // same formula, already annualized
+    let buyDesc = `${offlineVendors != null ? offlineVendors + ' vendors' : 'Vendors'} with procurement offline today — ${fmt$(buyOffline, true)} at $0 fees.`;
+    if (k2kEligible != null) buyDesc += ` ${k2kEligible} K2K-eligible.`;
+    if (recoverableNow != null) buyDesc += ` ${fmt$(recoverableNow, true)} recoverable immediately (K2K rate). ${fmt$(arrSustained, true)} ARR if sustained 12mo.`;
     opps.push({
-      type: 'BUY', stage: 'stage-buy', arr: arrEst, effort: 'quick fix',
-      desc: `${vendorLc ? vendorLc.offline_vendors + ' vendors' : 'Vendors'} with procurement offline today. ${fmt$(buyOffline, true)} offline at $0 fees.`,
+      type: 'BUY', stage: 'stage-buy', arr: arrEst, effort: 'quick fix', effortClass: 'badge-quick',
+      desc: buyDesc,
+      link: '&rarr; see BUY card', linkTarget: 'card-buy-' + id,
     });
   }
 
-  // Opp 2: LIST — variety gap / config issues
-  const cfg = list && list.config ? list.config.value : null;
+  // ── Opp 2a: LIST — MaxAge config issue
+  // ── Opp 2b: LIST — Bunches disabled
+  const cfg    = list && list.config ? list.config.value : null;
   const cfgRaw = cfg && cfg.raw ? cfg.raw : null;
+  // bunches_reality is ground truth for whether bunches are actually sold online
+  const bunchesReality = cfg && cfg.bunches_reality ? cfg.bunches_reality : null;
+
+  // Variety freshness data — used for variety gap and MaxAge ARR calc
+  const vf = list && list.variety_freshness ? list.variety_freshness.value : null;
+  const onlineVarCount  = vf && vf.online  ? (vf.online.total_varieties  || 0) : null;
+  const offlineVarCount = vf && vf.offline ? (vf.offline.total_varieties || 0) : null;
+  const varietyGap = (onlineVarCount != null && offlineVarCount != null) ? Math.max(0, offlineVarCount - onlineVarCount) : null;
+
+  let maxAgeBad = false;
+  let bunchesOff = false;
+  let configBlocker = false; // true if any config issue exists
+
   if (cfgRaw) {
-    const bunches = cfgRaw.sell_in_bunches != null ? cfgRaw.sell_in_bunches : cfgRaw.bunches;
-    const bunchesOff = bunches === false || bunches === 'false' || bunches === 0;
-    const maxAge = cfgRaw.max_age_sell != null ? cfgRaw.max_age_sell : cfgRaw.MaxAge;
-    const maxAgeBad = maxAge != null && maxAge < 30;
+    // MaxAge: prefer ecommerce_max_age (config_evidence_v2 field name)
+    const maxAgeRaw = cfgRaw.ecommerce_max_age != null ? cfgRaw.ecommerce_max_age
+                    : cfgRaw.max_age_sell       != null ? cfgRaw.max_age_sell
+                    : cfgRaw.MaxAge             != null ? cfgRaw.MaxAge
+                    : null;
+    const maxAge    = maxAgeRaw != null ? parseInt(maxAgeRaw, 10) : null;
+    maxAgeBad = maxAge != null && !isNaN(maxAge) && maxAge < 30;
 
     if (maxAgeBad) {
+      configBlocker = true;
+      // ARR estimate: variety_gap × (offline_sell / total_offline_varieties) × 0.002 × 12
+      let maxAgeArr = null;
+      if (varietyGap != null && varietyGap > 0 && sellOfflineYtd != null && offlineVarCount != null && offlineVarCount > 0) {
+        maxAgeArr = Math.round(varietyGap * (sellOfflineYtd / offlineVarCount) * 0.002 * 12);
+      }
+      // catalog pct blocked
+      const catalogPctBlocked = (varietyGap != null && offlineVarCount != null && offlineVarCount > 0)
+        ? Math.round((varietyGap / offlineVarCount) * 100) : null;
+      let maxAgeDesc = `MaxAge=${maxAge} days — blocks forward inventory. ${varietyGap != null ? varietyGap.toLocaleString() + ' varieties offline not visible online' : 'Catalog depth blocked'}.`;
+      if (catalogPctBlocked != null) maxAgeDesc += ` ${catalogPctBlocked}% of catalog hidden.`;
+      if (maxAgeArr != null) maxAgeDesc += ` ~${fmt$(maxAgeArr, true)} ARR unlocked if fixed.`;
       opps.push({
-        type: 'LIST', stage: 'stage-list', arr: null, effort: 'investigation',
-        desc: `MaxAge=${maxAge} blocks forward inventory from being listed online. Config change unlocks catalog depth.`,
+        type: 'LIST', stage: 'stage-list', arr: maxAgeArr, effort: 'investigation', effortClass: 'badge-invest',
+        desc: maxAgeDesc,
+        link: '&rarr; see LIST card', linkTarget: 'card-list-' + id,
       });
     }
+
+    // Bunches: use bunches_reality.actually_sells_bunches_ecom if available,
+    // else fall back to config flags (is_on_hand_inventory_units / sell_in_bunches / bunches)
+    const actuallyBunches = bunchesReality != null ? bunchesReality.actually_sells_bunches_ecom : null;
+    const configBunchFlag = cfgRaw.is_on_hand_inventory_units != null ? cfgRaw.is_on_hand_inventory_units
+                          : cfgRaw.sell_in_bunches             != null ? cfgRaw.sell_in_bunches
+                          : cfgRaw.bunches                     != null ? cfgRaw.bunches
+                          : null;
+    // Bunches opportunity: they don't actually sell bunches ecom (or config says off)
+    bunchesOff = actuallyBunches === false
+                    || (actuallyBunches == null && (configBunchFlag === false || configBunchFlag === 0));
+
     if (bunchesOff) {
+      configBlocker = true;
+      // ARR from bunches: sellOfflineYtd × 0.95 (retail share) × 0.002 × 12
+      const bunchGmv  = sellOfflineYtd != null ? Math.round(sellOfflineYtd * 0.95) : null;
+      const bunchArr  = bunchGmv != null ? Math.round(bunchGmv * 0.002 * 12) : null;
+      let bunchDesc = 'Bunches format disabled — 95% of retail TAM blocked.';
+      if (sellOfflineYtd != null) bunchDesc += ` ${fmt$(sellOfflineYtd, true)} offline bunch GMV invisible online.`;
+      if (bunchArr != null) bunchDesc += ` ~${fmt$(bunchArr, true)} ARR if enabled (5-min config fix).`;
       opps.push({
-        type: 'LIST', stage: 'stage-list', arr: null, effort: 'quick fix',
-        desc: 'Bunches format disabled. Retail TAM blocked. 5-min config fix.',
+        type: 'LIST', stage: 'stage-list', arr: bunchArr, effort: 'quick fix', effortClass: 'badge-quick',
+        desc: bunchDesc,
+        link: '&rarr; see LIST card', linkTarget: 'card-list-' + id,
       });
     }
   }
 
-  // Opp 3: SELL — offline buyers activation
-  const bt = sell && sell.buyers_table ? sell.buyers_table.value : null;
+  // ── Opp 3: SELL — offline buyers activation
+  const bt           = sell && sell.buyers_table ? sell.buyers_table.value : null;
   const offlineBuyers = bt ? bt.offline_buyers : null;
   if (offlineBuyers && offlineBuyers > 0 && bt.aov_online) {
     const activatedPct = 0.193; // network average CVR
-    const newOnline = Math.round(offlineBuyers * activatedPct);
-    const arrEst = Math.round(newOnline * bt.aov_online * 12 * 0.002);
+    const newOnline    = Math.round(offlineBuyers * activatedPct);
+    const rrData       = sell && sell.repeat_rate ? sell.repeat_rate.value : null;
+    const repeatRate   = rrData ? (rrData.repeat_rate_pct != null ? rrData.repeat_rate_pct / 100 : null) : null;
+    const arrEst       = Math.round(newOnline * bt.aov_online * 12 * 0.002);
+    let sellDesc = `${offlineBuyers.toLocaleString()} offline buyers never invited to eShop. Conversion at network rate (${fmtPct(activatedPct * 100, 1)}) = ${newOnline.toLocaleString()} new online buyers`;
+    sellDesc += ` × ${fmt$(bt.aov_online, true)} AOV`;
+    if (repeatRate != null) sellDesc += ` × ${fmtPct(repeatRate * 100, 0)} repeat rate`;
+    sellDesc += '.';
     opps.push({
-      type: 'SELL', stage: 'stage-sell', arr: arrEst, effort: 'project',
-      desc: `${offlineBuyers.toLocaleString()} offline buyers never invited to eShop. Conversion at network rate (${fmtPct(activatedPct * 100, 1)}) = ${newOnline.toLocaleString()} new online buyers.`,
+      type: 'SELL', stage: 'stage-sell', arr: arrEst, effort: 'project', effortClass: 'badge-project',
+      desc: sellDesc,
+      link: '&rarr; see SELL card', linkTarget: 'card-sell-' + id,
     });
   }
 
@@ -1965,17 +2069,102 @@ function renderOpportunitiesCard(ev) {
 
   const totalArr = atStake || opps.reduce((sum, o) => sum + (o.arr || 0), 0);
 
+  // ── Opp rows (ranked BUY → LIST → SELL)
   const oppsHtml = opps.map((o, i) => `
     <div class="opp-row">
       <div class="opp-header">
         <span class="opp-rank">#${i + 1}</span>
         <span class="opp-stage ${o.stage}">${escHtml(o.type)}</span>
         ${o.arr ? `<span class="opp-arr">${fmt$(o.arr, true)} ARR</span>` : ''}
-        <span class="opp-effort">${escHtml(o.effort)}</span>
+        <span class="opp-effort ${o.effortClass || ''}">${escHtml(o.effort)}</span>
       </div>
       <div class="opp-desc">${escHtml(o.desc)}</div>
+      ${o.link ? `<a class="opp-link">${o.link}</a>` : ''}
     </div>
   `).join('');
+
+  // ── Product profile collapsed row (data from list.inventory_current)
+  const inv = list && list.inventory_current ? list.inventory_current.value : null;
+  const invTotals = inv ? inv.totals : null;
+  const totalVarieties = invTotals ? (invTotals.total_varieties || invTotals.varieties || null) : null;
+  const industryLabel  = cfg ? cfg.company_industry || '' : '';
+  // ct_id for product profile label
+  const identity = ev.identity;
+  const ctId = identity ? (identity.ct_id || '') : '';
+  // Format label: Boxes/Bunches inferred from bunches config
+  const formatLabel = cfgRaw
+    ? (bunchesOff ? 'Boxes only' : 'Boxes + Bunches')
+    : null;
+  const productProfileText = [
+    ctId ? `ID: ${ctId}` : null,
+    industryLabel ? industryLabel.replace('Floral - ', '') : null,
+    totalVarieties ? totalVarieties.toLocaleString() + ' varieties' : null,
+    formatLabel,
+  ].filter(Boolean).join(' &middot; ');
+
+  // ── Config issues collapsed row — reuse maxAgeBad and bunchesOff already computed above
+  const configIssues = [];
+  if (cfgRaw) {
+    const maxAgeRaw2 = cfgRaw.ecommerce_max_age != null ? cfgRaw.ecommerce_max_age
+                     : cfgRaw.max_age_sell       != null ? cfgRaw.max_age_sell
+                     : cfgRaw.MaxAge             != null ? cfgRaw.MaxAge
+                     : null;
+    const maxAge2    = maxAgeRaw2 != null ? parseInt(maxAgeRaw2, 10) : null;
+    if (maxAge2 != null && !isNaN(maxAge2) && maxAge2 < 30) {
+      configIssues.push(`MaxAge=${maxAge2}`);
+    }
+    if (bunchesOff) configIssues.push('Bunches OFF');
+  }
+
+  // ── Bottleneck: first blocker in prerequisite chain CONFIG → BUY → LIST → SELL
+  // CONFIG issues block LIST, so if any config issue exists, bottleneck = LIST (config-gated)
+  // Otherwise find first opp in chain order
+  function _firstBlocker() {
+    if (configBlocker) {
+      // The blocking LIST opp is the first one in the opps array with type LIST
+      const listOpp = opps.find(o => o.type === 'LIST');
+      return listOpp || opps[0];
+    }
+    // No config blocker — walk chain: BUY first, then LIST, then SELL
+    const chainOrder = ['BUY', 'LIST', 'SELL'];
+    for (const t of chainOrder) {
+      const found = opps.find(o => o.type === t);
+      if (found) return found;
+    }
+    return opps[0];
+  }
+  const bottleneckOpp = opps.length > 0 ? _firstBlocker() : null;
+
+  // ── Next action text derived from first blocker
+  function _nextAction(o) {
+    if (!o) return 'Review opportunities above.';
+    if (o.type === 'BUY') {
+      const k2kEligibleCount = k2k ? (k2k.no_k2k != null ? k2k.no_k2k : (k2k.inactive_connections != null ? k2k.inactive_connections : null)) : null;
+      return k2kEligibleCount != null
+        ? `Submit K2K activation request for ${k2kEligibleCount} eligible vendors via CS &middot; CS confirms within 48h.`
+        : 'Identify K2K-eligible offline vendors &middot; submit activation request via CS.';
+    }
+    if (o.type === 'LIST') {
+      if (o.effort === 'quick fix') {
+        return sellOfflineYtd != null
+          ? `Enable bunches in eShop config &middot; unlocks ${fmt$(sellOfflineYtd, true)} offline GMV &middot; 5-min change &middot; verify with ops post-deploy.`
+          : 'Enable bunches format in eShop config &middot; 5-min change &middot; confirm with ops post-deploy.';
+      }
+      const maxAgeRaw3 = cfgRaw ? (cfgRaw.ecommerce_max_age != null ? cfgRaw.ecommerce_max_age : cfgRaw.max_age_sell != null ? cfgRaw.max_age_sell : cfgRaw.MaxAge) : null;
+      const maxAgeVal3 = maxAgeRaw3 != null ? parseInt(maxAgeRaw3, 10) : null;
+      return maxAgeVal3 != null
+        ? `Increase MaxAge from ${maxAgeVal3} → 30+ days in eShop config &middot; unlocks forward catalog &middot; confirm impact with ops.`
+        : 'Increase MaxAge to 30+ days in eShop config &middot; unlocks forward catalog &middot; confirm with ops.';
+    }
+    if (o.type === 'SELL') return 'Export offline buyer list &middot; build personalized eShop invite campaign &middot; target top-GMV offline buyers first.';
+    return 'Address first blocker — config before supply before demand.';
+  }
+
+  // ── Handoff: always points to BUY card with offline context
+  const buyOfflinePct = buyOnline != null ? Math.round(100 - buyOnline) : null;
+  const handoffText   = buyOfflinePct != null && buyOfflinePct > 0
+    ? `${buyOfflinePct}% of procurement is offline &mdash; how far is the buying gap?`
+    : 'how far is the buying gap?';
 
   const body = `
     <div class="content-gap-sm"></div>
@@ -1990,18 +2179,33 @@ function renderOpportunitiesCard(ev) {
       </div>
     </div>
     ${oppsHtml}
-    ${opps.length > 0 ? `
     <div class="content-gap-sm"></div>
+    <div class="collapse-row">
+      <span>&#9656;</span>
+      <strong>Product profile</strong>
+      ${productProfileText ? `<span>(${productProfileText})</span>` : ''}
+    </div>
+    ${configIssues.length > 0 ? `
+    <div class="collapse-row">
+      <span>&#9656;</span>
+      <strong>Config issues</strong>
+      <span>(${configIssues.length} limiting &mdash; ${configIssues.join(' &middot; ')})</span>
+    </div>` : ''}
+    ${bottleneckOpp ? `
     <div class="action-block">
       <div class="action-item bottleneck">
         <div class="action-label">Bottleneck</div>
-        <div class="action-text">${opps[0].type} &mdash; ${opps[0].desc.substring(0, 80)}${opps[0].desc.length > 80 ? '...' : ''}</div>
+        <div class="action-text">${bottleneckOpp.type} &mdash; ${escHtml(bottleneckOpp.desc)}</div>
       </div>
       <div class="action-item next">
         <div class="action-label">Next Action</div>
-        <div class="action-text">Address #1 intervention first &mdash; highest impact relative to effort.</div>
+        <div class="action-text">${_nextAction(bottleneckOpp)}</div>
       </div>
     </div>` : ''}
+    <div class="handoff">
+      <span class="handoff-arrow">&rarr;</span>
+      <span>Continue to <strong>BUY</strong>: ${handoffText}</span>
+    </div>
   `;
 
   return cardShell('Card 2 &middot; OPPORTUNITIES', `OPPORTUNITIES &mdash; ${fmt$(totalArr, true)} ARR at stake &middot; ${opps.length} intervention${opps.length !== 1 ? 's' : ''}`, body, true, 'card-opps-' + id);
