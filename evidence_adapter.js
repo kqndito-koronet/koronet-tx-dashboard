@@ -45,6 +45,7 @@
     benchmarks: {},         // benchmarks_v2.json        .benchmarks
     config: {},             // config_evidence_v2.json   .companies (id → obj)
     hardgoods: [],          // hardgoods_v2.json         .companies (list)
+    skusOnlineOffline: {},  // skus_online_offline.json  .companies (name → obj)
 
     // Derived lookup maps (built after all files loaded)
     idToName: {},           // company_id → company_name
@@ -63,19 +64,20 @@
   const DATA_BASE = 'data/';
 
   const FILES = {
-    universe:   DATA_BASE + 'account_universe_v1.json',
-    estGmv:     DATA_BASE + 'est_gmv_v2.json',
-    crosswalk:  DATA_BASE + 'identity_crosswalk_final.json',
-    sellDomain: DATA_BASE + 'sell_domain_v2.json',
-    buyDomain:  DATA_BASE + 'buy_domain_v2.json',
-    feesDomain: DATA_BASE + 'fees_domain_v2.json',
-    buyers:     DATA_BASE + 'buyers_evidence_v2.json',
-    vendors:    DATA_BASE + 'vendors_evidence_v2.json',
-    temporal:   DATA_BASE + 'temporal_evidence_v2.json',
-    inventory:  DATA_BASE + 'inventory_current_v1.json',
-    benchmarks: DATA_BASE + 'benchmarks_v2.json',
-    config:     DATA_BASE + 'config_evidence_v2.json',
-    hardgoods:  DATA_BASE + 'hardgoods_v2.json',
+    universe:          DATA_BASE + 'account_universe_v1.json',
+    estGmv:            DATA_BASE + 'est_gmv_v2.json',
+    crosswalk:         DATA_BASE + 'identity_crosswalk_final.json',
+    sellDomain:        DATA_BASE + 'sell_domain_v2.json',
+    buyDomain:         DATA_BASE + 'buy_domain_v2.json',
+    feesDomain:        DATA_BASE + 'fees_domain_v2.json',
+    buyers:            DATA_BASE + 'buyers_evidence_v2.json',
+    vendors:           DATA_BASE + 'vendors_evidence_v2.json',
+    temporal:          DATA_BASE + 'temporal_evidence_v2.json',
+    inventory:         DATA_BASE + 'inventory_current_v1.json',
+    benchmarks:        DATA_BASE + 'benchmarks_v2.json',
+    config:            DATA_BASE + 'config_evidence_v2.json',
+    hardgoods:         DATA_BASE + 'hardgoods_v2.json',
+    skusOnlineOffline: DATA_BASE + 'skus_online_offline.json',
   };
 
   /* ─────────────────────────────────────────────────────────────────────────
@@ -320,6 +322,9 @@
           case 'hardgoods':
             _state.hardgoods = (r.data && Array.isArray(r.data.companies)) ? r.data.companies : [];
             break;
+          case 'skusOnlineOffline':
+            _state.skusOnlineOffline = (r.data && r.data.companies) ? r.data.companies : {};
+            break;
         }
       });
 
@@ -540,6 +545,7 @@
     var buyRec  = name ? _state.buyDomain[name]          : null;
     var vendRec = name ? _state.vendorsByName[name]       : null;
     var saRows  = name ? (_state.temporalSellAnticipation[name] || null) : null;
+    var skusRec = name ? (_state.skusOnlineOffline[name] || null) : null;
 
     // ── Monthly sourcing table (buy domain)
     var sourcingTable = null;
@@ -614,6 +620,7 @@
       anticipation_offline:   anticipation && anticipation.offline ? _ev(anticipation.offline, 'observed', 'temporal sell_anticipation') : null,
       categories_top20:       categoriesTop20 ? _ev(categoriesTop20, 'observed', 'vendors_evidence_v2') : null,
       leakage:                leakage         ? _ev(leakage, 'observed', 'vendors_evidence_v2')         : null,
+      skus_online_offline:    skusRec         ? _ev(skusRec, 'observed', 'skus_online_offline')         : null,
     };
   }
 

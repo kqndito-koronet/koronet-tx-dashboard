@@ -2555,6 +2555,7 @@ function renderBuyCard(ev) {
 /* ─── CARD 4: LIST ────────────────────────────────────────────────── */
 function renderListCard(ev) {
   const list = ev.list;
+  const buy  = ev.buy;
   const p = ev.potential;
   const id = ev._company_id;
 
@@ -2566,6 +2567,18 @@ function renderListCard(ev) {
 
   // Get sell offline data for TAM computation
   const sellOffline = p ? fmtEv(p.sell_offline_ytd) : null;
+
+  // SKU data from buy domain (skus_online_offline)
+  const skusData   = buy && buy.skus_online_offline ? buy.skus_online_offline.value : null;
+  const skuOnline  = skusData ? skusData.online_skus  : null;
+  const skuOffline = skusData ? skusData.offline_skus : null;
+  const skuGap     = skusData ? (skusData.gap != null ? skusData.gap : (skuOnline != null && skuOffline != null ? Math.max(0, skuOffline - skuOnline) : null)) : null;
+
+  // Category data from buy domain (categories_top20)
+  const catsArr     = buy && buy.categories_top20 ? buy.categories_top20.value : null;
+  const catOnline   = catsArr && Array.isArray(catsArr) ? catsArr.filter(c => (c.online_gmv  || 0) > 0).length : null;
+  const catOffline  = catsArr && Array.isArray(catsArr) ? catsArr.filter(c => (c.offline_gmv || 0) > 0).length : null;
+  const catGap      = (catOnline != null && catOffline != null) ? Math.max(0, catOffline - catOnline) : null;
 
   if (list) {
     // ── LIST COMPARISON TABLE (categories/varieties/SKUs/bunches) ──
@@ -2579,16 +2592,28 @@ function renderListCard(ev) {
     const offlineVarCount = vf && vf.offline ? (vf.offline.total_varieties || 0) : null;
     const varGap = (onlineVarCount != null && offlineVarCount != null) ? Math.max(0, offlineVarCount - onlineVarCount) : null;
 
-    // Inventory totals for SKU count
+    // Inventory totals (fallback SKU source)
     const totalSkus  = inv && inv.totals ? inv.totals.total_skus : null;
-    const totalItems = inv && inv.totals ? inv.totals.total_items : null;
 
     // Bunches config
     const bunches = cfgRaw ? (cfgRaw.sell_in_bunches != null ? cfgRaw.sell_in_bunches : cfgRaw.bunches) : null;
     const bunchesOn  = bunches === true || bunches === 'true' || bunches === 1;
 
-    if (onlineVarCount != null || offlineVarCount != null || totalSkus != null) {
+    const hasCompData = onlineVarCount != null || offlineVarCount != null || skuOnline != null || catOnline != null || bunches != null;
+    if (hasCompData) {
       const compRows = [];
+
+      // Row 1 — Categories (from buy.categories_top20)
+      if (catOnline != null || catOffline != null) {
+        compRows.push(`<tr>
+          <td class="row-label">Categories <span style="font-size:10px;color:var(--text-muted)">(top 20)</span></td>
+          <td><span class="online">${catOnline != null ? catOnline : '—'}</span></td>
+          <td>${catOffline != null ? catOffline : '—'}</td>
+          <td>${catGap != null && catGap > 0 ? `<span class="warn">${catGap}</span>` : '—'}</td>
+        </tr>`);
+      }
+
+      // Row 2 — Varieties (from list.variety_freshness)
       if (onlineVarCount != null || offlineVarCount != null) {
         compRows.push(`<tr>
           <td class="row-label">Varieties</td>
@@ -2597,14 +2622,21 @@ function renderListCard(ev) {
           <td>${varGap != null ? `<span class="warn">${varGap.toLocaleString()}</span>` : '—'}</td>
         </tr>`);
       }
-      if (totalSkus != null) {
+
+      // Row 3 — SKUs (from buy.skus_online_offline; fallback to inventory_current)
+      const skuOnlineDisp  = skuOnline  != null ? skuOnline  : totalSkus;
+      const skuOfflineDisp = skuOffline != null ? skuOffline : null;
+      const skuGapDisp     = skuGap     != null ? skuGap     : null;
+      if (skuOnlineDisp != null || skuOfflineDisp != null) {
         compRows.push(`<tr>
-          <td class="row-label">SKUs (published)</td>
-          <td><span class="online">${totalSkus.toLocaleString()}</span></td>
-          <td>—</td>
-          <td>—</td>
+          <td class="row-label">SKUs</td>
+          <td><span class="online">${skuOnlineDisp != null ? skuOnlineDisp.toLocaleString() : '—'}</span></td>
+          <td>${skuOfflineDisp != null ? skuOfflineDisp.toLocaleString() : '—'}</td>
+          <td>${skuGapDisp != null && skuGapDisp > 0 ? `<span class="warn">${skuGapDisp.toLocaleString()}</span>` : '—'}</td>
         </tr>`);
       }
+
+      // Row 4 — Bunches
       if (bunches != null) {
         compRows.push(`<tr>
           <td class="row-label">Bunches</td>
@@ -2638,6 +2670,12 @@ function renderListCard(ev) {
       const maxAgeOk   = maxAge != null && maxAge >= 30;
       const futureOn   = futureListing === true || futureListing === 'true' || futureListing === 1;
 
+      // MaxAge progress bar: scale 0–90 days, target = 30
+      const maxAgeBarPct = maxAge != null ? Math.min(100, Math.round((maxAge / 90) * 100)) : 0;
+      const maxAgeTargetPct = Math.round((30 / 90) * 100); // ~33%
+      const maxAgeBarColor = maxAgeOk ? 'var(--green)' : '#dc2626';
+      const maxAgeTrackColor = maxAgeOk ? 'var(--green-bg)' : '#fecaca';
+
       configHtml = `
       <div class="content-gap"></div>
       <div class="section-label">CONFIGURATION STATUS</div>
@@ -2645,8 +2683,14 @@ function renderListCard(ev) {
         <div class="config-item ${maxAge != null ? (maxAgeOk ? 'config-ok' : 'config-bad') : ''}">
           <div class="config-item-label">MaxAge</div>
           <div class="config-value">${maxAge != null ? maxAge + ' days' : '—'}</div>
+          <div style="display:flex;justify-content:center;margin-bottom:4px">
+            <div style="position:relative;width:80px;height:8px;background:${maxAgeTrackColor};border-radius:4px;overflow:visible">
+              <div style="position:absolute;left:0;top:0;height:100%;width:${maxAgeBarPct}%;background:${maxAgeBarColor};border-radius:4px;transition:width 0.3s"></div>
+              <div style="position:absolute;top:-2px;left:${maxAgeTargetPct}%;height:12px;width:2px;background:#6b7280;border-radius:1px" title="Target: 30d"></div>
+            </div>
+          </div>
           <div class="config-sub">${maxAgeOk ? 'OK for forward listing' : 'Need 30+ for forward listing'}</div>
-          ${!maxAgeOk && maxAge != null ? '<div class="config-impact">Blocks catalog depth</div>' : ''}
+          ${!maxAgeOk && maxAge != null ? `<div class="config-impact">Blocks ${maxAge < 10 ? '70%+' : maxAge < 20 ? '50%+' : '~30%'} of catalog</div>` : ''}
         </div>
         <div class="config-item ${bunches != null ? (bunchesOn ? 'config-ok' : 'config-bad') : ''}">
           <div class="config-item-label">Bunches</div>
@@ -2736,12 +2780,24 @@ function renderListCard(ev) {
     }
 
     // ── TAM NOT VISIBLE section ──
-    if (sellOffline && (varGap || !bunchesOn)) {
+    if (sellOffline && (varGap || skuGap || catGap || !bunchesOn)) {
       const tamPills = [];
+      // Variety TAM: gap_varieties / total_offline_varieties × offline_sell_GMV
       if (varGap != null && offlineVarCount > 0 && sellOffline) {
         const varTam = Math.round((varGap / offlineVarCount) * sellOffline);
-        tamPills.push(`<div class="metric-pill warn-pill"><strong>Varieties:</strong> ${varGap.toLocaleString()} gap &rarr; ~${fmt$(varTam, true)} <em style="font-style:italic;font-weight:400;color:#92400e">directional</em></div>`);
+        tamPills.push(`<div class="metric-pill warn-pill"><strong>Variety gap:</strong> ${varGap.toLocaleString()} &rarr; ~${fmt$(varTam, true)} <em style="font-style:italic;font-weight:400;color:#92400e">directional</em></div>`);
       }
+      // SKU TAM: gap_skus / total_offline_skus × offline_sell_GMV
+      if (skuGap != null && skuOffline != null && skuOffline > 0 && sellOffline) {
+        const skuTam = Math.round((skuGap / skuOffline) * sellOffline);
+        tamPills.push(`<div class="metric-pill warn-pill"><strong>SKU gap:</strong> ${skuGap.toLocaleString()} &rarr; ~${fmt$(skuTam, true)} <em style="font-style:italic;font-weight:400;color:#92400e">directional</em></div>`);
+      }
+      // Category TAM: gap_categories / total_offline_categories × offline_sell_GMV
+      if (catGap != null && catOffline != null && catOffline > 0 && sellOffline) {
+        const catTam = Math.round((catGap / catOffline) * sellOffline);
+        tamPills.push(`<div class="metric-pill warn-pill"><strong>Category gap:</strong> ${catGap} &rarr; ~${fmt$(catTam, true)} <em style="font-style:italic;font-weight:400;color:#92400e">directional</em></div>`);
+      }
+      // Bunches: always 95% retail TAM blocked when off
       if (!bunchesOn && sellOffline) {
         tamPills.push(`<div class="metric-pill red-pill"><strong>Bunches:</strong> OFF &rarr; 95% retail TAM (${fmt$(sellOffline, true)} offline)</div>`);
       }
@@ -2777,13 +2833,32 @@ function renderListCard(ev) {
     }
   }
 
-  const listCallout = list
-    ? `<strong>SO WHAT:</strong> Published supply and configuration determine what buyers can actually see and order online.`
-    : 'No list domain data available for this account.';
+  // ── Dynamic SO WHAT callout ──
+  let listCalloutText = 'No list domain data available for this account.';
+  if (list) {
+    const vf2 = list.variety_freshness ? list.variety_freshness.value : null;
+    const onlineV  = vf2 && vf2.online  ? (vf2.online.total_varieties  || 0) : null;
+    const offlineV = vf2 && vf2.offline ? (vf2.offline.total_varieties || 0) : null;
+    const gapV = (onlineV != null && offlineV != null && offlineV > 0) ? Math.max(0, offlineV - onlineV) : null;
+    const pctOnline = (onlineV != null && offlineV != null && offlineV > 0) ? Math.round((onlineV / offlineV) * 100) : null;
+    const cfg2Raw = list.config && list.config.value && list.config.value.raw ? list.config.value.raw : null;
+    const bunches2 = cfg2Raw ? (cfg2Raw.sell_in_bunches != null ? cfg2Raw.sell_in_bunches : cfg2Raw.bunches) : null;
+    const bunchesOff = bunches2 === false || bunches2 === 'false' || bunches2 === 0;
+    // Variety TAM for callout
+    let tamStr = '';
+    if (gapV != null && offlineV > 0 && sellOffline) {
+      const t = Math.round((gapV / offlineV) * sellOffline);
+      tamStr = ` ${fmt$(t, true)} in varieties not online.`;
+    }
+    const pctStr = pctOnline != null ? `Shows ${pctOnline}% of what they sell.` : 'Catalog depth not fully online.';
+    const gapStr = gapV != null ? ` ${gapV.toLocaleString()} varieties offline.` : '';
+    const bunchStr = bunchesOff ? ' Bunches entirely OFF.' : '';
+    listCalloutText = `<strong>SO WHAT:</strong> LIST &mdash; ${pctStr}${tamStr}${gapStr}${bunchStr}`;
+  }
 
   const body = `
     <div class="content-gap-sm"></div>
-    <div class="callout">${listCallout}</div>
+    <div class="callout">${listCalloutText}</div>
     ${comparisonHtml}
     ${varietyHtml}
     ${tamNotVisibleHtml}
@@ -2797,6 +2872,10 @@ function renderListCard(ev) {
       </div>
     </div>
     ${!list ? '<div class="data-gap-row">List domain data not found for this account.</div>' : ''}
+    <div class="handoff">
+      <span class="handoff-arrow">&rarr;</span>
+      <span>Continue to <strong>SELL</strong>: do their buyers convert what IS already online?</span>
+    </div>
   `;
 
   return cardShell('Card 4 &middot; LIST', 'LIST &mdash; Catalog configuration &amp; published supply', body, true, 'card-list-' + id);
