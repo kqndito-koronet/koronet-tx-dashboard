@@ -358,6 +358,7 @@
       ct_id:        urec.ct_id        || null,
       sfdc_id:      urec.sfdc_id      || (xrec && xrec.sfdc_id) || null,
       sfdc_type:    urec.sfdc_type    || (xrec && xrec.sfdc_type) || null,
+      priority_level: urec.priority_level || null,
       status:       urec.status       || null,
       industry:     urec.industry     || null,
       komet_status: urec.komet_status || null,
