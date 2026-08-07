@@ -2147,6 +2147,9 @@ function renderOpportunitiesCard(ev) {
   const _typeOrder = { BUY: 0, LIST: 1, SELL: 2, CONFIG: 3 };
   opps.sort((a, b) => (_typeOrder[a.type] || 99) - (_typeOrder[b.type] || 99));
 
+  // $ at Stake from SFDC (the only real ARR)
+  const totalArr = atStake;
+
   // ── Opp rows (ranked BUY → LIST → SELL → CONFIG)
   const oppsHtml = opps.map((o, i) => `
     <div class="opp-row">
