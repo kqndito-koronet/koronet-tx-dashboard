@@ -195,12 +195,30 @@
      LOAD ALL FILES
   ───────────────────────────────────────────────────────────────────────── */
 
+  // Training/sandbox/demo accounts to exclude from the dashboard
+  var EXCLUDED_IDS = {
+    '561353': true, // Arizona Family Florist - Training Account
+    '549016': true, // Brightland Farms - Sandbox
+    '6316':   true, // Demo & Flowers
+    '554582': true, // Fresca Farms - Sandbox Account
+    '531246': true, // Implementations Sandbox
+    '531265': true, // KBC Cooler - Training
+    '55326':  true, // Kennicott Brothers Company - Training Site
+    '751276': true, // Kennicott Brothers West - Training Site
+    '132431': true, // Mayesh Wholesale - Training Site
+    '468006': true, // Rosaprima Sandbox
+    '398804': true, // [Sandbox] - Vimass
+    '806094': true, // eSuite Wholesaler Koronet Demo
+  };
+
   function _buildLookups() {
     // id ↔ name from account_universe (master)
     if (Array.isArray(_state.universe)) {
       _state.universe.forEach(function (rec) {
         var id = _sid(rec.company_id);
         if (!id) return;
+        // Skip training/sandbox/demo accounts
+        if (EXCLUDED_IDS[id]) return;
         _state.idToName[id]    = rec.company_name;
         _state.idToUniverse[id] = rec;
         if (rec.company_name) {
@@ -462,7 +480,7 @@
       }
 
       if (koronetSellForPen && koronetSellForPen > 0) {
-        sellPenetration = Math.min(100, (koronetSellForPen * annualizer / estSell) * 100);
+        sellPenetration = (koronetSellForPen * annualizer / estSell) * 100;
       }
     }
     if (estBuy && koronetBuyYtd && estBuy > 0) {
@@ -477,8 +495,12 @@
           }
         }
       }
-      buyPenetration = Math.min(100, (koronetBuyForPen * buyAnnualizer / estBuy) * 100);
+      buyPenetration = (koronetBuyForPen * buyAnnualizer / estBuy) * 100;
     }
+
+    // Source tracking for penetration honesty
+    var sellEstSource = gmvRec ? gmvRec.sell_source : null;
+    var buyEstSource  = gmvRec ? gmvRec.buy_source  : null;
 
     // ── Fees
     var feesTotal    = feesRec ? _num(feesRec.total_12m)  : null;
@@ -536,9 +558,23 @@
       sell_offline_ytd: _ev(sellOfflineYtd, sellOfflineYtd ? 'observed' : 'gap', null),
       buy_offline_ytd:  _ev(buyOfflineYtd,  buyOfflineYtd  ? 'observed' : 'gap', null),
 
-      // Penetration (model)
-      sell_penetration: _ev(sellPenetration, (estSell && koronetSellYtd) ? 'model' : 'gap', 'koronet_ytd / est_total'),
-      buy_penetration:  _ev(buyPenetration,  (estBuy  && koronetBuyYtd)  ? 'model' : 'gap', 'koronet_ytd / est_total'),
+      // Penetration — evidence state depends on est_gmv source
+      // 'tautological' = koronet_actual_annualized (est IS koronet, so pen ≈ 100% by definition)
+      // 'model' = ora/sfdc/christine (external estimate, penetration is meaningful)
+      // 'gap' = no estimate available
+      sell_penetration: _ev(
+        sellPenetration,
+        sellEstSource === 'koronet_actual_annualized' ? 'tautological'
+          : (estSell && koronetSellYtd) ? 'model' : 'gap',
+        sellEstSource || 'koronet_ytd / est_total'
+      ),
+      buy_penetration: _ev(
+        buyPenetration,
+        buyEstSource === 'koronet_actual_annualized' ? 'tautological'
+          : buyEstSource === 'estimated_54pct' ? 'tautological'
+          : (estBuy && koronetBuyYtd) ? 'model' : 'gap',
+        buyEstSource || 'koronet_ytd / est_total'
+      ),
 
       // Online %
       sell_online_pct: _ev(sellOnlinePct, sellOnlinePct != null ? 'observed' : 'gap', 'Snowflake sell domain'),

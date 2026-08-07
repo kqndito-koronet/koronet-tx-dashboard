@@ -1283,26 +1283,27 @@
       <div class="topbar-controls">
         <span class="period-label">Period</span>
         <select class="select-pill" id="timeframe-select">
-          <option value="jul_2026" selected>Jul 2026</option>
+          <option value="ytd_2026" selected>YTD 2026</option>
+          <option value="jul_2026">Jul 2026</option>
           <option value="jun_2026">Jun 2026</option>
           <option value="q2_2026">Q2 2026</option>
           <option value="h1_2026">H1 2026</option>
-          <option value="ytd_2026">YTD 2026</option>
         </select>
-        <span class="vs-divider">vs</span>
-        <select class="select-pill" id="comparison-select">
-          <option value="jul_2025_yoy" selected>Jul 2025 (YoY)</option>
-          <option value="jun_2026">Jun 2026</option>
-          <option value="jul_2025">Jul 2025</option>
-          <option value="q2_2025">Q2 2025</option>
+        <span class="vs-divider" style="color:var(--text-muted)">vs</span>
+        <select class="select-pill" id="comparison-select" disabled title="Comparison coming soon — needs monthly data pipeline" style="opacity:0.5;cursor:not-allowed">
+          <option value="" selected>Coming soon</option>
         </select>
         <div class="filter-chips" id="filter-chips"></div>
         <select class="select-pill" id="priority-filter">
           <option value="">All Priorities</option>
-          <option value="P1">P1</option>
-          <option value="IMPL">IMPL</option>
-          <option value="TA">TA</option>
-          <option value="WATCH">WATCH</option>
+          <option value="ECOSYSTEM">ECOSYSTEM (343)</option>
+          <option value="NEEDS_REVIEW">NEEDS_REVIEW (27)</option>
+          <option value="WATCH">WATCH (21)</option>
+          <option value="IMPL">IMPL (13)</option>
+          <option value="TA">TA (9)</option>
+          <option value="CS_TRACKED">CS_TRACKED (5)</option>
+          <option value="P1">P1 (4)</option>
+          <option value="CS_P2">CS_P2 (3)</option>
         </select>
         <select class="select-pill" id="ct-filter">
           <option value="">All Types</option>
@@ -1333,7 +1334,7 @@
           <span class="kpi-value" id="kpi-fees">Loading...</span>
           <span class="kpi-delta neutral" id="kpi-fees-delta" style="display:none"></span>
         </div>
-        <div class="kpi-label">Total Fees (ARR run rate)</div>
+        <div class="kpi-label">Fees YTD</div>
       </div>
       <div class="kpi-item">
         <div>
@@ -1609,15 +1610,23 @@ function renderRow(ev, idx) {
     ? (onlinePct < 20 ? 'mostly offline' : onlinePct >= 60 ? 'digital-first' : 'healthy')
     : '';
 
-  // Penetration qualifier (#17)
-  const penQualifier = sellPen != null
-    ? (sellPen < 10 ? 'low capture' : sellPen >= 50 ? 'high capture' : '')
-    : '';
+  // Penetration source — is it tautological (koronet-derived est) or real (external)?
+  const sellPenEv = p && p.sell_penetration ? p.sell_penetration.ev : 'gap';
+  const isSellPenTautological = sellPenEv === 'tautological';
 
-  // Koronet Sell qualifier (#16) — room to grow / big opportunity / majority captured
-  const sellGrowthQualifier = sellPen != null
-    ? (sellPen < 15 ? 'big opportunity' : sellPen < 40 ? 'room to grow' : 'majority captured')
-    : '';
+  // Penetration qualifier (#17) — only meaningful for real external estimates
+  const penQualifier = isSellPenTautological
+    ? 'Koronet = primary'
+    : (sellPen != null
+      ? (sellPen < 10 ? 'low capture' : sellPen >= 50 ? 'high capture' : '')
+      : '');
+
+  // Koronet Sell qualifier (#16) — only meaningful for real external estimates
+  const sellGrowthQualifier = isSellPenTautological
+    ? ''
+    : (sellPen != null
+      ? (sellPen < 15 ? 'big opportunity' : sellPen < 40 ? 'room to grow' : 'majority captured')
+      : '');
 
   // Take rate color + class (#19)
   const takeRateClass = 'takerate';
@@ -1698,7 +1707,7 @@ function renderRow(ev, idx) {
         <div class="metric-qualifier">${sellGrowthQualifier}</div>
       </td>
       <td class="metric-cell">
-        <div class="metric-value">${fmtPct(sellPen)}</div>
+        <div class="metric-value" ${isSellPenTautological ? 'style="color:var(--text-muted);font-style:italic"' : ''}>${isSellPenTautological ? '~100%' : fmtPct(sellPen)}</div>
         ${penQualifier ? `<div class="metric-qualifier">${penQualifier}</div>` : ''}
       </td>
       <td class="metric-cell ${onlineSegClass}">
@@ -1712,7 +1721,7 @@ function renderRow(ev, idx) {
         <div class="metric-value">${fmt$(koronetBuy, true)}</div>
       </td>
       <td class="metric-cell">
-        <div class="metric-value">${fmtPct(buyPen)}</div>
+        <div class="metric-value" ${(p && p.buy_penetration && p.buy_penetration.ev === 'tautological') ? 'style="color:var(--text-muted);font-style:italic"' : ''}>${(p && p.buy_penetration && p.buy_penetration.ev === 'tautological') ? '~100%' : fmtPct(buyPen)}</div>
       </td>
       <td class="metric-cell">
         <div class="${buyOnlinePct != null && buyOnlinePct >= 30 ? 'online-value' : 'online-low'}">${fmtPct(buyOnlinePct)}</div>
@@ -1812,7 +1821,9 @@ function renderPotentialCard(ev) {
     ? (p.est_buy.ev === 'proxy' ? 'Proxy \u2014 sell x ratio' : p.est_buy.ev === 'observed' ? 'Observed \u2014 Snowflake' : p.est_buy.note || p.est_buy.ev)
     : 'gap';
 
-  const title = `POTENTIAL \u2014 ${sellOffline ? fmt$(sellOffline, true) + ' offline at $0 fees. ' : ''}${sellPen ? fmtPct(sellPen) + ' sell captured' : ''}${sellOnline ? ', ' + fmtPct(sellOnline) + ' online' : ''}.`;
+  const sellPenTautological = p.sell_penetration && p.sell_penetration.ev === 'tautological';
+  const penLabel = sellPenTautological ? 'Koronet = primary channel' : (sellPen ? fmtPct(sellPen) + ' sell captured' : '');
+  const title = `POTENTIAL \u2014 ${sellOffline ? fmt$(sellOffline, true) + ' offline at $0 fees. ' : ''}${penLabel}${sellOnline ? ', ' + fmtPct(sellOnline) + ' online' : ''}.`;
 
   // ── Focus callout: offline sell + offline buy → $ at stake ──
   const atStakeResult = calcAtStake(ev);
@@ -1898,8 +1909,9 @@ function renderPotentialCard(ev) {
               <span class="ev-state observed">Observed \u2014 Snowflake</span>
             </td>
             <td>
-              <span>${fmtPct(sellPen)}</span>
-              <span class="ev-state model">Model \u2014 est/actual</span>
+              ${sellPenTautological
+                ? '<span style="color:var(--text-muted);font-style:italic">~100%</span><span class="ev-state gap">Tautological \u2014 est = Koronet annualized</span>'
+                : `<span>${fmtPct(sellPen)}</span><span class="ev-state model">Model \u2014 est/actual</span>`}
             </td>
             <td>
               <span class="${sellOnline != null && sellOnline >= 30 ? 'online' : 'online-low'}">${fmtPct(sellOnline)}</span>
@@ -1918,8 +1930,9 @@ function renderPotentialCard(ev) {
               <span class="ev-state observed">Observed \u2014 Snowflake</span>
             </td>
             <td>
-              <span>${fmtPct(buyPen)}</span>
-              <span class="ev-state model">Model</span>
+              ${(p.buy_penetration && p.buy_penetration.ev === 'tautological')
+                ? '<span style="color:var(--text-muted);font-style:italic">~100%</span><span class="ev-state gap">Tautological \u2014 est derived from Koronet</span>'
+                : `<span>${fmtPct(buyPen)}</span><span class="ev-state model">Model</span>`}
             </td>
             <td>
               <span class="${buyOnline != null && buyOnline >= 30 ? 'online' : 'online-low'}">${fmtPct(buyOnline)}</span>
@@ -1977,19 +1990,12 @@ function renderOpportunitiesCard(ev) {
   const vendorLc   = buy && buy.vendor_lifecycle ? buy.vendor_lifecycle.value : null;
 
   if (buyOffline && buyOffline > 0) {
-    const arrEst = Math.round(buyOffline * 0.10 * 0.015 * 12); // 10% shift, 1.5% K2K rate, annualized
     const offlineVendors = vendorLc && vendorLc.offline_vendors != null ? vendorLc.offline_vendors : null;
-    // K2K-eligible = vendors that are offline (no K2K) — use inactive/no_k2k from k2k_lifecycle
     const k2kEligible = k2k ? (k2k.no_k2k != null ? k2k.no_k2k : (k2k.inactive_connections != null ? k2k.inactive_connections : null)) : null;
-    // "Recoverable immediately" = K2K-eligible vendors × avg buy per vendor (approximated as buyOffline / offlineVendors)
-    const avgBuyPerVendor = (offlineVendors && offlineVendors > 0) ? buyOffline / offlineVendors : null;
-    const recoverableNow = (k2kEligible != null && avgBuyPerVendor != null) ? Math.round(k2kEligible * avgBuyPerVendor * 0.015) : null;
-    const arrSustained   = arrEst; // same formula, already annualized
     let buyDesc = `${offlineVendors != null ? offlineVendors + ' vendors' : 'Vendors'} with procurement offline today — ${fmt$(buyOffline, true)} at $0 fees.`;
     if (k2kEligible != null) buyDesc += ` ${k2kEligible} K2K-eligible.`;
-    if (recoverableNow != null) buyDesc += ` ${fmt$(recoverableNow, true)} recoverable immediately (K2K rate). ${fmt$(arrSustained, true)} ARR if sustained 12mo.`;
     opps.push({
-      type: 'BUY', stage: 'stage-buy', arr: arrEst, effort: 'quick fix', effortClass: 'badge-quick',
+      type: 'BUY', stage: 'stage-buy', effort: 'quick fix', effortClass: 'badge-quick',
       desc: buyDesc,
       link: '&rarr; see BUY card', linkTarget: 'card-buy-' + id,
     });
@@ -2023,19 +2029,12 @@ function renderOpportunitiesCard(ev) {
 
     if (maxAgeBad) {
       configBlocker = true;
-      // ARR estimate: variety_gap × (offline_sell / total_offline_varieties) × 0.002 × 12
-      let maxAgeArr = null;
-      if (varietyGap != null && varietyGap > 0 && sellOfflineYtd != null && offlineVarCount != null && offlineVarCount > 0) {
-        maxAgeArr = Math.round(varietyGap * (sellOfflineYtd / offlineVarCount) * 0.002 * 12);
-      }
-      // catalog pct blocked
       const catalogPctBlocked = (varietyGap != null && offlineVarCount != null && offlineVarCount > 0)
         ? Math.round((varietyGap / offlineVarCount) * 100) : null;
       let maxAgeDesc = `MaxAge=${maxAge} days — blocks forward inventory. ${varietyGap != null ? varietyGap.toLocaleString() + ' varieties offline not visible online' : 'Catalog depth blocked'}.`;
       if (catalogPctBlocked != null) maxAgeDesc += ` ${catalogPctBlocked}% of catalog hidden.`;
-      if (maxAgeArr != null) maxAgeDesc += ` ~${fmt$(maxAgeArr, true)} ARR unlocked if fixed.`;
       opps.push({
-        type: 'LIST', stage: 'stage-list', arr: maxAgeArr, effort: 'investigation', effortClass: 'badge-invest',
+        type: 'LIST', stage: 'stage-list', effort: 'investigation', effortClass: 'badge-invest',
         desc: maxAgeDesc,
         link: '&rarr; see LIST card', linkTarget: 'card-list-' + id,
       });
@@ -2054,14 +2053,10 @@ function renderOpportunitiesCard(ev) {
 
     if (bunchesOff) {
       configBlocker = true;
-      // ARR from bunches: sellOfflineYtd × 0.95 (retail share) × 0.002 × 12
-      const bunchGmv  = sellOfflineYtd != null ? Math.round(sellOfflineYtd * 0.95) : null;
-      const bunchArr  = bunchGmv != null ? Math.round(bunchGmv * 0.002 * 12) : null;
-      let bunchDesc = 'Bunches format disabled — 95% of retail TAM blocked.';
+      let bunchDesc = 'Bunches format disabled — retail TAM blocked.';
       if (sellOfflineYtd != null) bunchDesc += ` ${fmt$(sellOfflineYtd, true)} offline bunch GMV invisible online.`;
-      if (bunchArr != null) bunchDesc += ` ~${fmt$(bunchArr, true)} ARR if enabled (5-min config fix).`;
       opps.push({
-        type: 'LIST', stage: 'stage-list', arr: bunchArr, effort: 'quick fix', effortClass: 'badge-quick',
+        type: 'LIST', stage: 'stage-list', effort: 'quick fix', effortClass: 'badge-quick',
         desc: bunchDesc,
         link: '&rarr; see LIST card', linkTarget: 'card-list-' + id,
       });
@@ -2071,18 +2066,11 @@ function renderOpportunitiesCard(ev) {
   // ── Opp 3: SELL — offline buyers activation
   const bt           = sell && sell.buyers_table ? sell.buyers_table.value : null;
   const offlineBuyers = bt ? bt.offline_buyers : null;
-  if (offlineBuyers && offlineBuyers > 0 && bt.aov_online) {
-    const activatedPct = 0.193; // network average CVR
-    const newOnline    = Math.round(offlineBuyers * activatedPct);
-    const rrData       = sell && sell.repeat_rate ? sell.repeat_rate.value : null;
-    const repeatRate   = rrData ? (rrData.repeat_rate_pct != null ? rrData.repeat_rate_pct / 100 : null) : null;
-    const arrEst       = Math.round(newOnline * bt.aov_online * 12 * 0.002);
-    let sellDesc = `${offlineBuyers.toLocaleString()} offline buyers never invited to eShop. Conversion at network rate (${fmtPct(activatedPct * 100, 1)}) = ${newOnline.toLocaleString()} new online buyers`;
-    sellDesc += ` × ${fmt$(bt.aov_online, true)} AOV`;
-    if (repeatRate != null) sellDesc += ` × ${fmtPct(repeatRate * 100, 0)} repeat rate`;
-    sellDesc += '.';
+  if (offlineBuyers && offlineBuyers > 0) {
+    let sellDesc = `${offlineBuyers.toLocaleString()} offline buyers never invited to eShop.`;
+    if (bt.aov_online) sellDesc += ` AOV online: ${fmt$(bt.aov_online, true)}.`;
     opps.push({
-      type: 'SELL', stage: 'stage-sell', arr: arrEst, effort: 'project', effortClass: 'badge-project',
+      type: 'SELL', stage: 'stage-sell', effort: 'project', effortClass: 'badge-project',
       desc: sellDesc,
       link: '&rarr; see SELL card', linkTarget: 'card-sell-' + id,
     });
@@ -2093,12 +2081,11 @@ function renderOpportunitiesCard(ev) {
   const leakageCost  = leakageData ? leakageData.leakage_cost : null;
   if (leakageCost != null && leakageCost > 10000) {
     const leakageVendors = leakageData.vendor_count != null ? leakageData.vendor_count : null;
-    const leakageArr = Math.round(leakageCost * 0.015 * 12);
     let leakDesc = leakageVendors != null
       ? `${leakageVendors.toLocaleString()} K2K-connected vendors buying ${fmt$(leakageCost, true)} offline. Recoverable without new connections.`
       : `K2K-connected vendors buying ${fmt$(leakageCost, true)} offline. Recoverable without new connections.`;
     opps.push({
-      type: 'BUY', stage: 'stage-buy', arr: leakageArr, effort: 'quick fix', effortClass: 'badge-quick',
+      type: 'BUY', stage: 'stage-buy', effort: 'quick fix', effortClass: 'badge-quick',
       desc: leakDesc,
       link: '&rarr; see BUY card', linkTarget: 'card-buy-' + id,
     });
@@ -2108,7 +2095,7 @@ function renderOpportunitiesCard(ev) {
   const dormantCount = k2k ? k2k.dormant : null;
   if (dormantCount != null && dormantCount > 0) {
     opps.push({
-      type: 'BUY', stage: 'stage-buy', arr: null, effort: 'investigation', effortClass: 'badge-invest',
+      type: 'BUY', stage: 'stage-buy', effort: 'investigation', effortClass: 'badge-invest',
       desc: `${dormantCount.toLocaleString()} dormant K2K connections — connected but never bought. Investment not activated.`,
       link: '&rarr; see BUY card', linkTarget: 'card-buy-' + id,
     });
@@ -2117,23 +2104,16 @@ function renderOpportunitiesCard(ev) {
   // ── Opp 7: LIST — Variety/SKU Gap (offline varieties not online)
   // varietyGap is already computed above (offlineVarCount - onlineVarCount)
   if (varietyGap != null && varietyGap > 100) {
-    // Directional ARR: use TAM from variety gap (offline sell ÷ offline varieties × gap × fee rate × 12)
-    let varGapArr = null;
-    if (sellOfflineYtd != null && offlineVarCount != null && offlineVarCount > 0) {
-      varGapArr = Math.round(varietyGap * (sellOfflineYtd / offlineVarCount) * 0.002 * 12);
-    }
-    let varDesc = `${varietyGap.toLocaleString()} varieties sold offline not shown online`;
-    if (varGapArr != null) varDesc += ` → ~${fmt$(varGapArr, true)} directional estimate not visible.`;
-    else varDesc += ` → catalog depth hidden from online buyers.`;
+    let varDesc = `${varietyGap.toLocaleString()} varieties sold offline not shown online — catalog depth hidden from online buyers.`;
     opps.push({
-      type: 'LIST', stage: 'stage-list', arr: varGapArr, effort: 'project', effortClass: 'badge-project',
+      type: 'LIST', stage: 'stage-list', effort: 'project', effortClass: 'badge-project',
       desc: varDesc,
       link: '&rarr; see LIST card', linkTarget: 'card-list-' + id,
     });
   }
 
   // ── Opp 8: SELL — Declining Sell Trend (YoY < -5%)
-  const sellYoyDelta = p ? p.yoy_sell_delta : null;
+  const sellYoyDelta = p ? p.sell_yoy_delta : null;
   let sellYoyPct = null;
   if (sellYoyDelta) {
     if (typeof sellYoyDelta.pct === 'number') sellYoyPct = sellYoyDelta.pct;
@@ -2141,7 +2121,7 @@ function renderOpportunitiesCard(ev) {
   }
   if (sellYoyPct != null && sellYoyPct < -5) {
     opps.push({
-      type: 'SELL', stage: 'stage-sell', arr: null, effort: 'investigation', effortClass: 'badge-invest',
+      type: 'SELL', stage: 'stage-sell', effort: 'investigation', effortClass: 'badge-invest',
       desc: `Sell GMV declining ${fmtPct(Math.abs(sellYoyPct), 1)} YoY. Investigate: inventory? pricing? buyer churn?`,
       link: '&rarr; see SELL card', linkTarget: 'card-sell-' + id,
     });
@@ -2153,7 +2133,7 @@ function renderOpportunitiesCard(ev) {
   const koronetSellYtd = p ? fmtEv(p.koronet_sell_ytd) : null;
   if (implStage && (koronetSellYtd == null || koronetSellYtd < 500)) {
     opps.push({
-      type: 'CONFIG', stage: 'stage-config', arr: null, effort: 'investigation', effortClass: 'badge-invest',
+      type: 'CONFIG', stage: 'stage-config', effort: 'investigation', effortClass: 'badge-invest',
       desc: `Implementation complete (stage: ${implStage}) but near-zero transactions. Config or activation issue.`,
       link: null, linkTarget: null,
     });
@@ -2163,15 +2143,9 @@ function renderOpportunitiesCard(ev) {
     return ''; // No opportunities to show
   }
 
-  // ── Sort opps: BUY → LIST → SELL → CONFIG (then by ARR desc within type)
+  // ── Sort opps: BUY → LIST → SELL → CONFIG
   const _typeOrder = { BUY: 0, LIST: 1, SELL: 2, CONFIG: 3 };
-  opps.sort((a, b) => {
-    const tDiff = (_typeOrder[a.type] || 99) - (_typeOrder[b.type] || 99);
-    if (tDiff !== 0) return tDiff;
-    return (b.arr || 0) - (a.arr || 0);
-  });
-
-  const totalArr = atStake || opps.reduce((sum, o) => sum + (o.arr || 0), 0);
+  opps.sort((a, b) => (_typeOrder[a.type] || 99) - (_typeOrder[b.type] || 99));
 
   // ── Opp rows (ranked BUY → LIST → SELL → CONFIG)
   const oppsHtml = opps.map((o, i) => `
@@ -2179,7 +2153,6 @@ function renderOpportunitiesCard(ev) {
       <div class="opp-header">
         <span class="opp-rank">#${i + 1}</span>
         <span class="opp-stage ${o.stage}">${escHtml(o.type)}</span>
-        ${o.arr ? `<span class="opp-arr">${fmt$(o.arr, true)} ARR</span>` : ''}
         <span class="opp-effort ${o.effortClass || ''}">${escHtml(o.effort)}</span>
       </div>
       <div class="opp-desc">${escHtml(o.desc)}</div>
@@ -3440,7 +3413,7 @@ function detectOpportunityFlags(ev) {
   // SELL: offline buyers > 0 OR declining sell YoY < -5%
   var bt = ev.sell && ev.sell.buyers_table ? ev.sell.buyers_table.value : null;
   var offlineBuyers = bt ? bt.offline_buyers : null;
-  var yoyDelta = p ? p.yoy_sell_delta : null;
+  var yoyDelta = p ? p.sell_yoy_delta : null;
   var yoyPct = null;
   if (yoyDelta) {
     if (typeof yoyDelta.pct === 'number') yoyPct = yoyDelta.pct;
@@ -3449,12 +3422,12 @@ function detectOpportunityFlags(ev) {
   var hasSell = (offlineBuyers != null && offlineBuyers > 0)
              || (yoyPct != null && yoyPct < -5);
 
-  // CONFIG (blocking): MaxAge < 10 OR bunches OFF OR 0TX post-go-live
+  // CONFIG (blocking): MaxAge < 10 OR 0TX post-go-live (bunches is LIST, not CONFIG)
   var evIdentity = ev.identity;
   var implStageF = evIdentity ? evIdentity.impl_stage : null;
   var koronetSellYtdF = p ? fmtEv(p.koronet_sell_ytd) : null;
   var hasPostGoLiveZeroTx = implStageF != null && (koronetSellYtdF == null || koronetSellYtdF < 500);
-  var hasConfig = maxAgeBlocking || bunchesOff || hasPostGoLiveZeroTx;
+  var hasConfig = maxAgeBlocking || hasPostGoLiveZeroTx;
 
   // Declining: sell YoY < 0
   // Check sell_yoy_delta on potential (pct or directional)
@@ -3484,7 +3457,7 @@ function computeKPIs(evidenceList) {
     if (ks != null && ks > 0) { totalSell += ks; accountsWithData++; }
 
     // YoY: sell 2025 baseline
-    const ks25 = p.koronet_sell_ytd_2025 ? p.koronet_sell_ytd_2025.value : null;
+    const ks25 = p.sell_ytd_2025 ? p.sell_ytd_2025.value : null;
     if (ks25 != null && ks25 > 0) { totalSell2025 += ks25; hasSell2025 = true; }
 
     const f = p.fees_ytd_2026 ? p.fees_ytd_2026.value : null;
@@ -3677,7 +3650,7 @@ function renderTable() {
   // Section label
   const rawTfLabel = document.getElementById('timeframe-select').value;
   document.getElementById('section-label').textContent =
-    `Portfolio · ${_filteredEvidence.length} accounts · ${rawTfLabel.toUpperCase()} · Updated Jul 31, 2026`;
+    `Portfolio · ${_filteredEvidence.length} accounts · ${rawTfLabel.toUpperCase()} · Updated ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 
   // Load more
   const loadMoreWrap = document.getElementById('load-more-wrap');
