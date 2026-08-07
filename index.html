@@ -3386,8 +3386,22 @@ let _filteredEvidence = [];
 let _displayedCount = 0;
 const PAGE_SIZE = 50;
 
+/* Map dropdown raw values → adapter timeframe tokens */
+const tfMap = {
+  'jul_2026':  'current_month',
+  'jun_2026':  'prior_month',
+  'q2_2026':   'prior_quarter',
+  'h1_2026':   'ytd',
+  'ytd_2026':  'ytd',
+};
+
+function _adapterTf() {
+  var rawTf = document.getElementById('timeframe-select').value;
+  return tfMap[rawTf] || 'ytd';
+}
+
 function applyFilters() {
-  const tf = document.getElementById('timeframe-select').value;
+  const tf = _adapterTf();
   const ctFilter = document.getElementById('ct-filter').value.toLowerCase();
   const priorityFilter = document.getElementById('priority-filter').value.toLowerCase();
   const search = document.getElementById('search-input').value.toLowerCase().trim();
@@ -3458,9 +3472,9 @@ function renderTable() {
   document.getElementById('tab-count-declining').textContent = declining;
 
   // Section label
-  const tf = document.getElementById('timeframe-select').value;
+  const rawTfLabel = document.getElementById('timeframe-select').value;
   document.getElementById('section-label').textContent =
-    `Portfolio · ${_filteredEvidence.length} accounts · ${tf.toUpperCase()} · Updated Jul 31, 2026`;
+    `Portfolio · ${_filteredEvidence.length} accounts · ${rawTfLabel.toUpperCase()} · Updated Jul 31, 2026`;
 
   // Load more
   const loadMoreWrap = document.getElementById('load-more-wrap');
@@ -3511,8 +3525,7 @@ function toggleExpand(id) {
     const cardsContainer = document.getElementById('cards-' + id);
     if (cardsContainer && cardsContainer.dataset.loaded !== 'true') {
       cardsContainer.dataset.loaded = 'true';
-      const tf = document.getElementById('timeframe-select').value;
-      const ev = EvidenceAdapter.getAccountEvidence(id, tf);
+      const ev = EvidenceAdapter.getAccountEvidence(id, _adapterTf());
       if (ev) {
         cardsContainer.innerHTML = renderCards(id, ev);
       } else {
@@ -3589,9 +3602,9 @@ function sortEvidence(key) {
   });
 }
 
-/* ─── TIMEFRAME CHANGE: re-render open cards ─────────────────────── */
+/* ─── TIMEFRAME CHANGE: re-fetch all evidence + re-render ────────── */
 function onTimeframeChange() {
-  // Reset expanded rows (force re-load on next expand)
+  // Collapse all expanded rows
   document.querySelectorAll('[id^="cards-"]').forEach(el => {
     el.dataset.loaded = '';
     el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);font-style:italic;">&#8627; Re-expand to load with new timeframe.</div>';
@@ -3599,6 +3612,22 @@ function onTimeframeChange() {
   document.querySelectorAll('.toggle-btn.open').forEach(btn => btn.classList.remove('open'));
   document.querySelectorAll('.row-expanded').forEach(row => row.classList.remove('row-expanded'));
   document.querySelectorAll('[id^="expanded-"]').forEach(el => el.style.display = 'none');
+
+  // Re-fetch all evidence with the new adapter timeframe token
+  var newTf = _adapterTf();
+  var allIds = EvidenceAdapter.getAllAccountIds();
+  _allEvidence = allIds.map(function(cid) {
+    return EvidenceAdapter.getAccountEvidence(cid, newTf);
+  });
+  _allEvidence.sort((a, b) => {
+    const fa = (a && a.potential && a.potential.fees_ytd_2026 && a.potential.fees_ytd_2026.value) || 0;
+    const fb = (b && b.potential && b.potential.fees_ytd_2026 && b.potential.fees_ytd_2026.value) || 0;
+    if (fb !== fa) return fb - fa;
+    const na = (a && a._company_name) || '';
+    const nb = (b && b._company_name) || '';
+    return na.localeCompare(nb);
+  });
+
   applyFilters();
 }
 
@@ -3606,7 +3635,7 @@ function onTimeframeChange() {
 Promise.all([EvidenceAdapter.init(), _loadSfdcOpps()]).then(function() {
   // Table already visible — nothing to toggle
 
-  const tf = document.getElementById('timeframe-select').value;
+  const tf = _adapterTf();
   const allIds = EvidenceAdapter.getAllAccountIds();
 
   // Load all evidence upfront (needed for KPI aggregation)

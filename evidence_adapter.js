@@ -437,12 +437,24 @@
       }
     }
 
-    // ── Penetration
-    var sellPenetration = (estSell && koronetSellYtd) ? null : null; // computed below
+    // ── Penetration (annualized to make monthly / YTD comparable to annual est)
+    var sellPenetration = null;
+    var buyPenetration  = null;
     if (estSell && koronetSellYtd && estSell > 0) {
-      sellPenetration = (koronetSellYtd / estSell) * 100;
+      var monthsElapsed = 7; // Jul = month 7 of 2026
+      var koronetSellAnnualized;
+      if (timeframe === 'current_month') {
+        koronetSellAnnualized = koronetSellYtd * 12;
+      } else if (timeframe === 'prior_month') {
+        koronetSellAnnualized = koronetSellYtd * 12;
+      } else if (timeframe === 'ytd' || !timeframe) {
+        koronetSellAnnualized = koronetSellYtd * (12 / monthsElapsed);
+      } else {
+        // prior_quarter, l12m, etc. — use as-is
+        koronetSellAnnualized = koronetSellYtd;
+      }
+      sellPenetration = (koronetSellAnnualized / estSell) * 100;
     }
-    var buyPenetration = null;
     if (estBuy && koronetBuyYtd && estBuy > 0) {
       buyPenetration = (koronetBuyYtd / estBuy) * 100;
     }
