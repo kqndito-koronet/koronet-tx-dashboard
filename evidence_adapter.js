@@ -438,25 +438,46 @@
     }
 
     // ── Penetration (annualized to make monthly / YTD comparable to annual est)
+    // CRITICAL: koronetSellYtd is ALWAYS YTD (Jan-Jul), never a single month.
+    // For current_month/prior_month, we need the MONTHLY value from sell_domain, not YTD.
     var sellPenetration = null;
     var buyPenetration  = null;
-    if (estSell && koronetSellYtd && estSell > 0) {
-      var monthsElapsed = 7; // Jul = month 7 of 2026
-      var koronetSellAnnualized;
-      if (timeframe === 'current_month') {
-        koronetSellAnnualized = koronetSellYtd * 12;
-      } else if (timeframe === 'prior_month') {
-        koronetSellAnnualized = koronetSellYtd * 12;
-      } else if (timeframe === 'ytd' || !timeframe) {
-        koronetSellAnnualized = koronetSellYtd * (12 / monthsElapsed);
-      } else {
-        // prior_quarter, l12m, etc. — use as-is
-        koronetSellAnnualized = koronetSellYtd;
+    if (estSell && estSell > 0) {
+      var koronetSellForPen = koronetSellYtd; // default = YTD
+      var annualizer = 12 / 7; // YTD through month 7
+
+      if (timeframe === 'current_month' || timeframe === 'prior_month') {
+        // Use monthly value from sell_domain, not YTD
+        var monthIdx = timeframe === 'current_month' ? 0 : 1;
+        if (sellRec && Array.isArray(sellRec.monthly) && sellRec.monthly.length > monthIdx) {
+          var monthKeys = Object.keys(sellRec.monthly[0] || {}).filter(function(k){ return k.match(/^\d{4}-\d{2}$/); });
+          // Sort descending to get latest first
+          var sorted = sellRec.monthly.slice().sort(function(a,b){ return Object.keys(b)[0] > Object.keys(a)[0] ? 1 : -1; });
+          var sp = _selectPeriod(sellRec.monthly, timeframe, true);
+          if (sp && sp.current && sp.current.sell_total != null) {
+            koronetSellForPen = _num(sp.current.sell_total);
+            annualizer = 12; // single month × 12
+          }
+        }
       }
-      sellPenetration = (koronetSellAnnualized / estSell) * 100;
+
+      if (koronetSellForPen && koronetSellForPen > 0) {
+        sellPenetration = Math.min(100, (koronetSellForPen * annualizer / estSell) * 100);
+      }
     }
     if (estBuy && koronetBuyYtd && estBuy > 0) {
-      buyPenetration = (koronetBuyYtd / estBuy) * 100;
+      var buyAnnualizer = 12 / 7; // YTD
+      var koronetBuyForPen = koronetBuyYtd;
+      if (timeframe === 'current_month' || timeframe === 'prior_month') {
+        if (buyRec && Array.isArray(buyRec.monthly)) {
+          var bp = _selectPeriod(buyRec.monthly, timeframe, true);
+          if (bp && bp.current && bp.current.buy_total != null) {
+            koronetBuyForPen = _num(bp.current.buy_total);
+            buyAnnualizer = 12;
+          }
+        }
+      }
+      buyPenetration = Math.min(100, (koronetBuyForPen * buyAnnualizer / estBuy) * 100);
     }
 
     // ── Fees
