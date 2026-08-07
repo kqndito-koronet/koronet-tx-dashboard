@@ -1406,7 +1406,7 @@
           <th data-sort="koronet_buy">Koronet Buy</th>
           <th data-sort="buy_pen">Buy Pen%</th>
           <th data-sort="buy_online_pct">Online Buy%</th>
-          <th data-sort="fees">Fees (ARR)</th>
+          <th data-sort="fees">Fees YTD</th>
           <th data-sort="take_rate">Take Rate</th>
           <th>Trend</th>
           <th data-sort="at_stake">$ at Stake</th>
@@ -3291,11 +3291,87 @@ function cardShell(label, title, body, openByDefault, cardId, subtitle) {
   `;
 }
 
+/* ─── SHARED OPPORTUNITY FLAG DETECTOR ─────────────────────────── */
+// Returns { hasBuy, hasList, hasSell, hasConfig, isDecl }
+// Used by BOTH renderOpportunitiesCard() (card render) and tab counts.
+// Definitions:
+//   BUY    = offline buy > 0 OR K2K leakage > 0
+//   LIST   = MaxAge < 30 OR bunches OFF
+//   SELL   = offline buyers > 0
+//   CONFIG = MaxAge < 10 OR bunches OFF  (blocking config issues)
+//   Decl   = sell YoY < 0
+function detectOpportunityFlags(ev) {
+  if (!ev) return { hasBuy: false, hasList: false, hasSell: false, hasConfig: false, isDecl: false };
+
+  const p = ev.potential;
+
+  // BUY: offline buy GMV > 0 OR K2K leakage cost > 0
+  var buyOffline = p && p.buy_offline_ytd ? fmtEv(p.buy_offline_ytd) : null;
+  var leakageData = ev.buy && ev.buy.leakage ? ev.buy.leakage.value : null;
+  var leakageCost = leakageData ? leakageData.leakage_cost : null;
+  var hasBuy = (buyOffline != null && buyOffline > 0) || (leakageCost != null && leakageCost > 0);
+
+  // Extract config raw for LIST/CONFIG checks
+  var cfgRaw = null;
+  if (ev.list && ev.list.config && ev.list.config.value && ev.list.config.value.raw) {
+    cfgRaw = ev.list.config.value.raw;
+  }
+
+  // MaxAge (prefer ecommerce_max_age, then max_age_sell, then MaxAge)
+  var maxAgeRaw = cfgRaw
+    ? (cfgRaw.ecommerce_max_age != null ? cfgRaw.ecommerce_max_age
+       : cfgRaw.max_age_sell    != null ? cfgRaw.max_age_sell
+       : cfgRaw.MaxAge          != null ? cfgRaw.MaxAge
+       : null)
+    : null;
+  var maxAge = maxAgeRaw != null ? parseInt(maxAgeRaw, 10) : null;
+  var maxAgeBad = maxAge != null && !isNaN(maxAge) && maxAge < 30;
+  var maxAgeBlocking = maxAge != null && !isNaN(maxAge) && maxAge < 10;
+
+  // Bunches OFF — use bunches_reality if present, else config flags
+  var bunchesReality = ev.list && ev.list.config && ev.list.config.value && ev.list.config.value.bunches_reality
+    ? ev.list.config.value.bunches_reality
+    : null;
+  var actuallyBunches = bunchesReality != null ? bunchesReality.actually_sells_bunches_ecom : null;
+  var configBunchFlag = cfgRaw
+    ? (cfgRaw.is_on_hand_inventory_units != null ? cfgRaw.is_on_hand_inventory_units
+       : cfgRaw.sell_in_bunches          != null ? cfgRaw.sell_in_bunches
+       : cfgRaw.bunches                  != null ? cfgRaw.bunches
+       : null)
+    : null;
+  var bunchesOff = actuallyBunches === false
+    || (actuallyBunches == null && (configBunchFlag === false || configBunchFlag === 0));
+
+  // LIST = MaxAge < 30 OR bunches OFF
+  var hasList = maxAgeBad || bunchesOff;
+
+  // SELL: offline buyers > 0
+  var bt = ev.sell && ev.sell.buyers_table ? ev.sell.buyers_table.value : null;
+  var offlineBuyers = bt ? bt.offline_buyers : null;
+  var hasSell = offlineBuyers != null && offlineBuyers > 0;
+
+  // CONFIG (blocking): MaxAge < 10 OR bunches OFF
+  var hasConfig = maxAgeBlocking || bunchesOff;
+
+  // Declining: sell YoY < 0
+  // Check sell_yoy_delta on potential (pct or directional)
+  var sellYoy = p && p.sell_yoy_delta ? p.sell_yoy_delta : null;
+  var isDecl = false;
+  if (sellYoy) {
+    if (typeof sellYoy.pct === 'number') isDecl = sellYoy.pct < 0;
+    else if (sellYoy.direction === 'down') isDecl = true;
+  }
+
+  return { hasBuy: hasBuy, hasList: hasList, hasSell: hasSell, hasConfig: hasConfig, isDecl: isDecl };
+}
+
 /* ─── KPI AGGREGATOR ────────────────────────────────────────────── */
 function computeKPIs(evidenceList) {
   let totalSell = 0, totalFees = 0, totalOnlinePct = 0, totalTakeRate = 0;
+  let totalSell2025 = 0, totalFees2025 = 0;
   let onlineCount = 0, feesCount = 0, trCount = 0;
   let accountsWithData = 0;
+  let hasSell2025 = false, hasFees2025 = false;
 
   evidenceList.forEach(ev => {
     if (!ev || !ev.potential) return;
@@ -3304,8 +3380,16 @@ function computeKPIs(evidenceList) {
     const ks = p.koronet_sell_ytd ? p.koronet_sell_ytd.value : null;
     if (ks != null && ks > 0) { totalSell += ks; accountsWithData++; }
 
+    // YoY: sell 2025 baseline
+    const ks25 = p.koronet_sell_ytd_2025 ? p.koronet_sell_ytd_2025.value : null;
+    if (ks25 != null && ks25 > 0) { totalSell2025 += ks25; hasSell2025 = true; }
+
     const f = p.fees_ytd_2026 ? p.fees_ytd_2026.value : null;
     if (f != null) { totalFees += f; feesCount++; }
+
+    // YoY: fees 2025 baseline
+    const f25 = p.fees_ytd_2025 ? p.fees_ytd_2025.value : null;
+    if (f25 != null) { totalFees2025 += f25; hasFees2025 = true; }
 
     const op = p.sell_online_pct ? p.sell_online_pct.value : null;
     if (op != null) { totalOnlinePct += op; onlineCount++; }
@@ -3314,9 +3398,19 @@ function computeKPIs(evidenceList) {
     if (tr != null && tr > 0) { totalTakeRate += tr; trCount++; }
   });
 
+  // Compute YoY pct deltas (null if no prior-year baseline)
+  const sellYoyPct = (hasSell2025 && totalSell2025 > 0)
+    ? ((totalSell - totalSell2025) / totalSell2025) * 100
+    : null;
+  const feesYoyPct = (hasFees2025 && totalFees2025 > 0)
+    ? ((totalFees - totalFees2025) / totalFees2025) * 100
+    : null;
+
   return {
     totalSell,
     totalFees,
+    sellYoyPct,
+    feesYoyPct,
     avgOnlinePct: onlineCount > 0 ? totalOnlinePct / onlineCount : null,
     avgTakeRate:  trCount > 0 ? totalTakeRate / trCount : null,
     accountsWithData,
@@ -3446,24 +3540,30 @@ function renderTable() {
   document.getElementById('kpi-online').textContent   = fmtPct(kpis.avgOnlinePct, 1);
   document.getElementById('kpi-takerate').textContent = fmtPct(kpis.avgTakeRate, 2);
 
+  // Populate YoY delta spans
+  function _renderKpiDelta(spanId, yoyPct) {
+    const el = document.getElementById(spanId);
+    if (!el) return;
+    if (yoyPct == null) { el.style.display = 'none'; return; }
+    const sign = yoyPct >= 0 ? '+' : '';
+    el.textContent = sign + yoyPct.toFixed(1) + '% YoY';
+    el.className = 'kpi-delta ' + (yoyPct >= 0 ? 'up' : 'down');
+    el.style.display = '';
+  }
+  _renderKpiDelta('kpi-sell-delta', kpis.sellYoyPct);
+  _renderKpiDelta('kpi-fees-delta', kpis.feesYoyPct);
+
   // Update count badges
   document.getElementById('tab-count-portfolio').textContent = _filteredEvidence.length;
-  // Count leads per type from opportunities
+  // Count leads per type using the shared opportunity detection function
   var buyLeads = 0, listLeads = 0, sellLeads = 0, configLeads = 0, declining = 0;
   _filteredEvidence.forEach(function(ev) {
-    if (ev.opportunities && ev.opportunities.value) {
-      ev.opportunities.value.forEach(function(o) {
-        if (o.type === 'buy') buyLeads++;
-        else if (o.type === 'list') listLeads++;
-        else if (o.type === 'sell') sellLeads++;
-        else if (o.type === 'config') configLeads++;
-      });
-    }
-    // Declining = sell YoY negative
-    if (ev.potential && ev.potential.koronet_sell_ytd && ev.potential.koronet_sell_ytd.value) {
-      var sd = ev.sell_domain_monthly;
-      if (ev.potential.yoy_sell_delta && ev.potential.yoy_sell_delta.value < 0) declining++;
-    }
+    var flags = detectOpportunityFlags(ev);
+    if (flags.hasBuy)      buyLeads++;
+    if (flags.hasList)     listLeads++;
+    if (flags.hasSell)     sellLeads++;
+    if (flags.hasConfig)   configLeads++;
+    if (flags.isDecl)      declining++;
   });
   document.getElementById('tab-count-buy').textContent = buyLeads;
   document.getElementById('tab-count-list').textContent = listLeads;
