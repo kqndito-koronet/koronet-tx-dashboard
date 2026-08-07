@@ -2088,13 +2088,92 @@ function renderOpportunitiesCard(ev) {
     });
   }
 
+  // ── Opp 5: BUY — Vendor Leakage (K2K-connected vendors buying offline)
+  const leakageData  = buy && buy.leakage ? buy.leakage.value : null;
+  const leakageCost  = leakageData ? leakageData.leakage_cost : null;
+  if (leakageCost != null && leakageCost > 10000) {
+    const leakageVendors = leakageData.vendor_count != null ? leakageData.vendor_count : null;
+    const leakageArr = Math.round(leakageCost * 0.015 * 12);
+    let leakDesc = leakageVendors != null
+      ? `${leakageVendors.toLocaleString()} K2K-connected vendors buying ${fmt$(leakageCost, true)} offline. Recoverable without new connections.`
+      : `K2K-connected vendors buying ${fmt$(leakageCost, true)} offline. Recoverable without new connections.`;
+    opps.push({
+      type: 'BUY', stage: 'stage-buy', arr: leakageArr, effort: 'quick fix', effortClass: 'badge-quick',
+      desc: leakDesc,
+      link: '&rarr; see BUY card', linkTarget: 'card-buy-' + id,
+    });
+  }
+
+  // ── Opp 6: BUY — Dormant K2K Connections
+  const dormantCount = k2k ? k2k.dormant : null;
+  if (dormantCount != null && dormantCount > 0) {
+    opps.push({
+      type: 'BUY', stage: 'stage-buy', arr: null, effort: 'investigation', effortClass: 'badge-invest',
+      desc: `${dormantCount.toLocaleString()} dormant K2K connections — connected but never bought. Investment not activated.`,
+      link: '&rarr; see BUY card', linkTarget: 'card-buy-' + id,
+    });
+  }
+
+  // ── Opp 7: LIST — Variety/SKU Gap (offline varieties not online)
+  // varietyGap is already computed above (offlineVarCount - onlineVarCount)
+  if (varietyGap != null && varietyGap > 100) {
+    // Directional ARR: use TAM from variety gap (offline sell ÷ offline varieties × gap × fee rate × 12)
+    let varGapArr = null;
+    if (sellOfflineYtd != null && offlineVarCount != null && offlineVarCount > 0) {
+      varGapArr = Math.round(varietyGap * (sellOfflineYtd / offlineVarCount) * 0.002 * 12);
+    }
+    let varDesc = `${varietyGap.toLocaleString()} varieties sold offline not shown online`;
+    if (varGapArr != null) varDesc += ` → ~${fmt$(varGapArr, true)} directional estimate not visible.`;
+    else varDesc += ` → catalog depth hidden from online buyers.`;
+    opps.push({
+      type: 'LIST', stage: 'stage-list', arr: varGapArr, effort: 'project', effortClass: 'badge-project',
+      desc: varDesc,
+      link: '&rarr; see LIST card', linkTarget: 'card-list-' + id,
+    });
+  }
+
+  // ── Opp 8: SELL — Declining Sell Trend (YoY < -5%)
+  const sellYoyDelta = p ? p.yoy_sell_delta : null;
+  let sellYoyPct = null;
+  if (sellYoyDelta) {
+    if (typeof sellYoyDelta.pct === 'number') sellYoyPct = sellYoyDelta.pct;
+    else if (sellYoyDelta.direction === 'down' && typeof sellYoyDelta.value === 'number') sellYoyPct = -Math.abs(sellYoyDelta.value);
+  }
+  if (sellYoyPct != null && sellYoyPct < -5) {
+    opps.push({
+      type: 'SELL', stage: 'stage-sell', arr: null, effort: 'investigation', effortClass: 'badge-invest',
+      desc: `Sell GMV declining ${fmtPct(Math.abs(sellYoyPct), 1)} YoY. Investigate: inventory? pricing? buyer churn?`,
+      link: '&rarr; see SELL card', linkTarget: 'card-sell-' + id,
+    });
+  }
+
+  // ── Opp 9: CONFIG — 0TX Post-Go-Live
+  const _identityOpp9 = ev.identity;
+  const implStage = _identityOpp9 ? _identityOpp9.impl_stage : null;
+  const koronetSellYtd = p ? fmtEv(p.koronet_sell_ytd) : null;
+  if (implStage && (koronetSellYtd == null || koronetSellYtd < 500)) {
+    opps.push({
+      type: 'CONFIG', stage: 'stage-config', arr: null, effort: 'investigation', effortClass: 'badge-invest',
+      desc: `Implementation complete (stage: ${implStage}) but near-zero transactions. Config or activation issue.`,
+      link: null, linkTarget: null,
+    });
+  }
+
   if (opps.length === 0 && atStake == null) {
     return ''; // No opportunities to show
   }
 
+  // ── Sort opps: BUY → LIST → SELL → CONFIG (then by ARR desc within type)
+  const _typeOrder = { BUY: 0, LIST: 1, SELL: 2, CONFIG: 3 };
+  opps.sort((a, b) => {
+    const tDiff = (_typeOrder[a.type] || 99) - (_typeOrder[b.type] || 99);
+    if (tDiff !== 0) return tDiff;
+    return (b.arr || 0) - (a.arr || 0);
+  });
+
   const totalArr = atStake || opps.reduce((sum, o) => sum + (o.arr || 0), 0);
 
-  // ── Opp rows (ranked BUY → LIST → SELL)
+  // ── Opp rows (ranked BUY → LIST → SELL → CONFIG)
   const oppsHtml = opps.map((o, i) => `
     <div class="opp-row">
       <div class="opp-header">
@@ -2150,8 +2229,8 @@ function renderOpportunitiesCard(ev) {
       const listOpp = opps.find(o => o.type === 'LIST');
       return listOpp || opps[0];
     }
-    // No config blocker — walk chain: BUY first, then LIST, then SELL
-    const chainOrder = ['BUY', 'LIST', 'SELL'];
+    // No config blocker — walk chain: BUY first, then LIST, then SELL, then CONFIG
+    const chainOrder = ['BUY', 'LIST', 'SELL', 'CONFIG'];
     for (const t of chainOrder) {
       const found = opps.find(o => o.type === t);
       if (found) return found;
@@ -2182,6 +2261,7 @@ function renderOpportunitiesCard(ev) {
         : 'Increase MaxAge to 30+ days in eShop config &middot; unlocks forward catalog &middot; confirm with ops.';
     }
     if (o.type === 'SELL') return 'Export offline buyer list &middot; build personalized eShop invite campaign &middot; target top-GMV offline buyers first.';
+    if (o.type === 'CONFIG') return 'Audit eShop config and activation checklist &middot; verify impl stage with CS &middot; confirm first transaction path is clear.';
     return 'Address first blocker — config before supply before demand.';
   }
 
@@ -3295,21 +3375,25 @@ function cardShell(label, title, body, openByDefault, cardId, subtitle) {
 // Returns { hasBuy, hasList, hasSell, hasConfig, isDecl }
 // Used by BOTH renderOpportunitiesCard() (card render) and tab counts.
 // Definitions:
-//   BUY    = offline buy > 0 OR K2K leakage > 0
-//   LIST   = MaxAge < 30 OR bunches OFF
-//   SELL   = offline buyers > 0
-//   CONFIG = MaxAge < 10 OR bunches OFF  (blocking config issues)
+//   BUY    = offline buy > 0 OR K2K leakage > $10K OR dormant K2K connections > 0
+//   LIST   = MaxAge < 30 OR bunches OFF OR variety gap > 100
+//   SELL   = offline buyers > 0 OR sell YoY < -5%
+//   CONFIG = MaxAge < 10 OR bunches OFF OR 0TX post-go-live
 //   Decl   = sell YoY < 0
 function detectOpportunityFlags(ev) {
   if (!ev) return { hasBuy: false, hasList: false, hasSell: false, hasConfig: false, isDecl: false };
 
   const p = ev.potential;
 
-  // BUY: offline buy GMV > 0 OR K2K leakage cost > 0
+  // BUY: offline buy GMV > 0 OR K2K leakage cost > $10K OR dormant K2K > 0
   var buyOffline = p && p.buy_offline_ytd ? fmtEv(p.buy_offline_ytd) : null;
   var leakageData = ev.buy && ev.buy.leakage ? ev.buy.leakage.value : null;
   var leakageCost = leakageData ? leakageData.leakage_cost : null;
-  var hasBuy = (buyOffline != null && buyOffline > 0) || (leakageCost != null && leakageCost > 0);
+  var k2kLifecycle = ev.buy && ev.buy.k2k_lifecycle ? ev.buy.k2k_lifecycle.value : null;
+  var dormantK2k = k2kLifecycle ? k2kLifecycle.dormant : null;
+  var hasBuy = (buyOffline != null && buyOffline > 0)
+            || (leakageCost != null && leakageCost > 10000)
+            || (dormantK2k != null && dormantK2k > 0);
 
   // Extract config raw for LIST/CONFIG checks
   var cfgRaw = null;
@@ -3342,16 +3426,35 @@ function detectOpportunityFlags(ev) {
   var bunchesOff = actuallyBunches === false
     || (actuallyBunches == null && (configBunchFlag === false || configBunchFlag === 0));
 
-  // LIST = MaxAge < 30 OR bunches OFF
-  var hasList = maxAgeBad || bunchesOff;
+  // Variety gap: offline varieties - online varieties > 100
+  var vf = ev.list && ev.list.variety_freshness ? ev.list.variety_freshness.value : null;
+  var onlineVarCountF  = vf && vf.online  ? (vf.online.total_varieties  || 0) : null;
+  var offlineVarCountF = vf && vf.offline ? (vf.offline.total_varieties || 0) : null;
+  var varietyGapF = (onlineVarCountF != null && offlineVarCountF != null)
+    ? Math.max(0, offlineVarCountF - onlineVarCountF) : null;
+  var hasVarietyGap = varietyGapF != null && varietyGapF > 100;
 
-  // SELL: offline buyers > 0
+  // LIST = MaxAge < 30 OR bunches OFF OR variety gap > 100
+  var hasList = maxAgeBad || bunchesOff || hasVarietyGap;
+
+  // SELL: offline buyers > 0 OR declining sell YoY < -5%
   var bt = ev.sell && ev.sell.buyers_table ? ev.sell.buyers_table.value : null;
   var offlineBuyers = bt ? bt.offline_buyers : null;
-  var hasSell = offlineBuyers != null && offlineBuyers > 0;
+  var yoyDelta = p ? p.yoy_sell_delta : null;
+  var yoyPct = null;
+  if (yoyDelta) {
+    if (typeof yoyDelta.pct === 'number') yoyPct = yoyDelta.pct;
+    else if (yoyDelta.direction === 'down' && typeof yoyDelta.value === 'number') yoyPct = -Math.abs(yoyDelta.value);
+  }
+  var hasSell = (offlineBuyers != null && offlineBuyers > 0)
+             || (yoyPct != null && yoyPct < -5);
 
-  // CONFIG (blocking): MaxAge < 10 OR bunches OFF
-  var hasConfig = maxAgeBlocking || bunchesOff;
+  // CONFIG (blocking): MaxAge < 10 OR bunches OFF OR 0TX post-go-live
+  var evIdentity = ev.identity;
+  var implStageF = evIdentity ? evIdentity.impl_stage : null;
+  var koronetSellYtdF = p ? fmtEv(p.koronet_sell_ytd) : null;
+  var hasPostGoLiveZeroTx = implStageF != null && (koronetSellYtdF == null || koronetSellYtdF < 500);
+  var hasConfig = maxAgeBlocking || bunchesOff || hasPostGoLiveZeroTx;
 
   // Declining: sell YoY < 0
   // Check sell_yoy_delta on potential (pct or directional)
